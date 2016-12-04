@@ -13,12 +13,14 @@ namespace FastTab
     {
         private NotifyIcon notifyIcon;
 
-        public FastTabApplicationContext ()
+        public FastTabApplicationContext()
         {
-            notifyIcon = new NotifyIcon();
-            notifyIcon.Icon = Resources.ocean_through_window_frame;
-            notifyIcon.ContextMenu = new ContextMenu(new MenuItem[] { new MenuItem("Exit", Exit) });
-            notifyIcon.Visible = true;
+            notifyIcon = new NotifyIcon
+            { 
+                Icon = Resources.ocean_through_window_frame,
+                ContextMenu = new ContextMenu(new MenuItem[] { new MenuItem("Exit", Exit) }),
+                Visible = true
+            };
         }
 
         private void Exit(object sender, EventArgs e)
