@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static FastTab.KeyboardHook;
 
 namespace FastTab {
     class FastTabApplicationContext : ApplicationContext {
@@ -18,7 +19,7 @@ namespace FastTab {
             notifyIcon = new NotifyIcon {
                 Icon = Resources.ocean_through_window_frame,
                 ContextMenu = new ContextMenu(new MenuItem[] { new MenuItem("Exit", Exit) }),
-                Visible = true
+                Visible = true,
             };
             keyboardHook = new KeyboardHook(keyCallBack);
         }
@@ -28,14 +29,13 @@ namespace FastTab {
             Application.Exit();
         }
 
-        private bool keyCallBack(int keyCode) {
-            MessageBox.Show("Pressed " + keyCode);
-            return keyCode != (int)Keys.Tab;
+        private bool keyCallBack(int wParam, LPARAM lParam) {
+            bool altTab = lParam.flags == 32 && lParam.vkCode == 9;
+            //            MessageBox.Show("Flags " + lParam.flags + ", vkCode " + lParam.vkCode);
+            //            return altTab;
+            return false;
         }
 
-        public void Dispose() {
-            keyboardHook.Dispose();
-        }
     }
 
 }
