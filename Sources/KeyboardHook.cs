@@ -8,11 +8,7 @@ namespace FastTab {
 
     public class KeyboardHook : IDisposable {
 
-        public delegate bool KeyCallback(int keyCode);
-
-        private delegate IntPtr HOOKPROC(int nCode, IntPtr wParam, ref LPARAM lParam);
-
-        private struct LPARAM {
+        public struct LPARAM {
             public int vkCode;
             public int scanCode;
             public int flags;
@@ -20,17 +16,24 @@ namespace FastTab {
             public int dwExtraInfo;
         }
 
+        public delegate bool KeyCallback(int wParam, LPARAM lParam);
+
+        private delegate IntPtr KeyboardProc(int nCode, IntPtr wParam, ref LPARAM lParam);
+
         private const int WH_KEYBOARD_LL = 13;
+
+        private const int WM_KEYDOWN = 0x0100;
         private const int WM_KEYUP = 0x0101;
+        private const int WM_SYSKEYDOWN = 0x0104;
         private const int WM_SYSKEYUP = 0x0105;
 
-        private KeyCallback handler;
-        private HOOKPROC hookProc;
+        private KeyCallback callback;
+        private KeyboardProc hookProc;
         private IntPtr hookId;
 
         public KeyboardHook(KeyCallback callback) {
-            this.handler = callback;
-            hookProc = new HOOKPROC(HookProc);
+            this.callback = callback;
+            hookProc = new KeyboardProc(HookProc);
             using (Process curProcess = Process.GetCurrentProcess())
             using (ProcessModule curModule = curProcess.MainModule) {
                 hookId = SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, GetModuleHandle(curModule.ModuleName), 0);
@@ -40,9 +43,9 @@ namespace FastTab {
         private IntPtr HookProc(int nCode, IntPtr wParam, ref LPARAM lParam) {
             bool callNext = true;
             if (nCode >= 0) {
-                bool altTab = lParam.flags == 32 && lParam.vkCode == 9;
-                if (wParam == (IntPtr)WM_KEYUP || wParam == (IntPtr)WM_SYSKEYUP) {
-                    callNext &= handler(lParam.vkCode);
+                int w = (int)wParam;
+                if (w == WM_KEYDOWN || w == WM_KEYUP || w == WM_SYSKEYDOWN || w == WM_SYSKEYUP) {
+                    callNext &= callback((int)wParam, lParam);
                 }
             }
             return callNext ? CallNextHookEx(hookId, nCode, wParam, ref lParam) : (IntPtr)1;
@@ -56,7 +59,7 @@ namespace FastTab {
         private static extern IntPtr GetModuleHandle(string lpModuleName);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr SetWindowsHookEx(int idHook, HOOKPROC lpfn, IntPtr hMod, uint dwThreadId);
+        private static extern IntPtr SetWindowsHookEx(int idHook, KeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern bool UnhookWindowsHookEx(IntPtr hhk);
