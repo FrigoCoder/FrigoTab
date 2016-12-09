@@ -20,11 +20,6 @@ namespace FastTab {
 
         private delegate IntPtr KeyboardProc(int nCode, IntPtr wParam, ref LPARAM lParam);
 
-        private const int WM_KEYDOWN = 0x0100;
-        private const int WM_KEYUP = 0x0101;
-        private const int WM_SYSKEYDOWN = 0x0104;
-        private const int WM_SYSKEYUP = 0x0105;
-
         private KeyCallback callback;
         private KeyboardProc hookProc;
         private IntPtr hookId;
@@ -39,13 +34,7 @@ namespace FastTab {
         }
 
         private IntPtr HookProc(int nCode, IntPtr wParam, ref LPARAM lParam) {
-            bool callNext = true;
-            if (nCode >= 0) {
-                int w = (int)wParam;
-                if (w == WM_KEYDOWN || w == WM_KEYUP || w == WM_SYSKEYDOWN || w == WM_SYSKEYUP) {
-                    callNext &= callback((int)wParam, lParam);
-                }
-            }
+            bool callNext = nCode < 0 || callback((int)wParam, lParam);
             return callNext ? CallNextHookEx(hookId, nCode, wParam, ref lParam) : (IntPtr)1;
         }
 
