@@ -32,9 +32,9 @@ namespace FastTab {
             textBox.Dock = DockStyle.Fill;
 
             form = new Form();
-            form.Visible = true;
             form.Controls.Add(textBox);
             form.FormClosing += Exit;
+            form.Visible = true;
         }
 
         private void Exit(object sender, EventArgs e) {
