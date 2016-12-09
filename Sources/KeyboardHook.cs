@@ -20,8 +20,6 @@ namespace FastTab {
 
         private delegate IntPtr KeyboardProc(int nCode, IntPtr wParam, ref LPARAM lParam);
 
-        private const int WH_KEYBOARD_LL = 13;
-
         private const int WM_KEYDOWN = 0x0100;
         private const int WM_KEYUP = 0x0101;
         private const int WM_SYSKEYDOWN = 0x0104;
@@ -36,7 +34,7 @@ namespace FastTab {
             hookProc = new KeyboardProc(HookProc);
             using (Process curProcess = Process.GetCurrentProcess())
             using (ProcessModule curModule = curProcess.MainModule) {
-                hookId = SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, GetModuleHandle(curModule.ModuleName), 0);
+                hookId = SetWindowsHookEx(13, hookProc, GetModuleHandle(curModule.ModuleName), 0);
             }
         }
 
