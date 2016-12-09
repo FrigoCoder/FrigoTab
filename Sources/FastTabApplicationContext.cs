@@ -17,6 +17,7 @@ namespace FastTab {
         private KeyboardHook keyboardHook;
         private Form form;
         private TextBox textBox;
+        private int counter = 0;
 
         public FastTabApplicationContext() {
             notifyIcon = new NotifyIcon {
@@ -45,6 +46,7 @@ namespace FastTab {
         private bool keyCallBack(int wParam, LPARAM lParam) {
             bool altTab = (lParam.flags == 32) && (lParam.vkCode == 9);
             textBox.Text = "Flags " + lParam.flags + ", vkCode " + lParam.vkCode + "\r\n";
+            textBox.Text += "Counter " + counter++;
             return !altTab;
         }
 
