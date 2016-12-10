@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+
 using static FastTab.KeyboardHook;
 
 namespace FastTab {
@@ -45,7 +46,10 @@ namespace FastTab {
 
         private bool keyCallBack(int wParam, LPARAM lParam) {
             bool altTab = (lParam.flags == 32) && (lParam.vkCode == 9);
-            textBox.Text = "Flags " + lParam.flags + ", vkCode " + lParam.vkCode + "\r\n";
+            textBox.Text = "wParam=" + wParam + "\r\n";
+            textBox.Text += "vkCode=" + lParam.vkCode + "\r\n";
+            textBox.Text += "scanCode=" + lParam.scanCode + "\r\n";
+            textBox.Text += "flags=" + lParam.flags + "\r\n";
             textBox.Text += "Counter " + counter++;
             return !altTab;
         }
