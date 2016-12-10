@@ -44,13 +44,18 @@ namespace FastTab {
             ExitThread();
         }
 
-        private bool keyCallBack(int wParam, LPARAM lParam) {
-            bool altTab = (lParam.flags == 32) && (lParam.vkCode == 9);
+        private bool keyCallBack(IReadOnlyDictionary<Keys, bool> keys, int wParam, LPARAM lParam) {
+            bool alt = keys[Keys.LMenu] || keys[Keys.RMenu];
+            bool win = keys[Keys.LWin] || keys[Keys.RWin];
+            bool tab = keys[Keys.Tab];
+            bool altTab = (alt || win) && tab;
+
             textBox.Text = "wParam=" + wParam + "\r\n";
             textBox.Text += "vkCode=" + lParam.vkCode + "\r\n";
             textBox.Text += "scanCode=" + lParam.scanCode + "\r\n";
             textBox.Text += "flags=" + lParam.flags + "\r\n";
             textBox.Text += "Counter " + counter++;
+
             return !altTab;
         }
 
