@@ -1,60 +1,63 @@
-﻿using FastTab.Properties;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading;
 using System.Windows.Forms;
+
+using FastTab.Properties;
 
 using static FastTab.KeyboardHook;
 
 namespace FastTab {
 
-    class FastTabApplicationContext : ApplicationContext {
+    internal class FastTabApplicationContext : ApplicationContext {
 
-        private NotifyIcon notifyIcon;
+        private readonly Form form;
+
+        private readonly NotifyIcon notifyIcon;
+        private readonly TextBox textBox;
+
+        private int counter;
         private KeyboardHook keyboardHook;
-        private Form form;
-        private TextBox textBox;
-        private int counter = 0;
 
-        public FastTabApplicationContext() {
+        public FastTabApplicationContext () {
             notifyIcon = new NotifyIcon {
                 Icon = Resources.ocean_through_window_frame,
-                ContextMenu = new ContextMenu(new MenuItem[] { new MenuItem("Exit", Exit) }),
-                Visible = true,
+                ContextMenu = new ContextMenu(new[] {
+                    new MenuItem("Exit", exit)
+                }),
+                Visible = true
             };
 
             keyboardHook = new KeyboardHook(keyCallBack);
 
-            textBox = new TextBox();
-            textBox.Multiline = true;
-            textBox.Dock = DockStyle.Fill;
+            textBox = new TextBox {
+                Multiline = true,
+                Dock = DockStyle.Fill
+            };
 
             form = new Form();
             form.Controls.Add(textBox);
-            form.FormClosing += Exit;
+            form.FormClosing += exit;
             form.Visible = true;
         }
 
-        private void Exit(object sender, EventArgs e) {
+        private void exit (object sender, EventArgs e) {
+            form.Visible = false;
             notifyIcon.Visible = false;
             ExitThread();
         }
 
-        private bool keyCallBack(IReadOnlyDictionary<Keys, bool> keys, int wParam, LPARAM lParam) {
+        private bool keyCallBack (IReadOnlyDictionary<Keys, bool> keys, int wParam, LPARAM lParam) {
             bool alt = keys[Keys.LMenu] || keys[Keys.RMenu];
             bool win = keys[Keys.LWin] || keys[Keys.RWin];
             bool tab = keys[Keys.Tab];
             bool altTab = (alt || win) && tab;
 
-            textBox.Text = "wParam=" + wParam + "\r\n";
-            textBox.Text += "vkCode=" + lParam.vkCode + "\r\n";
-            textBox.Text += "scanCode=" + lParam.scanCode + "\r\n";
-            textBox.Text += "flags=" + lParam.flags + "\r\n";
-            textBox.Text += "Counter " + counter++;
+            string endl = "\r\n";
+            textBox.Text = @"wParam=" + wParam + endl;
+            textBox.Text += @"vkCode=" + lParam.vkCode + endl;
+            textBox.Text += @"scanCode=" + lParam.scanCode + endl;
+            textBox.Text += @"flags=" + lParam.flags + endl;
+            textBox.Text += @"Counter " + counter++;
 
             return !altTab;
         }
