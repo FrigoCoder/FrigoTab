@@ -52,12 +52,13 @@ namespace FastTab {
             bool tab = keys[Keys.Tab];
             bool altTab = (alt || win) && tab;
 
-            string endl = "\r\n";
-            textBox.Text = @"wParam=" + wParam + endl;
-            textBox.Text += @"vkCode=" + lParam.vkCode + endl;
-            textBox.Text += @"scanCode=" + lParam.scanCode + endl;
-            textBox.Text += @"flags=" + lParam.flags + endl;
-            textBox.Text += @"Counter " + counter++;
+            WindowFinder finder = new WindowFinder();
+
+            string text = "";
+            foreach( IntPtr hWnd in finder.getOpenWindows() ) {
+                text += finder.getWindowText(hWnd) + "\r\n";
+            }
+            textBox.Text = text;
 
             return !altTab;
         }
