@@ -13,6 +13,8 @@ namespace FastTab {
         private readonly Form form;
 
         private readonly NotifyIcon notifyIcon;
+        private readonly PictureBox pictureBox;
+
         private readonly TextBox textBox;
 
         private int counter;
@@ -34,8 +36,14 @@ namespace FastTab {
                 Dock = DockStyle.Fill
             };
 
+            pictureBox = new PictureBox {
+                Dock = DockStyle.Fill
+            };
+
             form = new Form();
-            form.Controls.Add(textBox);
+
+            //            form.Controls.Add(textBox);
+            form.Controls.Add(pictureBox);
             form.FormClosing += exit;
             form.Visible = true;
         }
@@ -59,6 +67,10 @@ namespace FastTab {
                 text += finder.getWindowText(hWnd) + "\r\n";
             }
             textBox.Text = text;
+
+            foreach( IntPtr hWnd in finder.getOpenWindows() ) {
+                pictureBox.Image = finder.printWindow(hWnd);
+            }
 
             return !altTab;
         }
