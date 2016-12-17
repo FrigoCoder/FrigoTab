@@ -17,6 +17,7 @@ namespace FastTab {
                 },
                 0);
             windows.Remove(GetShellWindow());
+            windows.Remove(getStartButton());
             return windows;
         }
 
@@ -25,6 +26,10 @@ namespace FastTab {
             StringBuilder builder = new StringBuilder(length);
             GetWindowText(hWnd, builder, length + 1);
             return builder.ToString();
+        }
+
+        private IntPtr getStartButton () {
+            return FindWindowEx(GetDesktopWindow(), IntPtr.Zero, "Button", "Start");
         }
 
         [DllImport ("user32.dll")]
@@ -41,6 +46,15 @@ namespace FastTab {
 
         [DllImport ("user32.dll")]
         private static extern IntPtr GetShellWindow ();
+
+        [DllImport ("user32.dll")]
+        private static extern IntPtr GetDesktopWindow ();
+
+        [DllImport ("user32.dll")]
+        public static extern IntPtr FindWindowEx (IntPtr hwndParent,
+            IntPtr hwndChildAfter,
+            string lpszClass,
+            string lpszWindow);
 
         private delegate bool EnumWindowsProc (IntPtr hWnd, int lParam);
 
