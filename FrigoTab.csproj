@@ -64,12 +64,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="FastTab\FastTabApplicationContext.cs" />
-    <Compile Include="FastTab\KeyboardHook.cs" />
-    <Compile Include="FastTab\KeyboardHookEventArgs.cs" />
-    <Compile Include="FastTab\Program.cs" />
+    <Compile Include="FastTabApplicationContext.cs" />
+    <Compile Include="KeyboardHook.cs" />
+    <Compile Include="KeyboardHookEventArgs.cs" />
+    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="FastTab\WindowFinder.cs" />
+    <Compile Include="WindowFinder.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
