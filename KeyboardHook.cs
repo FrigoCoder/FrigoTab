@@ -29,25 +29,19 @@ namespace FrigoTab {
         }
 
         private IntPtr HookProc (int nCode, IntPtr wParam, ref Lparam lParam) {
-            if( nCode < 0 ) {
-                return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
+            if( nCode >= 0 ) {
+                Wm w = (Wm) wParam;
+                if( (w == Wm.KeyDown) || (w == Wm.KeyUp) || (w == Wm.SysKeyDown) || (w == Wm.SysKeyUp) ) {
+                    Keys key = (Keys) lParam.VkCode;
+                    bool alt = (lParam.Flags & 32) == 32;
+
+                    KeyboardHookEventArgs e = new KeyboardHookEventArgs(key, alt);
+                    KeyEvent?.Invoke(this, e);
+                    if( e.Handled ) {
+                        return (IntPtr) 1;
+                    }
+                }
             }
-
-            WindowsMessages w = (WindowsMessages) wParam;
-            if( (w != WindowsMessages.KeyDown) && (w != WindowsMessages.KeyUp) && (w != WindowsMessages.SysKeyDown) &&
-                (w != WindowsMessages.SysKeyUp) ) {
-                return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
-            }
-
-            Keys key = (Keys) lParam.VkCode;
-            bool alt = (lParam.Flags & 32) == 32;
-
-            KeyboardHookEventArgs e = new KeyboardHookEventArgs(key, alt);
-            KeyEvent?.Invoke(this, e);
-            if( e.Handled ) {
-                return (IntPtr) 1;
-            }
-
             return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
         }
 
@@ -61,7 +55,7 @@ namespace FrigoTab {
 
         }
 
-        private enum WindowsMessages {
+        private enum Wm {
 
             KeyDown = 0x0100,
             KeyUp = 0x0101,
