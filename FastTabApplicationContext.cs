@@ -1,5 +1,4 @@
 using System;
-using System.Drawing;
 using System.Windows.Forms;
 
 namespace FrigoTab {
@@ -7,18 +6,13 @@ namespace FrigoTab {
     internal class FastTabApplicationContext : ApplicationContext {
 
         private readonly Form _form;
-        private readonly NotifyIcon _notifyIcon;
+        private readonly SysTrayIcon _sysTrayIcon;
         private readonly TextBox _textBox;
         private readonly KeyHook _keyHook;
 
         public FastTabApplicationContext () {
-            _notifyIcon = new NotifyIcon {
-                Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath),
-                ContextMenu = new ContextMenu(new[] {
-                    new MenuItem("Exit", Exit)
-                }),
-                Visible = true
-            };
+            _sysTrayIcon = new SysTrayIcon();
+            _sysTrayIcon.Exit += Application.Exit;
 
             _keyHook = new KeyHook();
             _keyHook.KeyEvent += KeyCallBack;
@@ -36,7 +30,6 @@ namespace FrigoTab {
 
         private void Exit (object sender, EventArgs e) {
             _form.Visible = false;
-            _notifyIcon.Visible = false;
             ExitThread();
         }
 
