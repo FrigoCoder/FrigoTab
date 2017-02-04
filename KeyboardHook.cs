@@ -8,25 +8,13 @@ namespace FrigoTab {
 
     public class KeyboardHook : IDisposable {
 
-        public delegate bool KeyCallback (IDictionary<Keys, bool> keys, int wParam, Lparam lParam);
-
-        public struct Lparam {
-
-            public int VkCode;
-            public int ScanCode;
-            public int Flags;
-            public int Time;
-            public int DwExtraInfo;
-
-        }
-
-        private readonly KeyCallback _callback;
         private readonly IntPtr _hookId;
         private readonly KeyboardProc _hookProc;
         private readonly IDictionary<Keys, bool> _keys;
 
-        public KeyboardHook (KeyCallback callback) {
-            _callback = callback;
+        public event EventHandler<KeyboardHookEventArgs> KeyEvent;
+
+        public KeyboardHook () {
             _hookProc = HookProc;
 
             _keys = new Dictionary<Keys, bool>();
@@ -59,8 +47,25 @@ namespace FrigoTab {
                 _keys[key] = false;
             }
 
-            bool callNext = _callback(_keys, w, lParam);
-            return callNext ? CallNextHookEx(_hookId, nCode, wParam, ref lParam) : (IntPtr) 1;
+            bool alt = (lParam.Flags & 32) == 32;
+
+            KeyboardHookEventArgs e = new KeyboardHookEventArgs(key, alt);
+            KeyEvent?.Invoke(this, e);
+            if( e.Handled ) {
+                return (IntPtr) 1;
+            }
+
+            return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
+        }
+
+        private struct Lparam {
+
+            public int VkCode;
+            public int ScanCode;
+            public int Flags;
+            public int Time;
+            public int DwExtraInfo;
+
         }
 
         private enum WindowsMessages {
