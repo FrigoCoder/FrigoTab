@@ -28,7 +28,7 @@ namespace FrigoTab {
             UnhookWindowsHookEx(_hookId);
         }
 
-        private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelKeyProcStruct lParam) {
+        private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam) {
             if( nCode >= 0 ) {
                 Wm w = (Wm) wParam;
                 if( (w == Wm.KeyDown) || (w == Wm.KeyUp) || (w == Wm.SysKeyDown) || (w == Wm.SysKeyUp) ) {
@@ -45,7 +45,7 @@ namespace FrigoTab {
             return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
         }
 
-        private struct LowLevelKeyProcStruct {
+        private struct LowLevelKeyStruct {
 
             public int VkCode;
             public int ScanCode;
@@ -64,7 +64,7 @@ namespace FrigoTab {
 
         }
 
-        private delegate IntPtr LowLevelKeyProc (int nCode, IntPtr wParam, ref LowLevelKeyProcStruct lParam);
+        private delegate IntPtr LowLevelKeyProc (int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam);
 
         [DllImport ("kernel32.dll")]
         private static extern IntPtr GetModuleHandle (string lpModuleName);
@@ -76,10 +76,7 @@ namespace FrigoTab {
         private static extern bool UnhookWindowsHookEx (IntPtr hhk);
 
         [DllImport ("user32.dll")]
-        private static extern IntPtr CallNextHookEx (IntPtr hhk,
-            int nCode,
-            IntPtr wParam,
-            ref LowLevelKeyProcStruct lParam);
+        private static extern IntPtr CallNextHookEx (IntPtr hhk, int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam);
 
     }
 
