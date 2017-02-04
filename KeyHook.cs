@@ -32,7 +32,7 @@ namespace FrigoTab {
             if( nCode >= 0 ) {
                 Wm w = (Wm) wParam;
                 if( (w == Wm.KeyDown) || (w == Wm.KeyUp) || (w == Wm.SysKeyDown) || (w == Wm.SysKeyUp) ) {
-                    Keys key = (Keys) lParam.VkCode;
+                    Keys key = lParam.VkCode;
                     bool alt = lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown);
                     KeyHookEventArgs e = new KeyHookEventArgs(key, alt);
                     KeyEvent?.Invoke(this, e);
@@ -46,7 +46,7 @@ namespace FrigoTab {
 
         internal struct LowLevelKeyStruct {
 
-            public int VkCode;
+            public Keys VkCode;
             public int ScanCode;
             public LowLevelKeyFlags Flags;
             public int Time;
