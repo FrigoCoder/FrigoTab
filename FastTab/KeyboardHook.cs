@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -9,57 +8,49 @@ namespace FastTab {
 
     public class KeyboardHook : IDisposable {
 
-        public delegate bool KeyCallback (IReadOnlyDictionary<Keys, bool> keys, int wParam, LPARAM lParam);
+        public delegate bool KeyCallback (IReadOnlyDictionary<Keys, bool> keys, int wParam, Lparam lParam);
 
-        private const int WM_KEYDOWN = 0x0100;
-        private const int WM_KEYUP = 0x0101;
-        private const int WM_SYSKEYDOWN = 0x0104;
-        private const int WM_SYSKEYUP = 0x0105;
-
-        private readonly KeyCallback callback;
-        private readonly IntPtr hookId;
-        private readonly KeyboardProc hookProc;
-        private readonly IDictionary<Keys, bool> keys;
-        private readonly IReadOnlyDictionary<Keys, bool> readOnlyKeys;
+        private readonly KeyCallback _callback;
+        private readonly IntPtr _hookId;
+        private readonly KeyboardProc _hookProc;
+        private readonly IDictionary<Keys, bool> _keys;
 
         public KeyboardHook (KeyCallback callback) {
-            this.callback = callback;
-            hookProc = HookProc;
+            _callback = callback;
+            _hookProc = HookProc;
 
-            keys = new Dictionary<Keys, bool>();
+            _keys = new Dictionary<Keys, bool>();
             foreach( Keys key in Enum.GetValues(typeof(Keys)) ) {
-                keys[key] = false;
+                _keys[key] = false;
             }
-
-            readOnlyKeys = new ReadOnlyDictionary<Keys, bool>(keys);
 
             using( Process curProcess = Process.GetCurrentProcess() ) {
                 using( ProcessModule curModule = curProcess.MainModule ) {
-                    hookId = SetWindowsHookEx(13, hookProc, GetModuleHandle(curModule.ModuleName), 0);
+                    _hookId = SetWindowsHookEx(13, _hookProc, GetModuleHandle(curModule.ModuleName), 0);
                 }
             }
         }
 
         public void Dispose () {
-            UnhookWindowsHookEx(hookId);
+            UnhookWindowsHookEx(_hookId);
         }
 
-        private IntPtr HookProc (int nCode, IntPtr wParam, ref LPARAM lParam) {
+        private IntPtr HookProc (int nCode, IntPtr wParam, ref Lparam lParam) {
             if( nCode < 0 ) {
-                return CallNextHookEx(hookId, nCode, wParam, ref lParam);
+                return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
             }
 
             int w = (int) wParam;
-            Keys key = (Keys) lParam.vkCode;
-            if( (w == WM_KEYDOWN) || (w == WM_SYSKEYDOWN) ) {
-                keys[key] = true;
+            Keys key = (Keys) lParam.VkCode;
+            if( (w == (int) WindowsMessages.KeyDown) || (w == (int) WindowsMessages.SysKeyDown) ) {
+                _keys[key] = true;
             }
-            if( (w == WM_KEYUP) || (w == WM_SYSKEYUP) ) {
-                keys[key] = false;
+            if( (w == (int) WindowsMessages.KeyUp) || (w == (int) WindowsMessages.SysKeyUp) ) {
+                _keys[key] = false;
             }
 
-            bool callNext = callback(readOnlyKeys, w, lParam);
-            return callNext ? CallNextHookEx(hookId, nCode, wParam, ref lParam) : (IntPtr) 1;
+            bool callNext = _callback(readOnlyKeys, w, lParam);
+            return callNext ? CallNextHookEx(_hookId, nCode, wParam, ref lParam) : (IntPtr) 1;
         }
 
         [DllImport ("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
@@ -72,19 +63,28 @@ namespace FastTab {
         private static extern bool UnhookWindowsHookEx (IntPtr hhk);
 
         [DllImport ("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr CallNextHookEx (IntPtr hhk, int nCode, IntPtr wParam, ref LPARAM lParam);
+        private static extern IntPtr CallNextHookEx (IntPtr hhk, int nCode, IntPtr wParam, ref Lparam lParam);
 
-        public struct LPARAM {
+        private enum WindowsMessages {
 
-            public int vkCode;
-            public int scanCode;
-            public int flags;
-            public int time;
-            public int dwExtraInfo;
+            KeyDown = 0x0100,
+            KeyUp = 0x0101,
+            SysKeyDown = 0x0104,
+            SysKeyUp = 0x0105
 
         }
 
-        private delegate IntPtr KeyboardProc (int nCode, IntPtr wParam, ref LPARAM lParam);
+        public struct Lparam {
+
+            public int VkCode;
+            public int ScanCode;
+            public int Flags;
+            public int Time;
+            public int DwExtraInfo;
+
+        }
+
+        private delegate IntPtr KeyboardProc (int nCode, IntPtr wParam, ref Lparam lParam);
 
     }
 

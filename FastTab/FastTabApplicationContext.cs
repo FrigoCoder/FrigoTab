@@ -10,51 +10,41 @@ namespace FastTab {
 
     internal class FastTabApplicationContext : ApplicationContext {
 
-        private readonly Form form;
-
-        private readonly NotifyIcon notifyIcon;
-        private readonly PictureBox pictureBox;
-
-        private readonly TextBox textBox;
-
-        private int counter;
-        private KeyboardHook keyboardHook;
+        private readonly Form _form;
+        private readonly NotifyIcon _notifyIcon;
+        private readonly TextBox _textBox;
+        private int _counter;
+        private KeyboardHook _keyboardHook;
 
         public FastTabApplicationContext () {
-            notifyIcon = new NotifyIcon {
+            _notifyIcon = new NotifyIcon {
                 Icon = Resources.ocean_through_window_frame,
                 ContextMenu = new ContextMenu(new[] {
-                    new MenuItem("Exit", exit)
+                    new MenuItem("Exit", Exit)
                 }),
                 Visible = true
             };
 
-            keyboardHook = new KeyboardHook(keyCallBack);
+            _keyboardHook = new KeyboardHook(keyCallBack);
 
-            textBox = new TextBox {
+            _textBox = new TextBox {
                 Multiline = true,
                 Dock = DockStyle.Fill
             };
 
-            pictureBox = new PictureBox {
-                Dock = DockStyle.Fill
-            };
-
-            form = new Form();
-
-            //            form.Controls.Add(textBox);
-            form.Controls.Add(pictureBox);
-            form.FormClosing += exit;
-            form.Visible = true;
+            _form = new Form();
+            _form.Controls.Add(_textBox);
+            _form.FormClosing += Exit;
+            _form.Visible = true;
         }
 
-        private void exit (object sender, EventArgs e) {
-            form.Visible = false;
-            notifyIcon.Visible = false;
+        private void Exit (object sender, EventArgs e) {
+            _form.Visible = false;
+            _notifyIcon.Visible = false;
             ExitThread();
         }
 
-        private bool keyCallBack (IReadOnlyDictionary<Keys, bool> keys, int wParam, LPARAM lParam) {
+        private bool keyCallBack (IReadOnlyDictionary<Keys, bool> keys, int wParam, Lparam lParam) {
             bool alt = keys[Keys.LMenu] || keys[Keys.RMenu];
             bool win = keys[Keys.LWin] || keys[Keys.RWin];
             bool tab = keys[Keys.Tab];
@@ -63,14 +53,10 @@ namespace FastTab {
             WindowFinder finder = new WindowFinder();
 
             string text = "";
-            foreach( IntPtr hWnd in finder.getOpenWindows() ) {
-                text += finder.getWindowText(hWnd) + "\r\n";
+            foreach( IntPtr hWnd in finder.GetOpenWindows() ) {
+                text += finder.GetWindowText(hWnd) + "\r\n";
             }
-            textBox.Text = text;
-
-            foreach( IntPtr hWnd in finder.getOpenWindows() ) {
-                pictureBox.Image = finder.printWindow(hWnd);
-            }
+            _textBox.Text = text;
 
             return !altTab;
         }

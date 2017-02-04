@@ -1,10 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using System.Windows.Forms;
 
 namespace FastTab.Sources {
-    class KeyboardHookEventArgs {
+
+    public class KeyboardHookEventArgs {
+
+        public bool Handled;
+
+        public Dictionary<Keys, bool> Keys;
+
     }
+
 }
