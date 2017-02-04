@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -9,7 +7,7 @@ namespace FastTab {
 
     public class WindowFinder {
 
-        public IList<IntPtr> getOpenWindows () {
+        public IList<IntPtr> GetOpenWindows () {
             IList<IntPtr> windows = new List<IntPtr>();
             EnumWindows((hWnd, lParam) => {
                     if( IsWindowVisible(hWnd) && (GetWindowTextLength(hWnd) > 0) ) {
@@ -19,36 +17,19 @@ namespace FastTab {
                 },
                 0);
             windows.Remove(GetShellWindow());
-            windows.Remove(getStartButton());
+            windows.Remove(GetStartButton());
             return windows;
         }
 
-        public string getWindowText (IntPtr hWnd) {
+        public string GetWindowText (IntPtr hWnd) {
             int length = GetWindowTextLength(hWnd);
             StringBuilder builder = new StringBuilder(length);
             GetWindowText(hWnd, builder, length + 1);
             return builder.ToString();
         }
 
-        private IntPtr getStartButton () {
+        private IntPtr GetStartButton () {
             return FindWindowEx(GetDesktopWindow(), IntPtr.Zero, "Button", "Start");
-        }
-
-        public Bitmap printWindow (IntPtr hWnd) {
-            LPRECT rect;
-            GetWindowRect(hWnd, out rect);
-            Bitmap bmp = new Bitmap(rect.right - rect.left, rect.bottom - rect.top, PixelFormat.Format32bppArgb);
-
-            using( Graphics gfx = Graphics.FromImage(bmp) ) {
-                IntPtr hdc = gfx.GetHdc();
-                try {
-                    PrintWindow(hWnd, hdc, 0);
-                } finally {
-                    gfx.ReleaseHdc(hdc);
-                }
-            }
-
-            return bmp;
         }
 
         [DllImport ("user32.dll")]
