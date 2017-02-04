@@ -1,9 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
-
-using static FrigoTab.KeyboardHook;
 
 namespace FrigoTab {
 
@@ -12,8 +9,7 @@ namespace FrigoTab {
         private readonly Form _form;
         private readonly NotifyIcon _notifyIcon;
         private readonly TextBox _textBox;
-        private int _counter;
-        private KeyboardHook _keyboardHook;
+        private readonly KeyboardHook _keyboardHook;
 
         public FastTabApplicationContext () {
             _notifyIcon = new NotifyIcon {
@@ -24,7 +20,8 @@ namespace FrigoTab {
                 Visible = true
             };
 
-            _keyboardHook = new KeyboardHook(keyCallBack);
+            _keyboardHook = new KeyboardHook();
+            _keyboardHook.KeyEvent += KeyCallBack;
 
             _textBox = new TextBox {
                 Multiline = true,
@@ -43,21 +40,18 @@ namespace FrigoTab {
             ExitThread();
         }
 
-        private bool keyCallBack (IDictionary<Keys, bool> keys, int wParam, Lparam lParam) {
-            bool alt = keys[Keys.LMenu] || keys[Keys.RMenu];
-            bool win = keys[Keys.LWin] || keys[Keys.RWin];
-            bool tab = keys[Keys.Tab];
-            bool altTab = (alt || win) && tab;
+        private void KeyCallBack (object sender, KeyboardHookEventArgs e) {
+            if( e.Alt && (e.Key == Keys.Tab) ) {
+                e.Handled = true;
 
-            WindowFinder finder = new WindowFinder();
+                WindowFinder finder = new WindowFinder();
 
-            string text = "";
-            foreach( IntPtr hWnd in finder.GetOpenWindows() ) {
-                text += finder.GetWindowText(hWnd) + "\r\n";
+                string text = "";
+                foreach( IntPtr hWnd in finder.GetOpenWindows() ) {
+                    text += finder.GetWindowText(hWnd) + "\r\n";
+                }
+                _textBox.Text = text;
             }
-            _textBox.Text = text;
-
-            return !altTab;
         }
 
     }
