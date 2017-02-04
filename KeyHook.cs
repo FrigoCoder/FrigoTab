@@ -34,7 +34,6 @@ namespace FrigoTab {
                 if( (w == Wm.KeyDown) || (w == Wm.KeyUp) || (w == Wm.SysKeyDown) || (w == Wm.SysKeyUp) ) {
                     Keys key = (Keys) lParam.VkCode;
                     bool alt = lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown);
-
                     KeyHookEventArgs e = new KeyHookEventArgs(key, alt);
                     KeyEvent?.Invoke(this, e);
                     if( e.Handled ) {
