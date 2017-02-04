@@ -1,6 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -8,20 +8,15 @@ namespace FrigoTab {
 
     public class KeyboardHook : IDisposable {
 
-        private readonly IntPtr _hookId;
+        [SuppressMessage ("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
         private readonly KeyboardProc _hookProc;
-        private readonly IDictionary<Keys, bool> _keys;
+
+        private readonly IntPtr _hookId;
 
         public event EventHandler<KeyboardHookEventArgs> KeyEvent;
 
         public KeyboardHook () {
             _hookProc = HookProc;
-
-            _keys = new Dictionary<Keys, bool>();
-            foreach( Keys key in Enum.GetValues(typeof(Keys)) ) {
-                _keys[key] = false;
-            }
-
             using( Process curProcess = Process.GetCurrentProcess() ) {
                 using( ProcessModule curModule = curProcess.MainModule ) {
                     _hookId = SetWindowsHookEx(13, _hookProc, GetModuleHandle(curModule.ModuleName), 0);
@@ -38,15 +33,13 @@ namespace FrigoTab {
                 return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
             }
 
-            int w = (int) wParam;
-            Keys key = (Keys) lParam.VkCode;
-            if( (w == (int) WindowsMessages.KeyDown) || (w == (int) WindowsMessages.SysKeyDown) ) {
-                _keys[key] = true;
-            }
-            if( (w == (int) WindowsMessages.KeyUp) || (w == (int) WindowsMessages.SysKeyUp) ) {
-                _keys[key] = false;
+            WindowsMessages w = (WindowsMessages) wParam;
+            if( (w != WindowsMessages.KeyDown) && (w != WindowsMessages.KeyUp) && (w != WindowsMessages.SysKeyDown) &&
+                (w != WindowsMessages.SysKeyUp) ) {
+                return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
             }
 
+            Keys key = (Keys) lParam.VkCode;
             bool alt = (lParam.Flags & 32) == 32;
 
             KeyboardHookEventArgs e = new KeyboardHookEventArgs(key, alt);
