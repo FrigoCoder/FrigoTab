@@ -1,12 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
-using FastTab.Properties;
+using FrigoTab.Properties;
 
-using static FastTab.KeyboardHook;
+using static FrigoTab.KeyboardHook;
 
-namespace FastTab {
+namespace FrigoTab {
 
     internal class FastTabApplicationContext : ApplicationContext {
 
@@ -44,7 +44,7 @@ namespace FastTab {
             ExitThread();
         }
 
-        private bool keyCallBack (IDictionary<Keys, bool> keys, int wParam, Lparam lParam) {
+        private bool keyCallBack (IDictionary<Keys, bool> keys, int wParam, KeyboardHook.Lparam lParam) {
             bool alt = keys[Keys.LMenu] || keys[Keys.RMenu];
             bool win = keys[Keys.LWin] || keys[Keys.RWin];
             bool tab = keys[Keys.Tab];
