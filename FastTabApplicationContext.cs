@@ -9,7 +9,7 @@ namespace FrigoTab {
         private readonly Form _form;
         private readonly NotifyIcon _notifyIcon;
         private readonly TextBox _textBox;
-        private readonly KeyboardHook _keyboardHook;
+        private readonly KeyHook _keyHook;
 
         public FastTabApplicationContext () {
             _notifyIcon = new NotifyIcon {
@@ -20,8 +20,8 @@ namespace FrigoTab {
                 Visible = true
             };
 
-            _keyboardHook = new KeyboardHook();
-            _keyboardHook.KeyEvent += KeyCallBack;
+            _keyHook = new KeyHook();
+            _keyHook.KeyEvent += KeyCallBack;
 
             _textBox = new TextBox {
                 Multiline = true,
@@ -40,7 +40,7 @@ namespace FrigoTab {
             ExitThread();
         }
 
-        private void KeyCallBack (object sender, KeyboardHookEventArgs e) {
+        private void KeyCallBack (object sender, KeyHookEventArgs e) {
             if( e.Alt && (e.Key == Keys.Tab) ) {
                 e.Handled = true;
 
