@@ -32,6 +32,17 @@ namespace FastTab {
             return FindWindowEx(GetDesktopWindow(), IntPtr.Zero, "Button", "Start");
         }
 
+        private struct LPRECT {
+
+            public int left;
+            public int top;
+            public int right;
+            public int bottom;
+
+        }
+
+        private delegate bool EnumWindowsProc (IntPtr hWnd, int lParam);
+
         [DllImport ("user32.dll")]
         private static extern bool EnumWindows (EnumWindowsProc enumFunc, int lParam);
 
@@ -61,17 +72,6 @@ namespace FastTab {
 
         [DllImport ("user32.dll")]
         private static extern bool PrintWindow (IntPtr hWnd, IntPtr hdcBlt, int nFlags);
-
-        private delegate bool EnumWindowsProc (IntPtr hWnd, int lParam);
-
-        private struct LPRECT {
-
-            public int left;
-            public int top;
-            public int right;
-            public int bottom;
-
-        }
 
     }
 
