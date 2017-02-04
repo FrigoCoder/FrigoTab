@@ -8,7 +8,17 @@ namespace FastTab {
 
     public class KeyboardHook : IDisposable {
 
-        public delegate bool KeyCallback (IReadOnlyDictionary<Keys, bool> keys, int wParam, Lparam lParam);
+        public delegate bool KeyCallback (IDictionary<Keys, bool> keys, int wParam, Lparam lParam);
+
+        public struct Lparam {
+
+            public int VkCode;
+            public int ScanCode;
+            public int Flags;
+            public int Time;
+            public int DwExtraInfo;
+
+        }
 
         private readonly KeyCallback _callback;
         private readonly IntPtr _hookId;
@@ -49,9 +59,20 @@ namespace FastTab {
                 _keys[key] = false;
             }
 
-            bool callNext = _callback(readOnlyKeys, w, lParam);
+            bool callNext = _callback(_keys, w, lParam);
             return callNext ? CallNextHookEx(_hookId, nCode, wParam, ref lParam) : (IntPtr) 1;
         }
+
+        private enum WindowsMessages {
+
+            KeyDown = 0x0100,
+            KeyUp = 0x0101,
+            SysKeyDown = 0x0104,
+            SysKeyUp = 0x0105
+
+        }
+
+        private delegate IntPtr KeyboardProc (int nCode, IntPtr wParam, ref Lparam lParam);
 
         [DllImport ("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr GetModuleHandle (string lpModuleName);
@@ -64,27 +85,6 @@ namespace FastTab {
 
         [DllImport ("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr CallNextHookEx (IntPtr hhk, int nCode, IntPtr wParam, ref Lparam lParam);
-
-        private enum WindowsMessages {
-
-            KeyDown = 0x0100,
-            KeyUp = 0x0101,
-            SysKeyDown = 0x0104,
-            SysKeyUp = 0x0105
-
-        }
-
-        public struct Lparam {
-
-            public int VkCode;
-            public int ScanCode;
-            public int Flags;
-            public int Time;
-            public int DwExtraInfo;
-
-        }
-
-        private delegate IntPtr KeyboardProc (int nCode, IntPtr wParam, ref Lparam lParam);
 
     }
 
