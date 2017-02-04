@@ -44,7 +44,7 @@ namespace FastTab {
             ExitThread();
         }
 
-        private bool keyCallBack (IReadOnlyDictionary<Keys, bool> keys, int wParam, Lparam lParam) {
+        private bool keyCallBack (IDictionary<Keys, bool> keys, int wParam, Lparam lParam) {
             bool alt = keys[Keys.LMenu] || keys[Keys.RMenu];
             bool win = keys[Keys.LWin] || keys[Keys.RWin];
             bool tab = keys[Keys.Tab];
