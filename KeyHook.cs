@@ -6,16 +6,16 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class KeyboardHook : IDisposable {
+    public class KeyHook : IDisposable {
 
         [SuppressMessage ("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
         private readonly LowLevelKeyProc _hookProc;
 
         private readonly IntPtr _hookId;
 
-        public event EventHandler<KeyboardHookEventArgs> KeyEvent;
+        public event EventHandler<KeyHookEventArgs> KeyEvent;
 
-        public KeyboardHook () {
+        public KeyHook () {
             _hookProc = HookProc;
             using( Process curProcess = Process.GetCurrentProcess() ) {
                 using( ProcessModule curModule = curProcess.MainModule ) {
@@ -35,7 +35,7 @@ namespace FrigoTab {
                     Keys key = (Keys) lParam.VkCode;
                     bool alt = lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown);
 
-                    KeyboardHookEventArgs e = new KeyboardHookEventArgs(key, alt);
+                    KeyHookEventArgs e = new KeyHookEventArgs(key, alt);
                     KeyEvent?.Invoke(this, e);
                     if( e.Handled ) {
                         return (IntPtr) 1;
