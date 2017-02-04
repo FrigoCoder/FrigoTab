@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Windows.Forms;
-
-using FrigoTab.Properties;
 
 using static FrigoTab.KeyboardHook;
 
@@ -18,7 +17,7 @@ namespace FrigoTab {
 
         public FastTabApplicationContext () {
             _notifyIcon = new NotifyIcon {
-                Icon = Resources.ocean_through_window_frame,
+                Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath),
                 ContextMenu = new ContextMenu(new[] {
                     new MenuItem("Exit", Exit)
                 }),
@@ -44,7 +43,7 @@ namespace FrigoTab {
             ExitThread();
         }
 
-        private bool keyCallBack (IDictionary<Keys, bool> keys, int wParam, KeyboardHook.Lparam lParam) {
+        private bool keyCallBack (IDictionary<Keys, bool> keys, int wParam, Lparam lParam) {
             bool alt = keys[Keys.LMenu] || keys[Keys.RMenu];
             bool win = keys[Keys.LWin] || keys[Keys.RWin];
             bool tab = keys[Keys.Tab];
