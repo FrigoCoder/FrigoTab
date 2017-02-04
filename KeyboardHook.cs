@@ -9,7 +9,7 @@ namespace FrigoTab {
     public class KeyboardHook : IDisposable {
 
         [SuppressMessage ("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
-        private readonly KeyboardProc _hookProc;
+        private readonly LowLevelKeyProc _hookProc;
 
         private readonly IntPtr _hookId;
 
@@ -28,7 +28,7 @@ namespace FrigoTab {
             UnhookWindowsHookEx(_hookId);
         }
 
-        private IntPtr HookProc (int nCode, IntPtr wParam, ref Lparam lParam) {
+        private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelKeyProcStruct lParam) {
             if( nCode >= 0 ) {
                 Wm w = (Wm) wParam;
                 if( (w == Wm.KeyDown) || (w == Wm.KeyUp) || (w == Wm.SysKeyDown) || (w == Wm.SysKeyUp) ) {
@@ -45,7 +45,7 @@ namespace FrigoTab {
             return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
         }
 
-        private struct Lparam {
+        private struct LowLevelKeyProcStruct {
 
             public int VkCode;
             public int ScanCode;
@@ -64,19 +64,22 @@ namespace FrigoTab {
 
         }
 
-        private delegate IntPtr KeyboardProc (int nCode, IntPtr wParam, ref Lparam lParam);
+        private delegate IntPtr LowLevelKeyProc (int nCode, IntPtr wParam, ref LowLevelKeyProcStruct lParam);
 
-        [DllImport ("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        [DllImport ("kernel32.dll")]
         private static extern IntPtr GetModuleHandle (string lpModuleName);
 
-        [DllImport ("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr SetWindowsHookEx (int idHook, KeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+        [DllImport ("user32.dll")]
+        private static extern IntPtr SetWindowsHookEx (int idHook, LowLevelKeyProc lpfn, IntPtr hMod, int dwThreadId);
 
-        [DllImport ("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        [DllImport ("user32.dll")]
         private static extern bool UnhookWindowsHookEx (IntPtr hhk);
 
-        [DllImport ("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr CallNextHookEx (IntPtr hhk, int nCode, IntPtr wParam, ref Lparam lParam);
+        [DllImport ("user32.dll")]
+        private static extern IntPtr CallNextHookEx (IntPtr hhk,
+            int nCode,
+            IntPtr wParam,
+            ref LowLevelKeyProcStruct lParam);
 
     }
 
