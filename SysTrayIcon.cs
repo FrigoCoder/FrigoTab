@@ -20,14 +20,14 @@ namespace FrigoTab {
             };
         }
 
-        public void ExitHandler (object sender, EventArgs args) {
-            Dispose();
-            Exit?.Invoke();
-        }
-
         public void Dispose () {
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
+        }
+
+        private void ExitHandler (object sender, EventArgs args) {
+            Dispose();
+            Exit?.Invoke();
         }
 
     }
