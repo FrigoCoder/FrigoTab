@@ -6,14 +6,10 @@ namespace FrigoTab {
     internal class FastTabApplicationContext : ApplicationContext {
 
         private readonly Form _form;
-        private readonly SysTrayIcon _sysTrayIcon;
         private readonly TextBox _textBox;
         private readonly KeyHook _keyHook;
 
         public FastTabApplicationContext () {
-            _sysTrayIcon = new SysTrayIcon();
-            _sysTrayIcon.Exit += Application.Exit;
-
             _keyHook = new KeyHook();
             _keyHook.KeyEvent += KeyCallBack;
 
