@@ -13,8 +13,12 @@ namespace FrigoTab {
             using( SysTrayIcon sysTrayIcon = new SysTrayIcon() ) {
                 sysTrayIcon.Exit += Application.Exit;
 
-                FastTabApplicationContext applicationContext = new FastTabApplicationContext();
-                Application.Run(applicationContext);
+                using( FastTabApplicationContext applicationContext = new FastTabApplicationContext() ) {
+                    using( KeyHook keyHook = new KeyHook() ) {
+                        keyHook.KeyEvent += applicationContext.KeyCallBack;
+                        Application.Run(applicationContext);
+                    }
+                }
             }
         }
 

@@ -7,12 +7,8 @@ namespace FrigoTab {
 
         private readonly Form _form;
         private readonly TextBox _textBox;
-        private readonly KeyHook _keyHook;
 
         public FastTabApplicationContext () {
-            _keyHook = new KeyHook();
-            _keyHook.KeyEvent += KeyCallBack;
-
             _textBox = new TextBox {
                 Multiline = true,
                 Dock = DockStyle.Fill
@@ -24,12 +20,7 @@ namespace FrigoTab {
             _form.Visible = true;
         }
 
-        private void Exit (object sender, EventArgs e) {
-            _form.Visible = false;
-            ExitThread();
-        }
-
-        private void KeyCallBack (object sender, KeyHookEventArgs e) {
+        public void KeyCallBack (object sender, KeyHookEventArgs e) {
             if( e.Alt && (e.Key == Keys.Tab) ) {
                 e.Handled = true;
 
@@ -41,6 +32,11 @@ namespace FrigoTab {
                 }
                 _textBox.Text = text;
             }
+        }
+
+        private void Exit (object sender, EventArgs e) {
+            _form.Visible = false;
+            ExitThread();
         }
 
     }
