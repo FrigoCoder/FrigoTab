@@ -9,7 +9,13 @@ namespace FrigoTab {
         private static void Main () {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new FastTabApplicationContext());
+
+            using( SysTrayIcon sysTrayIcon = new SysTrayIcon() ) {
+                sysTrayIcon.Exit += Application.Exit;
+
+                FastTabApplicationContext applicationContext = new FastTabApplicationContext();
+                Application.Run(applicationContext);
+            }
         }
 
     }
