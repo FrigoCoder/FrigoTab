@@ -93,6 +93,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Rect.cs" />
     <Compile Include="SessionManager.cs" />
     <Compile Include="KeyHook.cs" />
     <Compile Include="KeyHookEventArgs.cs" />
@@ -102,6 +103,7 @@
     </Compile>
     <Compile Include="SysTrayIcon.cs" />
     <Compile Include="WindowFinder.cs" />
+    <Compile Include="WindowHandle.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ocean-through-window-frame.ico" />
