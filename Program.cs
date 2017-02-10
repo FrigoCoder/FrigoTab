@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    internal static class Program {
+    public static class Program {
+
+        public static readonly Icon Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
 
         [STAThread]
         private static void Main () {

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Drawing;
 using System.Windows.Forms;
 
 namespace FrigoTab {
@@ -12,7 +11,7 @@ namespace FrigoTab {
 
         public SysTrayIcon () {
             _notifyIcon = new NotifyIcon {
-                Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath),
+                Icon = Program.Icon,
                 ContextMenu = new ContextMenu(new[] {
                     new MenuItem("Exit", ExitHandler)
                 }),
