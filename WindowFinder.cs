@@ -10,8 +10,6 @@ namespace FrigoTab {
 
         public WindowFinder () {
             EnumWindows(EnumWindowCallback, IntPtr.Zero);
-            Windows.Remove(GetShellWindow());
-            Windows.Remove(GetStartButton());
         }
 
         private bool EnumWindowCallback (WindowHandle handle, IntPtr lParam) {
@@ -32,27 +30,21 @@ namespace FrigoTab {
                 return false;
             }
 
-            return handle.IsWindowVisible() && (handle.GetWindowText().Length > 0);
-        }
-
-        private static WindowHandle GetStartButton () {
-            return FindWindowEx(GetDesktopWindow(), IntPtr.Zero, "Button", "Start");
+            WindowExStyles ex = handle.GetWindowExStyles();
+            if( ex.HasFlag(WindowExStyles.NoActivate) ) {
+                return false;
+            }
+            if( ex.HasFlag(WindowExStyles.AppWindow) ) {
+                return true;
+            }
+            if( ex.HasFlag(WindowExStyles.ToolWindow) ) {
+                return false;
+            }
+            return true;
         }
 
         [DllImport ("user32.dll")]
         private static extern bool EnumWindows (EnumWindowsProc enumFunc, IntPtr lParam);
-
-        [DllImport ("user32.dll")]
-        private static extern IntPtr GetShellWindow ();
-
-        [DllImport ("user32.dll")]
-        private static extern IntPtr GetDesktopWindow ();
-
-        [DllImport ("user32.dll")]
-        private static extern IntPtr FindWindowEx (IntPtr hwndParent,
-            IntPtr hwndChildAfter,
-            string lpszClass,
-            string lpszWindow);
 
     }
 

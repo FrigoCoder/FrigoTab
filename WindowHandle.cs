@@ -12,6 +12,15 @@ namespace FrigoTab {
 
     }
 
+    [Flags]
+    public enum WindowExStyles : long {
+
+        ToolWindow = 0x80,
+        AppWindow = 0x40000,
+        NoActivate = 0x8000000
+
+    }
+
     public struct WindowHandle {
 
         public static implicit operator WindowHandle (IntPtr handle) {
@@ -28,10 +37,6 @@ namespace FrigoTab {
             _handle = handle;
         }
 
-        public bool IsWindowVisible () {
-            return IsWindowVisible(_handle);
-        }
-
         public string GetWindowText () {
             StringBuilder text = new StringBuilder(GetWindowTextLength(_handle) + 1);
             GetWindowText(_handle, text, text.Capacity);
@@ -42,14 +47,16 @@ namespace FrigoTab {
             return (WindowStyles) GetWindowLongPtr(_handle, WindowLong.Style);
         }
 
+        public WindowExStyles GetWindowExStyles () {
+            return (WindowExStyles) GetWindowLongPtr(_handle, WindowLong.ExStyle);
+        }
+
         private enum WindowLong {
 
+            ExStyle = -20,
             Style = -16
 
         }
-
-        [DllImport ("user32.dll")]
-        private static extern bool IsWindowVisible (IntPtr hWnd);
 
         [DllImport ("user32.dll")]
         private static extern int GetWindowTextLength (IntPtr hWnd);
