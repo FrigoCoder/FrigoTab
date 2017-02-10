@@ -5,38 +5,25 @@ namespace FrigoTab {
 
     internal class FastTabApplicationContext : ApplicationContext {
 
-        private readonly Form _form;
-        private readonly TextBox _textBox;
-
-        public FastTabApplicationContext () {
-            _textBox = new TextBox {
-                Multiline = true,
-                Dock = DockStyle.Fill
-            };
-
-            _form = new Form();
-            _form.Controls.Add(_textBox);
-            _form.FormClosing += Exit;
-            _form.Visible = true;
-        }
+        private Session _session;
 
         public void KeyCallBack (object sender, KeyHookEventArgs e) {
             if( e.Alt && (e.Key == Keys.Tab) ) {
                 e.Handled = true;
-
-                WindowFinder finder = new WindowFinder();
-
-                string text = "";
-                foreach( IntPtr hWnd in finder.GetOpenWindows() ) {
-                    text += finder.GetWindowText(hWnd) + "\r\n";
+                if( _session == null ) {
+                    BeginSession();
                 }
-                _textBox.Text = text;
             }
         }
 
-        private void Exit (object sender, EventArgs e) {
-            _form.Visible = false;
-            ExitThread();
+        public void BeginSession () {
+            _session = new Session();
+            _session.FormClosed += EndSession;
+        }
+
+        public void EndSession (object sender, EventArgs e) {
+            _session.FormClosed -= EndSession;
+            _session = null;
         }
 
     }

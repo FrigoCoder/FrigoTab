@@ -97,6 +97,9 @@
     <Compile Include="KeyHook.cs" />
     <Compile Include="KeyHookEventArgs.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="Session.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="SysTrayIcon.cs" />
     <Compile Include="WindowFinder.cs" />
   </ItemGroup>
