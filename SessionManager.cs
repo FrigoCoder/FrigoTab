@@ -3,7 +3,7 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    internal class FastTabApplicationContext : ApplicationContext {
+    internal class SessionManager : ApplicationContext {
 
         private Session _session;
 
