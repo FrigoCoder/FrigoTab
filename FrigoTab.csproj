@@ -93,7 +93,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="FastTabApplicationContext.cs" />
+    <Compile Include="SessionManager.cs" />
     <Compile Include="KeyHook.cs" />
     <Compile Include="KeyHookEventArgs.cs" />
     <Compile Include="Program.cs" />
