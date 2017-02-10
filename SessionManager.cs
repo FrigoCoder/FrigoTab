@@ -3,7 +3,7 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    internal class SessionManager : ApplicationContext {
+    internal class SessionManager : IDisposable {
 
         private Session _session;
 
@@ -16,12 +16,16 @@ namespace FrigoTab {
             }
         }
 
-        public void BeginSession () {
+        public void Dispose () {
+            _session?.Dispose();
+        }
+
+        private void BeginSession () {
             _session = new Session();
             _session.FormClosed += EndSession;
         }
 
-        public void EndSession (object sender, EventArgs e) {
+        private void EndSession (object sender, EventArgs e) {
             _session.FormClosed -= EndSession;
             _session = null;
         }
