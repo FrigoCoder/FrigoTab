@@ -15,17 +15,21 @@ namespace FrigoTab {
         }
 
         private bool EnumWindowCallback (WindowHandle handle, IntPtr lParam) {
-            if( handle.IsWindowVisible() && (handle.GetWindowText().Length > 0) ) {
+            if( IsWindow(handle) ) {
                 Windows.Add(handle);
             }
             return true;
         }
 
-        private IntPtr GetStartButton () {
-            return FindWindowEx(GetDesktopWindow(), IntPtr.Zero, "Button", "Start");
+        private delegate bool EnumWindowsProc (WindowHandle handle, IntPtr lParam);
+
+        private static bool IsWindow (WindowHandle handle) {
+            return handle.IsWindowVisible() && (handle.GetWindowText().Length > 0);
         }
 
-        private delegate bool EnumWindowsProc (WindowHandle handle, IntPtr lParam);
+        private static WindowHandle GetStartButton () {
+            return FindWindowEx(GetDesktopWindow(), IntPtr.Zero, "Button", "Start");
+        }
 
         [DllImport ("user32.dll")]
         private static extern bool EnumWindows (EnumWindowsProc enumFunc, IntPtr lParam);
