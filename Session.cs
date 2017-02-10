@@ -1,4 +1,3 @@
-using System;
 using System.Windows.Forms;
 
 namespace FrigoTab {
@@ -18,8 +17,8 @@ namespace FrigoTab {
         private static string GetOpenWindowsList () {
             WindowFinder finder = new WindowFinder();
             string text = "";
-            foreach( IntPtr hWnd in finder.GetOpenWindows() ) {
-                text += finder.GetWindowText(hWnd) + "\r\n";
+            foreach( WindowHandle window in finder.Windows ) {
+                text += window.GetWindowText() + "\r\n";
             }
             return text;
         }
