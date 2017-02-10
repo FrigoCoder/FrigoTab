@@ -24,6 +24,14 @@ namespace FrigoTab {
         private delegate bool EnumWindowsProc (WindowHandle handle, IntPtr lParam);
 
         private static bool IsWindow (WindowHandle handle) {
+            WindowStyles style = handle.GetWindowStyles();
+            if( style.HasFlag(WindowStyles.Disabled) ) {
+                return false;
+            }
+            if( !style.HasFlag(WindowStyles.Visible) ) {
+                return false;
+            }
+
             return handle.IsWindowVisible() && (handle.GetWindowText().Length > 0);
         }
 
