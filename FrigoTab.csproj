@@ -102,6 +102,7 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="SysTrayIcon.cs" />
+    <Compile Include="Thumbnail.cs" />
     <Compile Include="WindowFinder.cs" />
     <Compile Include="WindowHandle.cs" />
   </ItemGroup>

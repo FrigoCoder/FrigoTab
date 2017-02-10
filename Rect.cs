@@ -1,11 +1,22 @@
-﻿namespace FrigoTab {
+﻿using System.Drawing;
 
-    public class Rect {
+namespace FrigoTab {
 
-        private int _left;
-        private int _top;
-        private int _right;
-        private int _bottom;
+    public struct Rect {
+
+        private readonly int _left;
+        private readonly int _top;
+        private readonly int _right;
+        private readonly int _bottom;
+
+        public Size Size => new Size(_right - _left, _bottom - _top);
+
+        public Rect (Point location, Size size) {
+            _left = location.X;
+            _top = location.Y;
+            _right = location.X + size.Width;
+            _bottom = location.Y + size.Height;
+        }
 
     }
 
