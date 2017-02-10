@@ -37,6 +37,12 @@ namespace FrigoTab {
             _handle = handle;
         }
 
+        public Rect GetWindowRect () {
+            Rect lpRect;
+            GetWindowRect(_handle, out lpRect);
+            return lpRect;
+        }
+
         public string GetWindowText () {
             StringBuilder text = new StringBuilder(GetWindowTextLength(_handle) + 1);
             GetWindowText(_handle, text, text.Capacity);
@@ -57,6 +63,9 @@ namespace FrigoTab {
             Style = -16
 
         }
+
+        [DllImport ("user32.dll")]
+        private static extern bool GetWindowRect (IntPtr hWnd, out Rect lpRect);
 
         [DllImport ("user32.dll")]
         private static extern int GetWindowTextLength (IntPtr hWnd);

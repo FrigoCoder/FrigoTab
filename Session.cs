@@ -1,26 +1,32 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class Session : Form {
+    public class Session : Form, IDisposable {
+
+        private readonly IList<Thumbnail> _thumbnails = new List<Thumbnail>();
 
         public Session () {
-            TextBox textBox = new TextBox {
-                Dock = DockStyle.Fill,
-                Multiline = true,
-                Text = GetOpenWindowsList()
-            };
-            Controls.Add(textBox);
+            Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
+
+
+            WindowFinder finder = new WindowFinder();
+            foreach( WindowHandle window in finder.Windows ) {
+                _thumbnails.Add(new Thumbnail(window, Handle, window.GetWindowRect()));
+            }
             Visible = true;
         }
 
-        private static string GetOpenWindowsList () {
-            WindowFinder finder = new WindowFinder();
-            string text = "";
-            foreach( WindowHandle window in finder.Windows ) {
-                text += window.GetWindowText() + "\r\n";
+        public new void Dispose () {
+            Visible = false;
+            foreach( Thumbnail thumbnail in _thumbnails ) {
+                thumbnail.Dispose();
             }
-            return text;
+            Close();
         }
 
     }
