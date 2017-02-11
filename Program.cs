@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -20,10 +21,20 @@ namespace FrigoTab {
                     using( KeyHook keyHook = new KeyHook() ) {
                         keyHook.KeyEvent += sessionManager.KeyCallBack;
 
+                        StartQuitTimer();
                         Application.Run();
                     }
                 }
             }
+        }
+
+        [Conditional ("DEBUG")]
+        private static void StartQuitTimer () {
+            Timer timer = new Timer {
+                Interval = 10 * 1000
+            };
+            timer.Tick += (sender, args) => { Application.Exit(); };
+            timer.Start();
         }
 
     }
