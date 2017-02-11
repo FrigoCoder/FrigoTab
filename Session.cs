@@ -19,7 +19,7 @@ namespace FrigoTab {
 
             WindowFinder finder = new WindowFinder();
 
-            foreach( WindowHandle window in finder.ToolWindows ) {
+            foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
                 _toolwindows.Add(new Thumbnail(window, Handle, window.GetWindowRect()));
             }
             foreach( WindowHandle window in finder.Windows ) {
