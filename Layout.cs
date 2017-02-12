@@ -45,13 +45,13 @@ namespace FrigoTab {
         }
 
         private static RectangleF CenterWithin (RectangleF rect, RectangleF bounds) {
-            SizeF size = FitWithin(rect.Size, bounds.Size);
+            SizeF size = ScaleWithin(rect.Size, bounds.Size);
             SizeF margin = bounds.Size - size;
             PointF location = new PointF(bounds.X + margin.Width / 2, bounds.Y + margin.Height / 2);
             return new RectangleF(location, size);
         }
 
-        private static SizeF FitWithin (SizeF size, SizeF bounds) {
+        private static SizeF ScaleWithin (SizeF size, SizeF bounds) {
             size = Scale(size, Math.Min(bounds.Width, size.Width) / size.Width);
             size = Scale(size, Math.Min(bounds.Height, size.Height) / size.Height);
             return size;
