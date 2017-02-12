@@ -14,59 +14,47 @@ namespace FrigoTab {
         }
 
         private bool EnumWindowCallback (WindowHandle handle, IntPtr lParam) {
-            if( IsWindow(handle) ) {
-                Windows.Add(handle);
-            }
-            if( IsToolWindow(handle) ) {
-                ToolWindows.Add(handle);
+            switch( GetWindowType(handle) ) {
+                case WindowType.AppWindow:
+                    Windows.Add(handle);
+                    break;
+                case WindowType.ToolWindow:
+                    ToolWindows.Add(handle);
+                    break;
             }
             return true;
+        }
+
+        private enum WindowType {
+
+            Hidden,
+            AppWindow,
+            ToolWindow
+
         }
 
         private delegate bool EnumWindowsProc (WindowHandle handle, IntPtr lParam);
 
-        private static bool IsWindow (WindowHandle handle) {
+        private static WindowType GetWindowType (WindowHandle handle) {
             WindowStyles style = handle.GetWindowStyles();
             if( style.HasFlag(WindowStyles.Disabled) ) {
-                return false;
+                return WindowType.Hidden;
             }
             if( !style.HasFlag(WindowStyles.Visible) ) {
-                return false;
+                return WindowType.Hidden;
             }
 
             WindowExStyles ex = handle.GetWindowExStyles();
             if( ex.HasFlag(WindowExStyles.NoActivate) ) {
-                return false;
+                return WindowType.Hidden;
             }
             if( ex.HasFlag(WindowExStyles.AppWindow) ) {
-                return true;
+                return WindowType.AppWindow;
             }
             if( ex.HasFlag(WindowExStyles.ToolWindow) ) {
-                return false;
+                return WindowType.ToolWindow;
             }
-            return true;
-        }
-
-        private static bool IsToolWindow (WindowHandle handle) {
-            WindowStyles style = handle.GetWindowStyles();
-            if( style.HasFlag(WindowStyles.Disabled) ) {
-                return false;
-            }
-            if( !style.HasFlag(WindowStyles.Visible) ) {
-                return false;
-            }
-
-            WindowExStyles ex = handle.GetWindowExStyles();
-            if( ex.HasFlag(WindowExStyles.NoActivate) ) {
-                return false;
-            }
-            if( ex.HasFlag(WindowExStyles.AppWindow) ) {
-                return false;
-            }
-            if( ex.HasFlag(WindowExStyles.ToolWindow) ) {
-                return true;
-            }
-            return false;
+            return WindowType.AppWindow;
         }
 
         [DllImport ("user32.dll")]
