@@ -22,8 +22,11 @@ namespace FrigoTab {
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
                 _toolwindows.Add(new Thumbnail(window, Handle, window.GetWindowRect()));
             }
+
+            Layout layout = new Layout(finder.Windows);
             foreach( WindowHandle window in finder.Windows ) {
-                _thumbnails.Add(new Thumbnail(window, Handle, window.GetWindowRect()));
+                Rectangle bounds = layout.Bounds[window];
+                _thumbnails.Add(new Thumbnail(window, Handle, new Rect(bounds)));
             }
 
             Visible = true;

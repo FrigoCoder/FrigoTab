@@ -18,6 +18,13 @@ namespace FrigoTab {
             _bottom = location.Y + size.Height;
         }
 
+        public Rect (Rectangle bounds) {
+            _left = bounds.Left;
+            _top = bounds.Top;
+            _right = bounds.Right;
+            _bottom = bounds.Bottom;
+        }
+
     }
 
 }
