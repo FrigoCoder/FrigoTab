@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Drawing;
 using System.Runtime.InteropServices;
 
 namespace FrigoTab {
@@ -13,7 +12,7 @@ namespace FrigoTab {
             DwmThumbnailProperties properties = new DwmThumbnailProperties {
                 Flags = DwmThumbnailFlags.RectDestination | DwmThumbnailFlags.RectSource,
                 Destination = bounds,
-                Source = new Rect(Point.Empty, bounds.Size)
+                Source = source.GetWindowRect()
             };
             DwmUpdateThumbnailProperties(_thumbnail, ref properties);
         }
