@@ -25,6 +25,10 @@ namespace FrigoTab {
             _bottom = bounds.Bottom;
         }
 
+        public RectangleF ToRectangleF () {
+            return RectangleF.FromLTRB(_left, _top, _right, _bottom);
+        }
+
     }
 
 }

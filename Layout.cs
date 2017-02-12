@@ -27,7 +27,8 @@ namespace FrigoTab {
             int rows = (int) Math.Ceiling((double) n / columns);
 
             for( int i = 0; i < windows.Count; i++ ) {
-                RectangleF bounds = GetCellBounds(screen, columns, rows, i % columns, i / columns);
+                RectangleF cell = GetCellBounds(screen, columns, rows, i % columns, i / columns);
+                RectangleF bounds = CenterWithin(windows[i].GetWindowRect().ToRectangleF(), cell);
                 bounds.Offset(screen.WorkingArea.Location);
                 Bounds[windows[i]] = Rectangle.Round(bounds);
             }
@@ -41,6 +42,23 @@ namespace FrigoTab {
             SizeF size = new SizeF((float) screen.WorkingArea.Width / columns, (float) screen.WorkingArea.Height / rows);
             PointF location = new PointF(column * size.Width, row * size.Height);
             return new RectangleF(location, size);
+        }
+
+        private static RectangleF CenterWithin (RectangleF rect, RectangleF bounds) {
+            SizeF size = FitWithin(rect.Size, bounds.Size);
+            SizeF margin = bounds.Size - size;
+            PointF location = new PointF(bounds.X + margin.Width / 2, bounds.Y + margin.Height / 2);
+            return new RectangleF(location, size);
+        }
+
+        private static SizeF FitWithin (SizeF size, SizeF bounds) {
+            size = Scale(size, Math.Min(bounds.Width, size.Width) / size.Width);
+            size = Scale(size, Math.Min(bounds.Height, size.Height) / size.Height);
+            return size;
+        }
+
+        private static SizeF Scale (SizeF size, float scale) {
+            return new SizeF(size.Width * scale, size.Height * scale);
         }
 
     }
