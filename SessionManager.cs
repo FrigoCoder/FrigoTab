@@ -14,6 +14,11 @@ namespace FrigoTab {
                     BeginSession();
                 }
             }
+            if( e.Alt && (e.Key == Keys.F4) ) {
+                if( _session != null ) {
+                    e.Handled = true;
+                }
+            }
         }
 
         public void Dispose () {
