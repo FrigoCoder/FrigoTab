@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace FrigoTab {
@@ -25,10 +26,11 @@ namespace FrigoTab {
 
             Layout layout = new Layout(finder.Windows);
             foreach( WindowHandle window in finder.Windows ) {
-                _windows.Add(new Window(Handle, window, layout.Bounds[window]));
+                _windows.Add(new Window(Handle, window, layout.Bounds[window], _windows.Count));
             }
 
             Visible = true;
+            SetForeground();
         }
 
         public new void Dispose () {
@@ -44,7 +46,12 @@ namespace FrigoTab {
 
         protected override void OnKeyDown (KeyEventArgs e) {
             base.OnKeyDown(e);
-            Dispose();
+            foreach( Window window in _windows ) {
+                if( (e.KeyCode - Keys.D1 == window.Index) || (e.KeyCode - Keys.NumPad1 == window.Index) ) {
+                    window.Handle.SetForeground();
+                    Dispose();
+                }
+            }
         }
 
         protected override void OnMouseClick (MouseEventArgs e) {
@@ -56,6 +63,26 @@ namespace FrigoTab {
                 }
             }
         }
+
+        private void SetForeground () {
+            int current = GetCurrentThreadId();
+            int foreground = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
+            AttachThreadInput(current, foreground, true);
+            Activate();
+            AttachThreadInput(current, foreground, false);
+        }
+
+        [DllImport ("user32.dll")]
+        private static extern IntPtr GetForegroundWindow ();
+
+        [DllImport ("user32.dll")]
+        private static extern int GetWindowThreadProcessId (IntPtr hWnd, IntPtr dwProcessId);
+
+        [DllImport ("kernel32.dll")]
+        private static extern int GetCurrentThreadId ();
+
+        [DllImport ("user32.dll")]
+        private static extern bool AttachThreadInput (int idAttach, int idAttachTo, bool fAttach);
 
     }
 
