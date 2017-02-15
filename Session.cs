@@ -65,21 +65,24 @@ namespace FrigoTab {
         }
 
         private void SetForeground () {
+            Activate();
             int current = GetCurrentThreadId();
             int foreground = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
-            AttachThreadInput(current, foreground, true);
-            Activate();
-            AttachThreadInput(current, foreground, false);
+            if( current != foreground ) {
+                AttachThreadInput(current, foreground, true);
+                Activate();
+                AttachThreadInput(current, foreground, false);
+            }
         }
 
-        [DllImport ("user32.dll")]
-        private static extern IntPtr GetForegroundWindow ();
+        [DllImport ("kernel32.dll")]
+        private static extern int GetCurrentThreadId ();
 
         [DllImport ("user32.dll")]
         private static extern int GetWindowThreadProcessId (IntPtr hWnd, IntPtr dwProcessId);
 
-        [DllImport ("kernel32.dll")]
-        private static extern int GetCurrentThreadId ();
+        [DllImport ("user32.dll")]
+        private static extern IntPtr GetForegroundWindow ();
 
         [DllImport ("user32.dll")]
         private static extern bool AttachThreadInput (int idAttach, int idAttachTo, bool fAttach);
