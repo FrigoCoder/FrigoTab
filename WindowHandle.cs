@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Windows.Forms;
 
 namespace FrigoTab {
 
@@ -8,7 +10,8 @@ namespace FrigoTab {
     public enum WindowStyles : long {
 
         Disabled = 0x8000000,
-        Visible = 0x10000000
+        Visible = 0x10000000,
+        Minimize = 0x20000000
 
     }
 
@@ -37,10 +40,15 @@ namespace FrigoTab {
             _handle = handle;
         }
 
-        public Rect GetWindowRect () {
-            Rect lpRect;
-            GetWindowRect(_handle, out lpRect);
-            return lpRect;
+        public Rect GetRestoredWindowRect () {
+            if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
+                WindowPlacement placement = GetWindowPlacement();
+                if( placement.Flags == WindowPlacementFlags.RestoreToMaximized ) {
+                    return new Rect(Screen.FromPoint(placement.MaximumPosition).WorkingArea);
+                }
+                return placement.NormalRectangle;
+            }
+            return GetWindowRect();
         }
 
         public string GetWindowText () {
@@ -59,6 +67,43 @@ namespace FrigoTab {
 
         public void SetForeground () {
             SetForegroundWindow(_handle);
+        }
+
+        private Rect GetWindowRect () {
+            Rect lpRect;
+            GetWindowRect(_handle, out lpRect);
+            return lpRect;
+        }
+
+        private WindowPlacement GetWindowPlacement () {
+            WindowPlacement placement = new WindowPlacement {
+                Length = Marshal.SizeOf(typeof(WindowPlacement))
+            };
+            GetWindowPlacement(_handle, ref placement);
+            return placement;
+        }
+
+        internal struct WindowPlacement {
+
+            public int Length;
+            public WindowPlacementFlags Flags;
+            public ShowWindowCommand ShowCommand;
+            public Point MinimumPosition;
+            public Point MaximumPosition;
+            public Rect NormalRectangle;
+
+        }
+
+        internal enum WindowPlacementFlags {
+
+            RestoreToMaximized = 2
+
+        }
+
+        internal enum ShowWindowCommand {
+
+            Restore = 9
+
         }
 
         private enum WindowLong {
@@ -82,6 +127,9 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern bool SetForegroundWindow (IntPtr hwnd);
+
+        [DllImport ("user32.dll")]
+        private static extern bool GetWindowPlacement (IntPtr hWnd, ref WindowPlacement lpwndpl);
 
     }
 

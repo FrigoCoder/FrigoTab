@@ -21,7 +21,7 @@ namespace FrigoTab {
             WindowFinder finder = new WindowFinder();
 
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
-                _toolwindows.Add(new Thumbnail(window, Handle, window.GetWindowRect()));
+                _toolwindows.Add(new Thumbnail(window, Handle, window.GetRestoredWindowRect()));
             }
 
             Layout layout = new Layout(finder.Windows);
