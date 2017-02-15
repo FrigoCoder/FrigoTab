@@ -9,7 +9,7 @@ namespace FrigoTab {
     public class Session : Form, IDisposable {
 
         private readonly IList<Thumbnail> _toolwindows = new List<Thumbnail>();
-        private readonly IList<Thumbnail> _thumbnails = new List<Thumbnail>();
+        private readonly IList<Window> _windows = new List<Window>();
 
         public Session () {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
@@ -25,8 +25,7 @@ namespace FrigoTab {
 
             Layout layout = new Layout(finder.Windows);
             foreach( WindowHandle window in finder.Windows ) {
-                Rectangle bounds = layout.Bounds[window];
-                _thumbnails.Add(new Thumbnail(window, Handle, new Rect(bounds)));
+                _windows.Add(new Window(Handle, window, layout.Bounds[window]));
             }
 
             Visible = true;
@@ -34,10 +33,10 @@ namespace FrigoTab {
 
         public new void Dispose () {
             Visible = false;
-            foreach( Thumbnail thumbnail in _toolwindows ) {
-                thumbnail.Dispose();
+            foreach( Window window in _windows ) {
+                window.Dispose();
             }
-            foreach( Thumbnail thumbnail in _thumbnails ) {
+            foreach( Thumbnail thumbnail in _toolwindows ) {
                 thumbnail.Dispose();
             }
             Close();
