@@ -13,7 +13,7 @@ namespace FrigoTab {
             DwmThumbnailProperties properties = new DwmThumbnailProperties {
                 Flags = DwmThumbnailFlags.RectDestination | DwmThumbnailFlags.RectSource,
                 Destination = bounds,
-                Source = new Rect(Point.Empty, source.GetWindowRect().Size)
+                Source = new Rect(Point.Empty, source.GetRestoredWindowRect().Size)
             };
             DwmUpdateThumbnailProperties(_thumbnail, ref properties);
         }
