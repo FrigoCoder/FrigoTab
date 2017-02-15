@@ -47,6 +47,16 @@ namespace FrigoTab {
             Dispose();
         }
 
+        protected override void OnMouseClick (MouseEventArgs e) {
+            base.OnMouseClick(e);
+            foreach( Window window in _windows ) {
+                if( window.Bounds.Contains(e.Location) ) {
+                    window.Handle.SetForeground();
+                    Dispose();
+                }
+            }
+        }
+
     }
 
 }

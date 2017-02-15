@@ -13,7 +13,7 @@ namespace FrigoTab {
             EnumWindows(EnumWindowCallback, IntPtr.Zero);
         }
 
-        private bool EnumWindowCallback (WindowHandle handle, IntPtr lParam) {
+        private bool EnumWindowCallback (IntPtr handle, IntPtr lParam) {
             switch( GetWindowType(handle) ) {
                 case WindowType.AppWindow:
                     Windows.Add(handle);
@@ -33,7 +33,7 @@ namespace FrigoTab {
 
         }
 
-        private delegate bool EnumWindowsProc (WindowHandle handle, IntPtr lParam);
+        private delegate bool EnumWindowsProc (IntPtr handle, IntPtr lParam);
 
         private static WindowType GetWindowType (WindowHandle handle) {
             WindowStyles style = handle.GetWindowStyles();
