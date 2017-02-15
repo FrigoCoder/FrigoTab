@@ -29,6 +29,10 @@ namespace FrigoTab {
             return RectangleF.FromLTRB(_left, _top, _right, _bottom);
         }
 
+        public bool IsEmpty () {
+            return (_right - _left <= 0) || (_bottom - _top <= 0);
+        }
+
     }
 
 }
