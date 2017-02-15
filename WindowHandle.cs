@@ -21,7 +21,7 @@ namespace FrigoTab {
 
     }
 
-    public struct WindowHandle {
+    public class WindowHandle {
 
         public static implicit operator WindowHandle (IntPtr handle) {
             return new WindowHandle(handle);
@@ -57,6 +57,10 @@ namespace FrigoTab {
             return (WindowExStyles) GetWindowLongPtr(_handle, WindowLong.ExStyle);
         }
 
+        public void SetForeground () {
+            SetForegroundWindow(_handle);
+        }
+
         private enum WindowLong {
 
             ExStyle = -20,
@@ -75,6 +79,9 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern IntPtr GetWindowLongPtr (IntPtr hWnd, WindowLong nIndex);
+
+        [DllImport ("user32.dll")]
+        private static extern bool SetForegroundWindow (IntPtr hwnd);
 
     }
 
