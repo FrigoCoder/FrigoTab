@@ -104,6 +104,7 @@
     </Compile>
     <Compile Include="SysTrayIcon.cs" />
     <Compile Include="Thumbnail.cs" />
+    <Compile Include="Window.cs" />
     <Compile Include="WindowFinder.cs" />
     <Compile Include="WindowHandle.cs" />
   </ItemGroup>
