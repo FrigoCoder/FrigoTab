@@ -129,7 +129,7 @@ namespace FrigoTab {
         [DllImport ("user32.dll")]
         private static extern IntPtr GetWindowLongPtr (IntPtr hWnd, WindowLong nIndex);
 
-                [DllImport ("user32.dll")]
+        [DllImport ("user32.dll")]
         private static extern bool ShowWindow (IntPtr hWnd, ShowWindowCommand nCmdShow);
 
         [DllImport ("user32.dll")]
