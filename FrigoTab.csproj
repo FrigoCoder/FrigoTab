@@ -93,6 +93,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FrigoForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Layout.cs" />
     <Compile Include="Rect.cs" />
     <Compile Include="SessionManager.cs" />
@@ -104,7 +107,9 @@
     </Compile>
     <Compile Include="SysTrayIcon.cs" />
     <Compile Include="Thumbnail.cs" />
-    <Compile Include="Window.cs" />
+    <Compile Include="Window.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="WindowFinder.cs" />
     <Compile Include="WindowHandle.cs" />
   </ItemGroup>

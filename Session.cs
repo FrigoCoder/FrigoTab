@@ -7,7 +7,7 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class Session : Form, IDisposable {
+    public class Session : FrigoForm {
 
         private readonly IList<Thumbnail> _toolwindows = new List<Thumbnail>();
         private readonly IList<Window> _windows = new List<Window>();
@@ -26,14 +26,14 @@ namespace FrigoTab {
 
             Layout layout = new Layout(finder.Windows);
             foreach( WindowHandle window in finder.Windows ) {
-                _windows.Add(new Window(Handle, window, layout.Bounds[window], _windows.Count));
+                _windows.Add(new Window(this, window, layout.Bounds[window], _windows.Count));
             }
 
             Visible = true;
             SetForeground();
         }
 
-        public new void Dispose () {
+        public override void Dispose () {
             Visible = false;
             foreach( Window window in _windows ) {
                 window.Dispose();
@@ -41,14 +41,14 @@ namespace FrigoTab {
             foreach( Thumbnail thumbnail in _toolwindows ) {
                 thumbnail.Dispose();
             }
-            Close();
+            base.Dispose();
         }
 
         protected override void OnKeyDown (KeyEventArgs e) {
             base.OnKeyDown(e);
             foreach( Window window in _windows ) {
                 if( (e.KeyCode - Keys.D1 == window.Index) || (e.KeyCode - Keys.NumPad1 == window.Index) ) {
-                    window.Handle.SetForeground();
+                    window.WindowHandle.SetForeground();
                     Dispose();
                 }
             }
@@ -58,7 +58,7 @@ namespace FrigoTab {
             base.OnMouseClick(e);
             foreach( Window window in _windows ) {
                 if( window.Bounds.Contains(e.Location) ) {
-                    window.Handle.SetForeground();
+                    window.WindowHandle.SetForeground();
                     Dispose();
                 }
             }
