@@ -1,8 +1,9 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 
 namespace FrigoTab {
 
-    public class Window : FrigoForm {
+    public class Window : FrigoForm, IDisposable {
 
         public readonly WindowHandle WindowHandle;
         public readonly int Index;
@@ -17,9 +18,9 @@ namespace FrigoTab {
             _thumbnail = new Thumbnail(windowHandle, session.Handle, new Rect(bounds));
         }
 
-        public override void Dispose () {
+        public new void Dispose () {
             _thumbnail.Dispose();
-            base.Dispose();
+            Close();
         }
 
     }

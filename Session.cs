@@ -7,7 +7,7 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class Session : FrigoForm {
+    public class Session : FrigoForm, IDisposable {
 
         private readonly IList<Thumbnail> _toolwindows = new List<Thumbnail>();
         private readonly IList<Window> _windows = new List<Window>();
@@ -16,6 +16,10 @@ namespace FrigoTab {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
 
             WindowFinder finder = new WindowFinder();
+            if( finder.Windows.Count == 0 ) {
+                Dispose();
+                return;
+            }
 
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
                 _toolwindows.Add(new Thumbnail(window, Handle, window.GetRestoredWindowRect()));
@@ -30,7 +34,7 @@ namespace FrigoTab {
             SetForeground();
         }
 
-        public override void Dispose () {
+        public new void Dispose () {
             Visible = false;
             foreach( Window window in _windows ) {
                 window.Dispose();
@@ -38,7 +42,7 @@ namespace FrigoTab {
             foreach( Thumbnail thumbnail in _toolwindows ) {
                 thumbnail.Dispose();
             }
-            base.Dispose();
+            Close();
         }
 
         protected override void OnKeyDown (KeyEventArgs e) {
