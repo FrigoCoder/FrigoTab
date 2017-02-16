@@ -1,9 +1,8 @@
-﻿using System;
-using System.Windows.Forms;
+﻿using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class FrigoForm : Form, IDisposable {
+    public class FrigoForm : Form {
 
         protected WindowExStyles ExStyle = WindowExStyles.ToolWindow | WindowExStyles.NoActivate;
 
@@ -25,11 +24,6 @@ namespace FrigoTab {
             TopMost = true;
             SetStyle(ControlStyles.SupportsTransparentBackColor, false);
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint, true);
-        }
-
-        public new virtual void Dispose () {
-            Close();
-            base.Dispose();
         }
 
         protected override void OnPaintBackground (PaintEventArgs e) {
