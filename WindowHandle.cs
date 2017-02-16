@@ -52,6 +52,13 @@ namespace FrigoTab {
             return GetWindowRect();
         }
 
+        public void SetForeground () {
+            if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
+                ShowWindow(_handle, ShowWindowCommand.Restore);
+            }
+            SetForegroundWindow(_handle);
+        }
+
         public string GetWindowText () {
             StringBuilder text = new StringBuilder(GetWindowTextLength(_handle) + 1);
             GetWindowText(_handle, text, text.Capacity);
@@ -64,10 +71,6 @@ namespace FrigoTab {
 
         public WindowExStyles GetWindowExStyles () {
             return (WindowExStyles) GetWindowLongPtr(_handle, WindowLong.ExStyle);
-        }
-
-        public void SetForeground () {
-            SetForegroundWindow(_handle);
         }
 
         private Rect GetWindowRect () {
@@ -125,6 +128,9 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern IntPtr GetWindowLongPtr (IntPtr hWnd, WindowLong nIndex);
+
+                [DllImport ("user32.dll")]
+        private static extern bool ShowWindow (IntPtr hWnd, ShowWindowCommand nCmdShow);
 
         [DllImport ("user32.dll")]
         private static extern bool SetForegroundWindow (IntPtr hwnd);
