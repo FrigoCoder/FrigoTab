@@ -20,6 +20,7 @@ namespace FrigoTab {
 
         ToolWindow = 0x80,
         AppWindow = 0x40000,
+        Layered = 0x80000,
         NoActivate = 0x8000000
 
     }

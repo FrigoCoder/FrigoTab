@@ -1,24 +1,25 @@
-﻿using System;
-using System.Drawing;
+﻿using System.Drawing;
 
 namespace FrigoTab {
 
-    public class Window : IDisposable {
+    public class Window : FrigoForm {
 
-        public readonly WindowHandle Handle;
-        public readonly Rectangle Bounds;
+        public readonly WindowHandle WindowHandle;
         public readonly int Index;
         private readonly Thumbnail _thumbnail;
 
-        public Window (WindowHandle owner, WindowHandle handle, Rectangle bounds, int index) {
-            Handle = handle;
+        public Window (Session session, WindowHandle windowHandle, Rectangle bounds, int index) {
+            Owner = session;
+            WindowHandle = windowHandle;
             Bounds = bounds;
             Index = index;
-            _thumbnail = new Thumbnail(handle, owner, new Rect(bounds));
+            ExStyle |= WindowExStyles.Layered;
+            _thumbnail = new Thumbnail(windowHandle, session.Handle, new Rect(bounds));
         }
 
-        public void Dispose () {
+        public override void Dispose () {
             _thumbnail.Dispose();
+            base.Dispose();
         }
 
     }
