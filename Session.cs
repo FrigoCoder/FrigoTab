@@ -14,9 +14,6 @@ namespace FrigoTab {
 
         public Session () {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
-            FormBorderStyle = FormBorderStyle.None;
-            ShowInTaskbar = false;
-            TopMost = true;
 
             WindowFinder finder = new WindowFinder();
 
