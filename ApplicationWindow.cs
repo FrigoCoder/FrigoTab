@@ -29,12 +29,13 @@ namespace FrigoTab {
             Bounds = bounds;
             Index = index;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
-            _thumbnail = new Thumbnail(windowHandle, session.Handle, new Rect(bounds));
-            _overlay = new Overlay(this);
 
             Icon = WindowHandle.IconFromSendMessageTimeout();
             Icon = Icon ?? WindowHandle.IconFromGetClassLongPtr();
             Icon = Icon ?? Program.Icon;
+
+            _thumbnail = new Thumbnail(windowHandle, session.Handle, new Rect(bounds));
+            _overlay = new Overlay(this);
         }
 
         public new void Dispose () {
