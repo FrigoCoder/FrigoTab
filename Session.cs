@@ -70,11 +70,10 @@ namespace FrigoTab {
 
         protected override void OnKeyDown (KeyEventArgs e) {
             base.OnKeyDown(e);
-            foreach( ApplicationWindow window in _applications ) {
-                if( window.Index == (char) e.KeyCode - '1' ) {
-                    window.WindowHandle.SetForeground();
-                    Dispose();
-                }
+            ApplicationWindow selected = _applications.FirstOrDefault(window => window.Index == (char) e.KeyCode - '1');
+            if( selected != null ) {
+                selected.WindowHandle.SetForeground();
+                Dispose();
             }
         }
 
@@ -85,8 +84,11 @@ namespace FrigoTab {
 
         protected override void OnMouseClick (MouseEventArgs e) {
             base.OnMouseClick(e);
-            SelectedWindow.WindowHandle.SetForeground();
-            Dispose();
+            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(e.Location));
+            if( SelectedWindow != null ) {
+                SelectedWindow.WindowHandle.SetForeground();
+                Dispose();
+            }
         }
 
         private void SetForeground () {
