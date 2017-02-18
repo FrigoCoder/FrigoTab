@@ -74,7 +74,7 @@ namespace FrigoTab {
         }
 
         public void IconFromCallback (SendMessageDelegate callback) {
-            SendMessageCallback(_handle, WindowsMessages.GetIcon, (IntPtr) 1, (IntPtr) 0, callback, 0);
+            SendMessageCallback(_handle, WindowsMessages.GetIcon, (IntPtr) GetIconSize.Big, (IntPtr) 0, callback, 0);
         }
 
         public WindowStyles GetWindowStyles () {
@@ -132,6 +132,12 @@ namespace FrigoTab {
         private enum WindowsMessages {
 
             GetIcon = 127
+
+        }
+
+        private enum GetIconSize {
+
+            Big = 1
 
         }
 
