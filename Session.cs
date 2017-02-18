@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -97,7 +98,10 @@ namespace FrigoTab {
             Activate();
             int current = GetCurrentThreadId();
             int foreground = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
-            if( current != foreground ) {
+            if( current == foreground ) {
+                File.AppendAllText("log.txt", "Successfully called SetForeground\n");
+            } else {
+                File.AppendAllText("log.txt", "Had to AttachThreadInput\n");
                 AttachThreadInput(current, foreground, true);
                 Activate();
                 AttachThreadInput(current, foreground, false);
