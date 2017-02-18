@@ -31,6 +31,9 @@ namespace FrigoTab {
             }
 
             Visible = true;
+            foreach( ApplicationWindow window in _applications ) {
+                window.Visible = true;
+            }
             SetForeground();
         }
 

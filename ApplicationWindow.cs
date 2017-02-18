@@ -8,6 +8,7 @@ namespace FrigoTab {
         public readonly WindowHandle WindowHandle;
         public readonly int Index;
         private readonly Thumbnail _thumbnail;
+        private readonly Overlay _overlay;
 
         public ApplicationWindow (Session session, WindowHandle windowHandle, Rectangle bounds, int index) {
             Owner = session;
@@ -16,6 +17,7 @@ namespace FrigoTab {
             Index = index;
             ExStyle |= WindowExStyles.Layered;
             _thumbnail = new Thumbnail(windowHandle, session.Handle, new Rect(bounds));
+            _overlay = new Overlay(this);
         }
 
         public new void Dispose () {
