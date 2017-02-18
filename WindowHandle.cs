@@ -28,6 +28,8 @@ namespace FrigoTab {
 
     public class WindowHandle {
 
+        public delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
+
         public static implicit operator WindowHandle (IntPtr handle) {
             return new WindowHandle(handle);
         }
@@ -66,13 +68,13 @@ namespace FrigoTab {
             return text.ToString();
         }
 
-        public Icon GetWindowIcon () {
-            IntPtr iconHandle;
-            SendMessageTimeout(_handle, 127, 1, 0, 1 | 2, 500, out iconHandle);
-            if( iconHandle == IntPtr.Zero ) {
-                iconHandle = GetClassLongPtr(_handle, -14);
-            }
-            return iconHandle == IntPtr.Zero ? null : Icon.FromHandle(iconHandle);
+        public Icon IconFromGetClassLongPtr () {
+            IntPtr icon = GetClassLongPtr(_handle, -14);
+            return icon != IntPtr.Zero ? Icon.FromHandle(icon) : null;
+        }
+
+        public void IconFromCallback (SendMessageDelegate callback) {
+            SendMessageCallback(_handle, 127, 1, 0, callback, 0);
         }
 
         public WindowStyles GetWindowStyles () {
@@ -149,16 +151,15 @@ namespace FrigoTab {
         private static extern bool GetWindowPlacement (IntPtr hWnd, ref WindowPlacement lpwndpl);
 
         [DllImport ("user32.dll")]
-        private static extern IntPtr SendMessageTimeout (IntPtr hwnd,
+        private static extern IntPtr GetClassLongPtr (IntPtr hWnd, int nIndex);
+
+        [DllImport ("user32.dll")]
+        private static extern bool SendMessageCallback (IntPtr hWnd,
             int message,
             long wParam,
             long lParam,
-            int flags,
-            int timeout,
-            out IntPtr result);
-
-        [DllImport ("user32.dll")]
-        private static extern IntPtr GetClassLongPtr (IntPtr hWnd, int nIndex);
+            SendMessageDelegate lpCallBack,
+            long dwData);
 
     }
 

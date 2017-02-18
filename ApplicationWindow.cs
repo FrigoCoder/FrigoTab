@@ -30,11 +30,22 @@ namespace FrigoTab {
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             _thumbnail = new Thumbnail(windowHandle, session.Handle, new Rect(bounds));
             _overlay = new Overlay(this);
+
+            Icon = Program.Icon;
+            Icon = windowHandle.IconFromGetClassLongPtr() ?? Icon;
+            windowHandle.IconFromCallback(SetIcon);
         }
 
         public new void Dispose () {
             _thumbnail.Dispose();
             Close();
+        }
+
+        private void SetIcon (IntPtr hwnd, int msg, IntPtr dwData, IntPtr lResult) {
+            if( lResult != IntPtr.Zero ) {
+                Icon = Icon.FromHandle(lResult);
+            }
+            _overlay.Draw();
         }
 
     }
