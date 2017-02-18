@@ -59,7 +59,7 @@ namespace FrigoTab {
             RectangleF background = new RectangleF(graphics.VisibleClipBounds.Location, new SizeF(width, height));
             FillRectangle(graphics, background, Color.Black);
 
-            using( icon ) {
+            {
                 float x = background.X + pad;
                 float y = Center(icon.Size, background).Y;
                 graphics.DrawIcon(icon, (int) x, (int) y);
