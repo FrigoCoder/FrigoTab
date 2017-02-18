@@ -34,12 +34,41 @@ namespace FrigoTab {
             graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
             RenderFrame(graphics);
+            RenderTitle(graphics);
             RenderNumber(graphics);
         }
 
         private void RenderFrame (Graphics graphics) {
             if( _window.Selected ) {
                 FillRectangle(graphics, graphics.VisibleClipBounds, Color.FromArgb(128, 0, 0, 255));
+            }
+        }
+
+        private void RenderTitle (Graphics graphics) {
+            const int pad = 8;
+
+            Icon icon = _window.WindowHandle.GetWindowIcon() ?? Program.Icon;
+            string text = _window.WindowHandle.GetWindowText();
+
+            Font font = new Font("Segoe UI", 11f);
+            SizeF textSize = graphics.MeasureString(text, font);
+
+            float width = pad + icon.Width + pad + textSize.Width + pad;
+            float height = pad + Math.Max(icon.Height, textSize.Height) + pad;
+
+            RectangleF background = new RectangleF(graphics.VisibleClipBounds.Location, new SizeF(width, height));
+            FillRectangle(graphics, background, Color.Black);
+
+            using( icon ) {
+                float x = background.X + pad;
+                float y = Center(icon.Size, background).Y;
+                graphics.DrawIcon(icon, (int) x, (int) y);
+            }
+
+            using( Brush brush = new SolidBrush(Color.White) ) {
+                float x = background.X + pad + icon.Width + pad;
+                float y = Center(textSize, background).Y;
+                graphics.DrawString(text, font, brush, x, y);
             }
         }
 
