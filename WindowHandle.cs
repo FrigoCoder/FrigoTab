@@ -18,6 +18,7 @@ namespace FrigoTab {
     [Flags]
     public enum WindowExStyles : long {
 
+        Transparent = 0x20,
         ToolWindow = 0x80,
         AppWindow = 0x40000,
         Layered = 0x80000,
