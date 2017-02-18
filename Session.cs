@@ -11,7 +11,6 @@ namespace FrigoTab {
 
         private readonly IList<ApplicationWindow> _applications = new List<ApplicationWindow>();
         private readonly IList<Thumbnail> _backgrounds = new List<Thumbnail>();
-
         private ApplicationWindow _selectedWindow;
 
         private ApplicationWindow SelectedWindow {
