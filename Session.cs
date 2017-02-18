@@ -70,11 +70,10 @@ namespace FrigoTab {
 
         protected override void OnKeyDown (KeyEventArgs e) {
             base.OnKeyDown(e);
-            ApplicationWindow selected = _applications.FirstOrDefault(window => window.Index == (char) e.KeyCode - '1');
-            if( selected != null ) {
-                SelectedWindow = selected;
+            _applications.Where(window => window.Index == (char) e.KeyCode - '1').ToList().ForEach(window => {
+                SelectedWindow = window;
                 End();
-            }
+            });
         }
 
         protected override void OnMouseMove (MouseEventArgs e) {
