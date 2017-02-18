@@ -73,8 +73,20 @@ namespace FrigoTab {
             return icon != IntPtr.Zero ? Icon.FromHandle(icon) : null;
         }
 
-        public void IconFromCallback (SendMessageDelegate callback) {
-            SendMessageCallback(_handle, WindowsMessages.GetIcon, (IntPtr) GetIconSize.Big, (IntPtr) 0, callback, 0);
+        public Icon IconFromSendMessageTimeout () {
+            IntPtr icon;
+            SendMessageTimeout(_handle,
+                WindowMessages.GetIcon,
+                (IntPtr) GetIconSize.Big,
+                (IntPtr) 0,
+                SendMessageTimeoutFlags.AbortIfHung | SendMessageTimeoutFlags.Block,
+                500,
+                out icon);
+            return icon != IntPtr.Zero ? Icon.FromHandle(icon) : null;
+        }
+
+        public void IconFromSendMessageCallback (SendMessageDelegate callback) {
+            SendMessageCallback(_handle, WindowMessages.GetIcon, (IntPtr) GetIconSize.Big, (IntPtr) 0, callback, 0);
         }
 
         public WindowStyles GetWindowStyles () {
@@ -135,7 +147,7 @@ namespace FrigoTab {
 
         }
 
-        private enum WindowsMessages {
+        private enum WindowMessages {
 
             GetIcon = 127
 
@@ -144,6 +156,14 @@ namespace FrigoTab {
         private enum GetIconSize {
 
             Big = 1
+
+        }
+
+        [Flags]
+        private enum SendMessageTimeoutFlags {
+
+            Block = 1,
+            AbortIfHung = 2
 
         }
 
@@ -172,8 +192,17 @@ namespace FrigoTab {
         private static extern IntPtr GetClassLongPtr (IntPtr hWnd, ClassLong nIndex);
 
         [DllImport ("user32.dll")]
+        private static extern IntPtr SendMessageTimeout (IntPtr hwnd,
+            WindowMessages message,
+            IntPtr wparam,
+            IntPtr lparam,
+            SendMessageTimeoutFlags flags,
+            int timeout,
+            out IntPtr result);
+
+        [DllImport ("user32.dll")]
         private static extern bool SendMessageCallback (IntPtr hWnd,
-            WindowsMessages message,
+            WindowMessages message,
             IntPtr wParam,
             IntPtr lParam,
             SendMessageDelegate lpCallBack,

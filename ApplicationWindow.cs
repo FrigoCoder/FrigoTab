@@ -32,9 +32,9 @@ namespace FrigoTab {
             _thumbnail = new Thumbnail(windowHandle, session.Handle, new Rect(bounds));
             _overlay = new Overlay(this);
 
-            Icon = Program.Icon;
-            Icon = windowHandle.IconFromGetClassLongPtr() ?? Icon;
-            windowHandle.IconFromCallback(SetIcon);
+            Icon = WindowHandle.IconFromSendMessageTimeout();
+            Icon = Icon ?? WindowHandle.IconFromGetClassLongPtr();
+            Icon = Icon ?? Program.Icon;
         }
 
         public new void Dispose () {
