@@ -15,7 +15,7 @@ namespace FrigoTab {
             WindowHandle = windowHandle;
             Bounds = bounds;
             Index = index;
-            ExStyle |= WindowExStyles.Layered;
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             _thumbnail = new Thumbnail(windowHandle, session.Handle, new Rect(bounds));
             _overlay = new Overlay(this);
         }
