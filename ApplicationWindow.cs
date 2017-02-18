@@ -3,13 +3,13 @@ using System.Drawing;
 
 namespace FrigoTab {
 
-    public class Window : FrigoForm, IDisposable {
+    public class ApplicationWindow : FrigoForm, IDisposable {
 
         public readonly WindowHandle WindowHandle;
         public readonly int Index;
         private readonly Thumbnail _thumbnail;
 
-        public Window (Session session, WindowHandle windowHandle, Rectangle bounds, int index) {
+        public ApplicationWindow (Session session, WindowHandle windowHandle, Rectangle bounds, int index) {
             Owner = session;
             WindowHandle = windowHandle;
             Bounds = bounds;

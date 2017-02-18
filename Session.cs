@@ -10,7 +10,7 @@ namespace FrigoTab {
     public class Session : FrigoForm, IDisposable {
 
         private readonly IList<Thumbnail> _toolwindows = new List<Thumbnail>();
-        private readonly IList<Window> _windows = new List<Window>();
+        private readonly IList<ApplicationWindow> _windows = new List<ApplicationWindow>();
 
         public Session () {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
@@ -27,7 +27,7 @@ namespace FrigoTab {
 
             Layout layout = new Layout(finder.Windows);
             foreach( WindowHandle window in finder.Windows ) {
-                _windows.Add(new Window(this, window, layout.Bounds[window], _windows.Count));
+                _windows.Add(new ApplicationWindow(this, window, layout.Bounds[window], _windows.Count));
             }
 
             Visible = true;
@@ -36,7 +36,7 @@ namespace FrigoTab {
 
         public new void Dispose () {
             Visible = false;
-            foreach( Window window in _windows ) {
+            foreach( ApplicationWindow window in _windows ) {
                 window.Dispose();
             }
             foreach( Thumbnail thumbnail in _toolwindows ) {
@@ -47,7 +47,7 @@ namespace FrigoTab {
 
         protected override void OnKeyDown (KeyEventArgs e) {
             base.OnKeyDown(e);
-            foreach( Window window in _windows ) {
+            foreach( ApplicationWindow window in _windows ) {
                 if( (e.KeyCode - Keys.D1 == window.Index) || (e.KeyCode - Keys.NumPad1 == window.Index) ) {
                     window.WindowHandle.SetForeground();
                     Dispose();
@@ -57,7 +57,7 @@ namespace FrigoTab {
 
         protected override void OnMouseClick (MouseEventArgs e) {
             base.OnMouseClick(e);
-            foreach( Window window in _windows ) {
+            foreach( ApplicationWindow window in _windows ) {
                 if( window.Bounds.Contains(e.Location) ) {
                     window.WindowHandle.SetForeground();
                     Dispose();
