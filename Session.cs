@@ -24,7 +24,9 @@ namespace FrigoTab {
                     _selectedWindow.Selected = false;
                 }
                 _selectedWindow = value;
-                _selectedWindow.Selected = true;
+                if( _selectedWindow != null ) {
+                    _selectedWindow.Selected = true;
+                }
             }
         }
 
@@ -78,21 +80,13 @@ namespace FrigoTab {
 
         protected override void OnMouseMove (MouseEventArgs e) {
             base.OnMouseMove(e);
-            foreach( ApplicationWindow window in _applications ) {
-                if( window.Bounds.Contains(e.Location) ) {
-                    SelectedWindow = window;
-                }
-            }
+            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(e.Location));
         }
 
         protected override void OnMouseClick (MouseEventArgs e) {
             base.OnMouseClick(e);
-            foreach( ApplicationWindow window in _applications ) {
-                if( window.Bounds.Contains(e.Location) ) {
-                    window.WindowHandle.SetForeground();
-                    Dispose();
-                }
-            }
+            SelectedWindow.WindowHandle.SetForeground();
+            Dispose();
         }
 
         private void SetForeground () {
