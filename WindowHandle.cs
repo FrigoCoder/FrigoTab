@@ -74,7 +74,7 @@ namespace FrigoTab {
         }
 
         public void IconFromCallback (SendMessageDelegate callback) {
-            SendMessageCallback(_handle, 127, 1, 0, callback, 0);
+            SendMessageCallback(_handle, WindowsMessages.GetIcon, (IntPtr) 1, (IntPtr) 0, callback, 0);
         }
 
         public WindowStyles GetWindowStyles () {
@@ -129,6 +129,12 @@ namespace FrigoTab {
 
         }
 
+        private enum WindowsMessages {
+
+            GetIcon = 127
+
+        }
+
         [DllImport ("user32.dll")]
         private static extern bool GetWindowRect (IntPtr hWnd, out Rect lpRect);
 
@@ -155,9 +161,9 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern bool SendMessageCallback (IntPtr hWnd,
-            int message,
-            long wParam,
-            long lParam,
+            WindowsMessages message,
+            IntPtr wParam,
+            IntPtr lParam,
             SendMessageDelegate lpCallBack,
             long dwData);
 
