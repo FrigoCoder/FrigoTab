@@ -72,8 +72,8 @@ namespace FrigoTab {
             base.OnKeyDown(e);
             ApplicationWindow selected = _applications.FirstOrDefault(window => window.Index == (char) e.KeyCode - '1');
             if( selected != null ) {
-                selected.WindowHandle.SetForeground();
-                Dispose();
+                SelectedWindow = selected;
+                End();
             }
         }
 
@@ -85,6 +85,10 @@ namespace FrigoTab {
         protected override void OnMouseClick (MouseEventArgs e) {
             base.OnMouseClick(e);
             SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(e.Location));
+            End();
+        }
+
+        private void End () {
             if( SelectedWindow != null ) {
                 SelectedWindow.WindowHandle.SetForeground();
                 Dispose();
