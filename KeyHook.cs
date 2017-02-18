@@ -44,7 +44,7 @@ namespace FrigoTab {
             return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
         }
 
-        internal struct LowLevelKeyStruct {
+        private struct LowLevelKeyStruct {
 
             public Keys VkCode;
             public int ScanCode;
@@ -55,7 +55,7 @@ namespace FrigoTab {
         }
 
         [Flags]
-        internal enum LowLevelKeyFlags {
+        private enum LowLevelKeyFlags {
 
             AltDown = 32
 
