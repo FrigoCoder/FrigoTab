@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Text;
 using System.Runtime.InteropServices;
 
 namespace FrigoTab {
@@ -29,6 +31,26 @@ namespace FrigoTab {
         }
 
         private void Render (Graphics graphics) {
+            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            RenderNumber(graphics);
+        }
+
+        private void RenderNumber (Graphics graphics) {
+            string text = (_window.Index + 1).ToString();
+
+            Font font = new Font("Segoe UI", 72f, FontStyle.Bold);
+            SizeF textSize = graphics.MeasureString(text, font);
+
+            RectangleF background = Center(textSize, graphics.VisibleClipBounds);
+            using( Brush brush = new SolidBrush(Color.Black) ) {
+                graphics.FillRectangle(brush, background);
+            }
+
+            graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+            using( Brush brush = new SolidBrush(Color.White) ) {
+                graphics.DrawString(text, font, brush, background);
+            }
         }
 
         private void UpdateLayeredWindow (IntPtr hdc) {
@@ -42,6 +64,12 @@ namespace FrigoTab {
                 1
             };
             UpdateLayeredWindow(_window.Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, pblend, 2);
+        }
+
+        private static RectangleF Center (SizeF rect, RectangleF bounds) {
+            SizeF margins = bounds.Size - rect;
+            PointF location = new PointF(bounds.X + margins.Width / 2, bounds.Y + margins.Height / 2);
+            return new RectangleF(location, rect);
         }
 
         [DllImport ("user32.dll")]
