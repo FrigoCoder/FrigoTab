@@ -9,8 +9,8 @@ namespace FrigoTab {
 
     public class Session : FrigoForm, IDisposable {
 
-        private readonly IList<Thumbnail> _toolwindows = new List<Thumbnail>();
-        private readonly IList<ApplicationWindow> _windows = new List<ApplicationWindow>();
+        private readonly IList<ApplicationWindow> _applications = new List<ApplicationWindow>();
+        private readonly IList<Thumbnail> _backgrounds = new List<Thumbnail>();
 
         public Session () {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
@@ -22,12 +22,12 @@ namespace FrigoTab {
             }
 
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
-                _toolwindows.Add(new Thumbnail(window, Handle, window.GetRestoredWindowRect()));
+                _backgrounds.Add(new Thumbnail(window, Handle, window.GetRestoredWindowRect()));
             }
 
             Layout layout = new Layout(finder.Windows);
             foreach( WindowHandle window in finder.Windows ) {
-                _windows.Add(new ApplicationWindow(this, window, layout.Bounds[window], _windows.Count));
+                _applications.Add(new ApplicationWindow(this, window, layout.Bounds[window], _applications.Count));
             }
 
             Visible = true;
@@ -36,10 +36,10 @@ namespace FrigoTab {
 
         public new void Dispose () {
             Visible = false;
-            foreach( ApplicationWindow window in _windows ) {
+            foreach( ApplicationWindow window in _applications ) {
                 window.Dispose();
             }
-            foreach( Thumbnail thumbnail in _toolwindows ) {
+            foreach( Thumbnail thumbnail in _backgrounds ) {
                 thumbnail.Dispose();
             }
             Close();
@@ -47,7 +47,7 @@ namespace FrigoTab {
 
         protected override void OnKeyDown (KeyEventArgs e) {
             base.OnKeyDown(e);
-            foreach( ApplicationWindow window in _windows ) {
+            foreach( ApplicationWindow window in _applications ) {
                 if( (e.KeyCode - Keys.D1 == window.Index) || (e.KeyCode - Keys.NumPad1 == window.Index) ) {
                     window.WindowHandle.SetForeground();
                     Dispose();
@@ -57,7 +57,7 @@ namespace FrigoTab {
 
         protected override void OnMouseClick (MouseEventArgs e) {
             base.OnMouseClick(e);
-            foreach( ApplicationWindow window in _windows ) {
+            foreach( ApplicationWindow window in _applications ) {
                 if( window.Bounds.Contains(e.Location) ) {
                     window.WindowHandle.SetForeground();
                     Dispose();
