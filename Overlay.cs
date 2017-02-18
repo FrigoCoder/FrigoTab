@@ -47,7 +47,7 @@ namespace FrigoTab {
         private void RenderTitle (Graphics graphics) {
             const int pad = 8;
 
-            Icon icon = _window.WindowHandle.GetWindowIcon() ?? Program.Icon;
+            Icon icon = _window.Icon;
             string text = _window.WindowHandle.GetWindowText();
 
             Font font = new Font("Segoe UI", 11f);
