@@ -97,7 +97,7 @@ namespace FrigoTab {
                 SourceConstantAlpha = 0xff,
                 AlphaFormat = AlphaFormat.SourceAlpha
             };
-            UpdateLayeredWindowFlags flag = UpdateLayeredWindowFlags.Alpha;
+            const UpdateLayeredWindowFlags flag = UpdateLayeredWindowFlags.Alpha;
             UpdateLayeredWindow(_window.Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, ref pblend, flag);
         }
 
