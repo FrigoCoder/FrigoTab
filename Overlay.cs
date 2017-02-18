@@ -87,18 +87,6 @@ namespace FrigoTab {
             }
         }
 
-        private void FillRectangle (Graphics graphics, RectangleF bounds, Color color) {
-            PointF[] points = new PointF[5];
-            points[0] = new PointF(bounds.Left, bounds.Top);
-            points[1] = new PointF(bounds.Left, bounds.Top);
-            points[2] = new PointF(bounds.Right, bounds.Top);
-            points[3] = new PointF(bounds.Right, bounds.Bottom);
-            points[4] = new PointF(bounds.Left, bounds.Bottom);
-            using( Brush brush = new SolidBrush(color) ) {
-                graphics.FillPolygon(brush, points);
-            }
-        }
-
         private void UpdateLayeredWindow (IntPtr hdc) {
             Point pptDst = _window.Bounds.Location;
             Size pSize = _window.Bounds.Size;
@@ -110,6 +98,18 @@ namespace FrigoTab {
                 1
             };
             UpdateLayeredWindow(_window.Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, pblend, 2);
+        }
+
+        private static void FillRectangle (Graphics graphics, RectangleF bounds, Color color) {
+            PointF[] points = new PointF[5];
+            points[0] = new PointF(bounds.Left, bounds.Top);
+            points[1] = new PointF(bounds.Left, bounds.Top);
+            points[2] = new PointF(bounds.Right, bounds.Top);
+            points[3] = new PointF(bounds.Right, bounds.Bottom);
+            points[4] = new PointF(bounds.Left, bounds.Bottom);
+            using( Brush brush = new SolidBrush(color) ) {
+                graphics.FillPolygon(brush, points);
+            }
         }
 
         private static RectangleF Center (SizeF rect, RectangleF bounds) {
