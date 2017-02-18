@@ -91,13 +91,22 @@ namespace FrigoTab {
             Point pptDst = _window.Bounds.Location;
             Size pSize = _window.Bounds.Size;
             Point pptSrc = Point.Empty;
-            byte[] pblend = {
-                0,
-                0,
-                0xff,
-                1
+            BlendFunction pblend = new BlendFunction {
+                BlendOp = 0,
+                BlendFlags = 0,
+                SourceConstantAlpha = 0xff,
+                AlphaFormat = 1
             };
-            UpdateLayeredWindow(_window.Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, pblend, 2);
+            UpdateLayeredWindow(_window.Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, ref pblend, 2);
+        }
+
+        private struct BlendFunction {
+
+            public byte BlendOp;
+            public byte BlendFlags;
+            public byte SourceConstantAlpha;
+            public byte AlphaFormat;
+
         }
 
         private static void FillRectangle (Graphics graphics, RectangleF bounds, Color color) {
@@ -147,7 +156,7 @@ namespace FrigoTab {
             IntPtr hdcSrc,
             ref Point pptSrc,
             int crKey,
-            byte[] pblend,
+            ref BlendFunction pblend,
             int dwFlags);
 
     }
