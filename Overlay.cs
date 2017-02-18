@@ -39,9 +39,7 @@ namespace FrigoTab {
 
         private void RenderFrame (Graphics graphics) {
             if( _window.Selected ) {
-                using( Brush brush = new SolidBrush(Color.FromArgb(128, 0, 0, 255)) ) {
-                    graphics.FillRectangle(brush, graphics.VisibleClipBounds);
-                }
+                FillRectangle(graphics, graphics.VisibleClipBounds, Color.FromArgb(128, 0, 0, 255));
             }
         }
 
@@ -52,13 +50,23 @@ namespace FrigoTab {
             SizeF textSize = graphics.MeasureString(text, font);
 
             RectangleF background = Center(textSize, graphics.VisibleClipBounds);
-            using( Brush brush = new SolidBrush(Color.Black) ) {
-                graphics.FillRectangle(brush, background);
-            }
+            FillRectangle(graphics, background, Color.Black);
 
             graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
             using( Brush brush = new SolidBrush(Color.White) ) {
                 graphics.DrawString(text, font, brush, background);
+            }
+        }
+
+        private void FillRectangle (Graphics graphics, RectangleF bounds, Color color) {
+            PointF[] points = new PointF[5];
+            points[0] = new PointF(bounds.Left, bounds.Top);
+            points[1] = new PointF(bounds.Left, bounds.Top);
+            points[2] = new PointF(bounds.Right, bounds.Top);
+            points[3] = new PointF(bounds.Right, bounds.Bottom);
+            points[4] = new PointF(bounds.Left, bounds.Bottom);
+            using( Brush brush = new SolidBrush(color) ) {
+                graphics.FillPolygon(brush, points);
             }
         }
 
