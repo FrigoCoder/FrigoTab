@@ -71,7 +71,7 @@ namespace FrigoTab {
         protected override void OnKeyDown (KeyEventArgs e) {
             base.OnKeyDown(e);
             foreach( ApplicationWindow window in _applications ) {
-                if( (e.KeyCode - Keys.D1 == window.Index) || (e.KeyCode - Keys.NumPad1 == window.Index) ) {
+                if( window.Index == (char) e.KeyCode - '1' ) {
                     window.WindowHandle.SetForeground();
                     Dispose();
                 }
