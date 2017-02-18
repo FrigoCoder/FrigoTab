@@ -97,6 +97,7 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Layout.cs" />
+    <Compile Include="Overlay.cs" />
     <Compile Include="Rect.cs" />
     <Compile Include="SessionManager.cs" />
     <Compile Include="KeyHook.cs" />
