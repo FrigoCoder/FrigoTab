@@ -12,6 +12,22 @@ namespace FrigoTab {
         private readonly IList<ApplicationWindow> _applications = new List<ApplicationWindow>();
         private readonly IList<Thumbnail> _backgrounds = new List<Thumbnail>();
 
+        private ApplicationWindow _selectedWindow;
+
+        private ApplicationWindow SelectedWindow {
+            get { return _selectedWindow; }
+            set {
+                if( _selectedWindow == value ) {
+                    return;
+                }
+                if( _selectedWindow != null ) {
+                    _selectedWindow.Selected = false;
+                }
+                _selectedWindow = value;
+                _selectedWindow.Selected = true;
+            }
+        }
+
         public Session () {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
 
@@ -29,6 +45,8 @@ namespace FrigoTab {
             foreach( WindowHandle window in finder.Windows ) {
                 _applications.Add(new ApplicationWindow(this, window, layout.Bounds[window], _applications.Count));
             }
+
+            SelectedWindow = _applications[0];
 
             Visible = true;
             foreach( ApplicationWindow window in _applications ) {
@@ -54,6 +72,15 @@ namespace FrigoTab {
                 if( (e.KeyCode - Keys.D1 == window.Index) || (e.KeyCode - Keys.NumPad1 == window.Index) ) {
                     window.WindowHandle.SetForeground();
                     Dispose();
+                }
+            }
+        }
+
+        protected override void OnMouseMove (MouseEventArgs e) {
+            base.OnMouseMove(e);
+            foreach( ApplicationWindow window in _applications ) {
+                if( window.Bounds.Contains(e.Location) ) {
+                    SelectedWindow = window;
                 }
             }
         }
