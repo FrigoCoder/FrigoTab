@@ -15,7 +15,7 @@ namespace FrigoTab {
             Draw();
         }
 
-        private void Draw () {
+        public void Draw () {
             IntPtr screenDc = GetDC(IntPtr.Zero);
             IntPtr memDc = CreateCompatibleDC(screenDc);
             IntPtr hBitmap = CreateCompatibleBitmap(screenDc, _window.Bounds.Width, _window.Bounds.Height);
@@ -33,7 +33,16 @@ namespace FrigoTab {
         private void Render (Graphics graphics) {
             graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            RenderFrame(graphics);
             RenderNumber(graphics);
+        }
+
+        private void RenderFrame (Graphics graphics) {
+            if( _window.Selected ) {
+                using( Brush brush = new SolidBrush(Color.FromArgb(128, 0, 0, 255)) ) {
+                    graphics.FillRectangle(brush, graphics.VisibleClipBounds);
+                }
+            }
         }
 
         private void RenderNumber (Graphics graphics) {
