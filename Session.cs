@@ -98,9 +98,7 @@ namespace FrigoTab {
             Activate();
             int current = GetCurrentThreadId();
             int foreground = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
-            if( current == foreground ) {
-                File.AppendAllText("log.txt", "Successfully called SetForeground\n");
-            } else {
+            if( current != foreground ) {
                 File.AppendAllText("log.txt", "Had to AttachThreadInput\n");
                 AttachThreadInput(current, foreground, true);
                 Activate();
