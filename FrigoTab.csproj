@@ -107,7 +107,7 @@
     </Compile>
     <Compile Include="SysTrayIcon.cs" />
     <Compile Include="Thumbnail.cs" />
-    <Compile Include="Window.cs">
+    <Compile Include="ApplicationWindow.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="WindowFinder.cs" />
