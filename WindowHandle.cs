@@ -69,7 +69,7 @@ namespace FrigoTab {
         }
 
         public Icon IconFromGetClassLongPtr () {
-            IntPtr icon = GetClassLongPtr(_handle, -14);
+            IntPtr icon = GetClassLongPtr(_handle, ClassLong.Icon);
             return icon != IntPtr.Zero ? Icon.FromHandle(icon) : null;
         }
 
@@ -129,6 +129,12 @@ namespace FrigoTab {
 
         }
 
+        private enum ClassLong {
+
+            Icon = -14
+
+        }
+
         private enum WindowsMessages {
 
             GetIcon = 127
@@ -163,7 +169,7 @@ namespace FrigoTab {
         private static extern bool GetWindowPlacement (IntPtr hWnd, ref WindowPlacement lpwndpl);
 
         [DllImport ("user32.dll")]
-        private static extern IntPtr GetClassLongPtr (IntPtr hWnd, int nIndex);
+        private static extern IntPtr GetClassLongPtr (IntPtr hWnd, ClassLong nIndex);
 
         [DllImport ("user32.dll")]
         private static extern bool SendMessageCallback (IntPtr hWnd,
