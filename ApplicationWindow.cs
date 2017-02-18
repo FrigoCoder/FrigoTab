@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Windows.Forms;
 
 namespace FrigoTab {
 
@@ -22,7 +23,7 @@ namespace FrigoTab {
             }
         }
 
-        public ApplicationWindow (Session session, WindowHandle windowHandle, Rectangle bounds, int index) {
+        public ApplicationWindow (Form session, WindowHandle windowHandle, Rectangle bounds, int index) {
             Owner = session;
             WindowHandle = windowHandle;
             Bounds = bounds;
