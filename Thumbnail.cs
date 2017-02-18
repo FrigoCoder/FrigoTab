@@ -26,7 +26,7 @@ namespace FrigoTab {
             DwmUnregisterThumbnail(_thumbnail);
         }
 
-        internal struct DwmThumbnailProperties {
+        private struct DwmThumbnailProperties {
 
             public DwmThumbnailFlags Flags;
             public Rect Destination;
@@ -38,7 +38,7 @@ namespace FrigoTab {
         }
 
         [Flags]
-        internal enum DwmThumbnailFlags {
+        private enum DwmThumbnailFlags {
 
             None = 0,
             RectDestination = 1,

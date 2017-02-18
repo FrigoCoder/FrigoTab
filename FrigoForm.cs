@@ -18,7 +18,7 @@ namespace FrigoTab {
             }
         }
 
-        public FrigoForm () {
+        protected FrigoForm () {
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             TopMost = true;

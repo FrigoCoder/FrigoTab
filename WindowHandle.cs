@@ -88,7 +88,7 @@ namespace FrigoTab {
             return placement;
         }
 
-        internal struct WindowPlacement {
+        private struct WindowPlacement {
 
             public int Length;
             public WindowPlacementFlags Flags;
@@ -99,13 +99,13 @@ namespace FrigoTab {
 
         }
 
-        internal enum WindowPlacementFlags {
+        private enum WindowPlacementFlags {
 
             RestoreToMaximized = 2
 
         }
 
-        internal enum ShowWindowCommand {
+        private enum ShowWindowCommand {
 
             Restore = 9
 
