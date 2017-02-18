@@ -92,20 +92,32 @@ namespace FrigoTab {
             Size pSize = _window.Bounds.Size;
             Point pptSrc = Point.Empty;
             BlendFunction pblend = new BlendFunction {
-                BlendOp = 0,
+                BlendOperation = BlendOperation.SourceOver,
                 BlendFlags = 0,
                 SourceConstantAlpha = 0xff,
-                AlphaFormat = 1
+                AlphaFormat = AlphaFormat.SourceAlpha
             };
             UpdateLayeredWindow(_window.Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, ref pblend, 2);
         }
 
         private struct BlendFunction {
 
-            public byte BlendOp;
+            public BlendOperation BlendOperation;
             public byte BlendFlags;
             public byte SourceConstantAlpha;
-            public byte AlphaFormat;
+            public AlphaFormat AlphaFormat;
+
+        }
+
+        private enum BlendOperation : byte {
+
+            SourceOver = 0
+
+        }
+
+        private enum AlphaFormat : byte {
+
+            SourceAlpha = 1
 
         }
 
