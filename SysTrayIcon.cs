@@ -13,20 +13,14 @@ namespace FrigoTab {
             _notifyIcon = new NotifyIcon {
                 Icon = Program.Icon,
                 ContextMenu = new ContextMenu(new[] {
-                    new MenuItem("Exit", ExitHandler)
+                    new MenuItem("Exit", (sender, args) => { Exit?.Invoke(); })
                 }),
                 Visible = true
             };
         }
 
         public void Dispose () {
-            _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
-        }
-
-        private void ExitHandler (object sender, EventArgs args) {
-            Dispose();
-            Exit?.Invoke();
         }
 
     }
