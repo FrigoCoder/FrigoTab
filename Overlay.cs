@@ -97,7 +97,8 @@ namespace FrigoTab {
                 SourceConstantAlpha = 0xff,
                 AlphaFormat = AlphaFormat.SourceAlpha
             };
-            UpdateLayeredWindow(_window.Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, ref pblend, 2);
+            UpdateLayeredWindowFlags flag = UpdateLayeredWindowFlags.Alpha;
+            UpdateLayeredWindow(_window.Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, ref pblend, flag);
         }
 
         private struct BlendFunction {
@@ -118,6 +119,13 @@ namespace FrigoTab {
         private enum AlphaFormat : byte {
 
             SourceAlpha = 1
+
+        }
+
+        [Flags]
+        private enum UpdateLayeredWindowFlags {
+
+            Alpha = 2
 
         }
 
@@ -169,7 +177,7 @@ namespace FrigoTab {
             ref Point pptSrc,
             int crKey,
             ref BlendFunction pblend,
-            int dwFlags);
+            UpdateLayeredWindowFlags dwFlags);
 
     }
 
