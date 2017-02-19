@@ -46,7 +46,7 @@ namespace FrigoTab {
 
             Visible = true;
             foreach( ApplicationWindow window in _applications ) {
-                window.Visible = true;
+                window.Overlay.Visible = true;
             }
             SetForeground();
         }
@@ -83,7 +83,7 @@ namespace FrigoTab {
 
         private void End () {
             if( SelectedWindow != null ) {
-                SelectedWindow.WindowHandle.SetForeground();
+                SelectedWindow.Handle.SetForeground();
                 Dispose();
             }
         }

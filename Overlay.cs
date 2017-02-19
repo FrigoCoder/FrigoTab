@@ -6,11 +6,15 @@ using System.Runtime.InteropServices;
 
 namespace FrigoTab {
 
-    public class Overlay {
+    public class Overlay : FrigoForm {
 
         private readonly ApplicationWindow _window;
 
-        public Overlay (ApplicationWindow window) {
+        public Overlay (Session session, ApplicationWindow window) {
+            Owner = session;
+            Bounds = window.Bounds;
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
+
             _window = window;
             Draw();
         }
@@ -47,8 +51,8 @@ namespace FrigoTab {
         private void RenderTitle (Graphics graphics) {
             const int pad = 8;
 
-            Icon icon = _window.WindowIcon;
-            string text = _window.WindowHandle.GetWindowText();
+            Icon icon = _window.Icon;
+            string text = _window.Handle.GetWindowText();
 
             Font font = new Font("Segoe UI", 11f);
             SizeF textSize = graphics.MeasureString(text, font);
@@ -98,7 +102,7 @@ namespace FrigoTab {
                 AlphaFormat = AlphaFormat.SourceAlpha
             };
             const UpdateLayeredWindowFlags flag = UpdateLayeredWindowFlags.Alpha;
-            UpdateLayeredWindow(_window.Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, ref pblend, flag);
+            UpdateLayeredWindow(Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, ref pblend, flag);
         }
 
         private struct BlendFunction {
