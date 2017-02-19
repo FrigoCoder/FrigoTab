@@ -44,13 +44,6 @@ namespace FrigoTab {
             Close();
         }
 
-        private void SetIcon (IntPtr hwnd, int msg, IntPtr dwData, IntPtr lResult) {
-            if( lResult != IntPtr.Zero ) {
-                Icon = Icon.FromHandle(lResult);
-            }
-            _overlay.Draw();
-        }
-
     }
 
 }
