@@ -30,14 +30,8 @@ namespace FrigoTab {
             }
         }
 
-        public Session () {
+        public Session (WindowFinder finder) {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
-
-            WindowFinder finder = new WindowFinder();
-            if( finder.Windows.Count == 0 ) {
-                Dispose();
-                return;
-            }
 
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
                 _backgrounds.Add(new Thumbnail(window, Handle, window.GetRestoredWindowRect()));
