@@ -28,8 +28,6 @@ namespace FrigoTab {
 
     public class WindowHandle {
 
-        public delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
-
         public static implicit operator WindowHandle (IntPtr handle) {
             return new WindowHandle(handle);
         }
@@ -66,27 +64,6 @@ namespace FrigoTab {
             StringBuilder text = new StringBuilder(GetWindowTextLength(_handle) + 1);
             GetWindowText(_handle, text, text.Capacity);
             return text.ToString();
-        }
-
-        public Icon IconFromGetClassLongPtr () {
-            IntPtr icon = GetClassLongPtr(_handle, ClassLong.Icon);
-            return icon != IntPtr.Zero ? Icon.FromHandle(icon) : null;
-        }
-
-        public Icon IconFromSendMessageTimeout () {
-            IntPtr icon;
-            SendMessageTimeout(_handle,
-                WindowMessages.GetIcon,
-                (IntPtr) GetIconSize.Big,
-                (IntPtr) 0,
-                SendMessageTimeoutFlags.AbortIfHung | SendMessageTimeoutFlags.Block,
-                500,
-                out icon);
-            return icon != IntPtr.Zero ? Icon.FromHandle(icon) : null;
-        }
-
-        public void IconFromSendMessageCallback (SendMessageDelegate callback) {
-            SendMessageCallback(_handle, WindowMessages.GetIcon, (IntPtr) GetIconSize.Big, (IntPtr) 0, callback, 0);
         }
 
         public WindowStyles GetWindowStyles () {
@@ -141,32 +118,6 @@ namespace FrigoTab {
 
         }
 
-        private enum ClassLong {
-
-            Icon = -14
-
-        }
-
-        private enum WindowMessages {
-
-            GetIcon = 127
-
-        }
-
-        private enum GetIconSize {
-
-            Big = 1
-
-        }
-
-        [Flags]
-        private enum SendMessageTimeoutFlags {
-
-            Block = 1,
-            AbortIfHung = 2
-
-        }
-
         [DllImport ("user32.dll")]
         private static extern bool GetWindowRect (IntPtr hWnd, out Rect lpRect);
 
@@ -187,26 +138,6 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern bool GetWindowPlacement (IntPtr hWnd, ref WindowPlacement lpwndpl);
-
-        [DllImport ("user32.dll")]
-        private static extern IntPtr GetClassLongPtr (IntPtr hWnd, ClassLong nIndex);
-
-        [DllImport ("user32.dll")]
-        private static extern IntPtr SendMessageTimeout (IntPtr hwnd,
-            WindowMessages message,
-            IntPtr wparam,
-            IntPtr lparam,
-            SendMessageTimeoutFlags flags,
-            int timeout,
-            out IntPtr result);
-
-        [DllImport ("user32.dll")]
-        private static extern bool SendMessageCallback (IntPtr hWnd,
-            WindowMessages message,
-            IntPtr wParam,
-            IntPtr lParam,
-            SendMessageDelegate lpCallBack,
-            long dwData);
 
     }
 

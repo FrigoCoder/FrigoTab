@@ -107,6 +107,7 @@
     <Compile Include="FrigoForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="IconManager.cs" />
     <Compile Include="Layout.cs" />
     <Compile Include="Overlay.cs">
       <SubType>Form</SubType>
