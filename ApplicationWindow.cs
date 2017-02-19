@@ -8,6 +8,7 @@ namespace FrigoTab {
 
         public readonly WindowHandle WindowHandle;
         public readonly int Index;
+        public readonly Icon WindowIcon;
         private readonly Thumbnail _thumbnail;
         private readonly Overlay _overlay;
         private bool _selected;
@@ -30,9 +31,9 @@ namespace FrigoTab {
             Index = index;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
 
-            Icon = WindowHandle.IconFromSendMessageTimeout();
-            Icon = Icon ?? WindowHandle.IconFromGetClassLongPtr();
-            Icon = Icon ?? Program.Icon;
+            WindowIcon = WindowHandle.IconFromSendMessageTimeout();
+            WindowIcon = WindowIcon ?? WindowHandle.IconFromGetClassLongPtr();
+            WindowIcon = WindowIcon ?? Program.Icon;
 
             _thumbnail = new Thumbnail(windowHandle, session.Handle, new Rect(bounds));
             _overlay = new Overlay(this);
