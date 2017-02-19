@@ -22,7 +22,7 @@ namespace FrigoTab {
         public void Draw () {
             IntPtr screenDc = GetDC(IntPtr.Zero);
             IntPtr memDc = CreateCompatibleDC(screenDc);
-            IntPtr hBitmap = CreateCompatibleBitmap(screenDc, _window.Bounds.Width, _window.Bounds.Height);
+            IntPtr hBitmap = CreateCompatibleBitmap(screenDc, Bounds.Width, Bounds.Height);
             IntPtr hOldBitmap = SelectObject(memDc, hBitmap);
             using( Graphics graphics = Graphics.FromHdc(memDc) ) {
                 Render(graphics);
@@ -92,8 +92,8 @@ namespace FrigoTab {
         }
 
         private void UpdateLayeredWindow (IntPtr hdc) {
-            Point pptDst = _window.Bounds.Location;
-            Size pSize = _window.Bounds.Size;
+            Point pptDst = Bounds.Location;
+            Size pSize = Bounds.Size;
             Point pptSrc = Point.Empty;
             BlendFunction pblend = new BlendFunction {
                 BlendOperation = BlendOperation.SourceOver,
