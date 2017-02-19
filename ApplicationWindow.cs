@@ -29,8 +29,8 @@ namespace FrigoTab {
             Bounds = bounds;
             Index = index;
 
-            Icon = Handle.IconFromSendMessageTimeout();
-            Icon = Icon ?? Handle.IconFromGetClassLongPtr();
+            Icon = IconManager.IconFromSendMessageTimeout(Handle);
+            Icon = Icon ?? IconManager.IconFromGetClassLongPtr(Handle);
             Icon = Icon ?? Program.Icon;
 
             _thumbnail = new Thumbnail(handle, session.Handle, new Rect(bounds));
