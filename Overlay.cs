@@ -14,7 +14,6 @@ namespace FrigoTab {
             Owner = session;
             Bounds = window.Bounds;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
-
             _window = window;
             Draw();
         }
