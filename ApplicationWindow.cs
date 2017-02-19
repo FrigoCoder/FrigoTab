@@ -1,16 +1,16 @@
 ﻿using System;
 using System.Drawing;
-using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class ApplicationWindow : FrigoForm, IDisposable {
+    public class ApplicationWindow : IDisposable {
 
-        public readonly WindowHandle WindowHandle;
+        public readonly WindowHandle Handle;
+        public readonly Rectangle Bounds;
         public readonly int Index;
-        public readonly Icon WindowIcon;
+        public readonly Icon Icon;
+        public readonly Overlay Overlay;
         private readonly Thumbnail _thumbnail;
-        private readonly Overlay _overlay;
         private bool _selected;
 
         public bool Selected {
@@ -20,28 +20,26 @@ namespace FrigoTab {
                     return;
                 }
                 _selected = value;
-                _overlay.Draw();
+                Overlay.Draw();
             }
         }
 
-        public ApplicationWindow (Form session, WindowHandle windowHandle, Rectangle bounds, int index) {
-            Owner = session;
-            WindowHandle = windowHandle;
+        public ApplicationWindow (Session session, WindowHandle handle, Rectangle bounds, int index) {
+            Handle = handle;
             Bounds = bounds;
             Index = index;
-            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
 
-            WindowIcon = WindowHandle.IconFromSendMessageTimeout();
-            WindowIcon = WindowIcon ?? WindowHandle.IconFromGetClassLongPtr();
-            WindowIcon = WindowIcon ?? Program.Icon;
+            Icon = Handle.IconFromSendMessageTimeout();
+            Icon = Icon ?? Handle.IconFromGetClassLongPtr();
+            Icon = Icon ?? Program.Icon;
 
-            _thumbnail = new Thumbnail(windowHandle, session.Handle, new Rect(bounds));
-            _overlay = new Overlay(this);
+            _thumbnail = new Thumbnail(handle, session.Handle, new Rect(bounds));
+            Overlay = new Overlay(session, this);
         }
 
-        public new void Dispose () {
+        public void Dispose () {
+            Overlay.Close();
             _thumbnail.Dispose();
-            Close();
         }
 
     }
