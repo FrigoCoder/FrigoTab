@@ -72,12 +72,12 @@ namespace FrigoTab {
 
         protected override void OnMouseMove (MouseEventArgs e) {
             base.OnMouseMove(e);
-            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(e.Location));
+            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(ClientToScreen(e.Location)));
         }
 
         protected override void OnMouseClick (MouseEventArgs e) {
             base.OnMouseClick(e);
-            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(e.Location));
+            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(ClientToScreen(e.Location)));
             End();
         }
 
@@ -100,6 +100,11 @@ namespace FrigoTab {
             }
         }
 
+        private Point ClientToScreen (Point location) {
+            ClientToScreen(Handle, ref location);
+            return location;
+        }
+
         [DllImport ("kernel32.dll")]
         private static extern int GetCurrentThreadId ();
 
@@ -111,6 +116,9 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern bool AttachThreadInput (int idAttach, int idAttachTo, bool fAttach);
+
+        [DllImport ("user32.dll")]
+        private static extern bool ClientToScreen (IntPtr hWnd, ref Point lpPoint);
 
     }
 
