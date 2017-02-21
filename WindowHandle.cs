@@ -42,7 +42,7 @@ namespace FrigoTab {
             _handle = handle;
         }
 
-        public Rect GetRestoredWindowRect () {
+        public Rect GetRect () {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 WindowPlacement placement = GetWindowPlacement();
                 if( placement.Flags == WindowPlacementFlags.RestoreToMaximized ) {

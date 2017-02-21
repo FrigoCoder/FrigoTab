@@ -16,7 +16,7 @@ namespace FrigoTab {
             DwmRegisterThumbnail(destination, source, out _thumbnail);
             DwmThumbnailProperties properties = new DwmThumbnailProperties {
                 Flags = DwmThumbnailFlags.RectSource | DwmThumbnailFlags.RectDestination,
-                Source = ScreenToClient(source, source.GetRestoredWindowRect()),
+                Source = ScreenToClient(source, source.GetRect()),
                 Destination = ScreenToClient(destination, bounds)
             };
             DwmUpdateThumbnailProperties(_thumbnail, ref properties);
