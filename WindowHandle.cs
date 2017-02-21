@@ -44,11 +44,7 @@ namespace FrigoTab {
 
         public Rect GetRect () {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
-                WindowPlacement placement = GetWindowPlacement();
-                if( placement.Flags == WindowPlacementFlags.RestoreToMaximized ) {
-                    return new Rect(Screen.FromPoint(placement.MaximumPosition).WorkingArea);
-                }
-                return placement.NormalRectangle;
+                return GetRestoredRect();
             }
             return GetWindowRect();
         }
@@ -78,6 +74,14 @@ namespace FrigoTab {
             Rect lpRect;
             GetWindowRect(_handle, out lpRect);
             return lpRect;
+        }
+
+        private Rect GetRestoredRect () {
+            WindowPlacement placement = GetWindowPlacement();
+            if( placement.Flags == WindowPlacementFlags.RestoreToMaximized ) {
+                return new Rect(Screen.FromPoint(placement.MaximumPosition).WorkingArea);
+            }
+            return placement.NormalRectangle;
         }
 
         private WindowPlacement GetWindowPlacement () {
