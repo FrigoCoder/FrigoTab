@@ -9,6 +9,7 @@ namespace FrigoTab {
         private readonly int _right;
         private readonly int _bottom;
 
+        public Point Location => new Point(_left, _top);
         public Size Size => new Size(_right - _left, _bottom - _top);
 
         public Rect (Point location, Size size) {
@@ -25,13 +26,9 @@ namespace FrigoTab {
             _bottom = bounds.Bottom;
         }
 
-        public RectangleF ToRectangleF () {
-            return RectangleF.FromLTRB(_left, _top, _right, _bottom);
-        }
+        public RectangleF ToRectangleF () => RectangleF.FromLTRB(_left, _top, _right, _bottom);
 
-        public bool IsEmpty () {
-            return (_right - _left <= 0) || (_bottom - _top <= 0);
-        }
+        public bool IsEmpty () => (_right - _left <= 0) || (_bottom - _top <= 0);
 
     }
 
