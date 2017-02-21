@@ -28,7 +28,7 @@ namespace FrigoTab {
 
             for( int i = 0; i < windows.Count; i++ ) {
                 RectangleF cell = GetCellBounds(screen, columns, rows, i % columns, i / columns);
-                RectangleF bounds = CenterWithin(windows[i].GetRestoredWindowRect().ToRectangleF(), cell);
+                RectangleF bounds = CenterWithin(windows[i].GetRect().ToRectangleF(), cell);
                 bounds.Offset(screen.WorkingArea.Location);
                 Bounds[windows[i]] = Rectangle.Round(bounds);
             }
