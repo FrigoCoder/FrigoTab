@@ -24,16 +24,16 @@ namespace FrigoTab {
             }
         }
 
-        public ApplicationWindow (Session session, WindowHandle handle, Rectangle bounds, int index) {
+        public ApplicationWindow (Session session, WindowHandle handle, ScreenRect bounds, int index) {
             Handle = handle;
-            Bounds = bounds;
+            Bounds = bounds.ToRectangle();
             Index = index;
 
             Icon = IconManager.IconFromSendMessageTimeout(Handle);
             Icon = Icon ?? IconManager.IconFromGetClassLongPtr(Handle);
             Icon = Icon ?? Program.Icon;
 
-            _thumbnail = new Thumbnail(handle, session.Handle, new Rect(bounds));
+            _thumbnail = new Thumbnail(handle, session.Handle, bounds);
             Overlay = new Overlay(session, this);
         }
 
