@@ -17,19 +17,13 @@ namespace FrigoTab {
             DwmThumbnailProperties properties = new DwmThumbnailProperties {
                 Flags = DwmThumbnailFlags.RectSource | DwmThumbnailFlags.RectDestination,
                 Source = new ClientRect(Point.Empty, source.GetRect().Size),
-                Destination = ScreenToClient(destination, bounds)
+                Destination = bounds.ScreenToClient(destination)
             };
             DwmUpdateThumbnailProperties(_thumbnail, ref properties);
         }
 
         public void Dispose () {
             DwmUnregisterThumbnail(_thumbnail);
-        }
-
-        private ClientRect ScreenToClient (WindowHandle window, ScreenRect bounds) {
-            Point location = bounds.Location;
-            ScreenToClient(window, ref location);
-            return new ClientRect(location, bounds.Size);
         }
 
         private struct DwmThumbnailProperties {
@@ -68,9 +62,6 @@ namespace FrigoTab {
 
         [DllImport ("dwmapi.dll")]
         private static extern int DwmUpdateThumbnailProperties (IntPtr thumb, ref DwmThumbnailProperties props);
-
-        [DllImport ("user32.dll")]
-        private static extern bool ScreenToClient (IntPtr hWnd, ref Point lpPoint);
 
     }
 
