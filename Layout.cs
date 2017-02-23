@@ -8,7 +8,7 @@ namespace FrigoTab {
 
     public class Layout {
 
-        public readonly Dictionary<WindowHandle, Rectangle> Bounds = new Dictionary<WindowHandle, Rectangle>();
+        public readonly Dictionary<WindowHandle, ScreenRect> Bounds = new Dictionary<WindowHandle, ScreenRect>();
 
         public Layout (IList<WindowHandle> windows) {
             foreach( Screen screen in Screen.AllScreens ) {
@@ -30,7 +30,7 @@ namespace FrigoTab {
                 RectangleF cell = GetCellBounds(screen, columns, rows, i % columns, i / columns);
                 RectangleF bounds = CenterWithin(windows[i].GetRect().ToRectangleF(), cell);
                 bounds.Offset(screen.WorkingArea.Location);
-                Bounds[windows[i]] = Rectangle.Round(bounds);
+                Bounds[windows[i]] = ScreenRect.Round(bounds);
             }
         }
 

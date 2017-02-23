@@ -42,10 +42,10 @@ namespace FrigoTab {
             _handle = handle;
         }
 
-        public Rect GetRect () {
-            if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
-                return GetRestoredRect();
-            }
+        public ScreenRect GetRect () {
+            /*            if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
+                            return GetRestoredRect();
+                        }*/
             return GetWindowRect();
         }
 
@@ -70,16 +70,16 @@ namespace FrigoTab {
             return (WindowExStyles) GetWindowLongPtr(_handle, WindowLong.ExStyle);
         }
 
-        private Rect GetWindowRect () {
-            Rect lpRect;
+        private ScreenRect GetWindowRect () {
+            ScreenRect lpRect;
             GetWindowRect(_handle, out lpRect);
             return lpRect;
         }
 
-        private Rect GetRestoredRect () {
+        private WorkspaceRect GetRestoredRect () {
             WindowPlacement placement = GetWindowPlacement();
             if( placement.Flags == WindowPlacementFlags.RestoreToMaximized ) {
-                return new Rect(Screen.FromPoint(placement.MaximumPosition).WorkingArea);
+                return new WorkspaceRect(Screen.FromPoint(placement.MaximumPosition).WorkingArea);
             }
             return placement.NormalRectangle;
         }
@@ -99,7 +99,7 @@ namespace FrigoTab {
             public ShowWindowCommand ShowCommand;
             public Point MinimumPosition;
             public Point MaximumPosition;
-            public Rect NormalRectangle;
+            public WorkspaceRect NormalRectangle;
 
         }
 
@@ -123,7 +123,7 @@ namespace FrigoTab {
         }
 
         [DllImport ("user32.dll")]
-        private static extern bool GetWindowRect (IntPtr hWnd, out Rect lpRect);
+        private static extern bool GetWindowRect (IntPtr hWnd, out ScreenRect lpRect);
 
         [DllImport ("user32.dll")]
         private static extern int GetWindowTextLength (IntPtr hWnd);
