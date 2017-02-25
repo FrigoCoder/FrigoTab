@@ -32,6 +32,13 @@ namespace FrigoTab {
         public Point Location => new Point(_left, _top);
         public Size Size => new Size(_right - _left, _bottom - _top);
 
+        public ScreenRect (Point location, Size size) {
+            _left = location.X;
+            _top = location.Y;
+            _right = location.X + size.Width;
+            _bottom = location.Y + size.Height;
+        }
+
         public ScreenRect (Rectangle bounds) {
             _left = bounds.Left;
             _top = bounds.Top;
