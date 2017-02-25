@@ -6,9 +6,9 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class Layout {
+    public static class Layout {
 
-        public void LayoutWindows (IList<ApplicationWindow> windows) {
+        public static void LayoutWindows (IList<ApplicationWindow> windows) {
             foreach( Screen screen in Screen.AllScreens ) {
                 LayoutScreen(screen, GetWindowsOnScreen(windows, screen));
             }
