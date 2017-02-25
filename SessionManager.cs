@@ -27,10 +27,11 @@ namespace FrigoTab {
 
         private void BeginSession () {
             WindowFinder finder = new WindowFinder();
-            if( finder.Windows.Count != 0 ) {
-                _session = new Session(finder);
-                _session.FormClosed += EndSession;
+            if( finder.Windows.Count == 0 ) {
+                return;
             }
+            _session = new Session(finder);
+            _session.FormClosed += EndSession;
         }
 
         private void EndSession (object sender, EventArgs e) {
