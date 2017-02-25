@@ -68,6 +68,9 @@ namespace FrigoTab {
                 SelectedWindow = window;
                 End();
             });
+            if( e.KeyCode == Keys.Escape ) {
+                Dispose();
+            }
         }
 
         protected override void OnMouseMove (MouseEventArgs e) {
