@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Runtime.InteropServices;
 
@@ -52,7 +53,7 @@ namespace FrigoTab {
 
         }
 
-        [Flags]
+        [Flags, SuppressMessage ("ReSharper", "UnusedMember.Local")]
         private enum DwmThumbnailFlags {
 
             RectDestination = 1,
