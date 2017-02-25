@@ -41,7 +41,10 @@ namespace FrigoTab {
         private enum DwmThumbnailFlags {
 
             RectDestination = 1,
-            RectSource = 2
+            RectSource = 2,
+            Opacity = 4,
+            Visible = 8,
+            SourceClientAreaOnly = 16
 
         }
 
