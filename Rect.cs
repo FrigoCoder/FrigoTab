@@ -50,8 +50,6 @@ namespace FrigoTab {
 
         public RectangleF ToRectangleF () => RectangleF.FromLTRB(_left, _top, _right, _bottom);
 
-        public bool IsEmpty () => (_right - _left <= 0) || (_bottom - _top <= 0);
-
         public ClientRect ScreenToClient (WindowHandle window) {
             Point location = Location;
             ScreenToClient(window, ref location);
