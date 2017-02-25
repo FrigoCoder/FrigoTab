@@ -49,6 +49,12 @@ namespace FrigoTab {
             return GetWindowRect();
         }
 
+        public ScreenRect GetWindowRect () {
+            ScreenRect lpRect;
+            GetWindowRect(_handle, out lpRect);
+            return lpRect;
+        }
+
         public void SetForeground () {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 ShowWindow(_handle, ShowWindowCommand.Restore);
@@ -68,12 +74,6 @@ namespace FrigoTab {
 
         public WindowExStyles GetWindowExStyles () {
             return (WindowExStyles) GetWindowLongPtr(_handle, WindowLong.ExStyle);
-        }
-
-        private ScreenRect GetWindowRect () {
-            ScreenRect lpRect;
-            GetWindowRect(_handle, out lpRect);
-            return lpRect;
         }
 
         private ScreenRect GetRestoredRect () {

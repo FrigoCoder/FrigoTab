@@ -34,7 +34,7 @@ namespace FrigoTab {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
 
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
-                _backgrounds.Add(new Thumbnail(window, Handle, window.GetRect()));
+                _backgrounds.Add(new Thumbnail(window, Handle, window.GetWindowRect()));
             }
 
             Layout layout = new Layout(finder.Windows);
