@@ -10,27 +10,44 @@ namespace FrigoTab {
             DwmEnableComposition(DwmEnableCompositionConstants.EnableComposition);
         }
 
+        private readonly WindowHandle _destination;
         private readonly IntPtr _thumbnail;
 
         public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect bounds) {
+            _destination = destination;
             DwmRegisterThumbnail(destination, source, out _thumbnail);
-
-            DwmThumbnailProperties properties = new DwmThumbnailProperties {
-                Flags = DwmThumbnailFlags.RectSource | DwmThumbnailFlags.RectDestination,
-                Source = new ClientRect(Point.Empty, GetSourceSize()),
-                Destination = bounds.ScreenToClient(destination)
-            };
-            DwmUpdateThumbnailProperties(_thumbnail, ref properties);
+            SetSourceRect(new ClientRect(Point.Empty, GetSourceSize()));
+            SetDestinationRect(bounds);
         }
 
         public void Dispose () {
             DwmUnregisterThumbnail(_thumbnail);
         }
 
-        public Size GetSourceSize () {
+        private Size GetSourceSize () {
             Size size;
             DwmQueryThumbnailSourceSize(_thumbnail, out size);
             return size;
+        }
+
+        private void SetSourceRect (ClientRect bounds) {
+            DwmThumbnailProperties properties = new DwmThumbnailProperties {
+                Flags = DwmThumbnailFlags.RectSource,
+                Source = bounds
+            };
+            DwmUpdateThumbnailProperties(_thumbnail, ref properties);
+        }
+
+        private void SetDestinationRect (ScreenRect bounds) {
+            SetDestinationRect(bounds.ScreenToClient(_destination));
+        }
+
+        private void SetDestinationRect (ClientRect bounds) {
+            DwmThumbnailProperties properties = new DwmThumbnailProperties {
+                Flags = DwmThumbnailFlags.RectDestination,
+                Destination = bounds
+            };
+            DwmUpdateThumbnailProperties(_thumbnail, ref properties);
         }
 
         private struct DwmThumbnailProperties {
