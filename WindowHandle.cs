@@ -43,9 +43,9 @@ namespace FrigoTab {
         }
 
         public ScreenRect GetRect () {
-            /*            if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
-                            return GetRestoredRect();
-                        }*/
+            if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
+                return GetRestoredRect();
+            }
             return GetWindowRect();
         }
 
@@ -76,12 +76,12 @@ namespace FrigoTab {
             return lpRect;
         }
 
-        private WorkspaceRect GetRestoredRect () {
+        private ScreenRect GetRestoredRect () {
             WindowPlacement placement = GetWindowPlacement();
-            if( placement.Flags == WindowPlacementFlags.RestoreToMaximized ) {
-                return new WorkspaceRect(Screen.FromPoint(placement.MaximumPosition).WorkingArea);
+            if( placement.Flags.HasFlag(WindowPlacementFlags.RestoreToMaximized) ) {
+                return new ScreenRect(Screen.FromHandle(_handle).WorkingArea);
             }
-            return placement.NormalRectangle;
+            return new ScreenRect(placement.NormalRectangle.Location, placement.NormalRectangle.Size);
         }
 
         private WindowPlacement GetWindowPlacement () {
