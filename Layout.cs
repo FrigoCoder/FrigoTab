@@ -26,7 +26,7 @@ namespace FrigoTab {
 
             for( int i = 0; i < windows.Count; i++ ) {
                 RectangleF cell = GetCellBounds(screen, columns, rows, i % columns, i / columns);
-                RectangleF bounds = CenterWithin(windows[i].GetRect().ToRectangleF(), cell);
+                RectangleF bounds = CenterWithin(windows[i].GetSourceSize(), cell);
                 bounds.Offset(screen.WorkingArea.Location);
                 windows[i].Bounds = Rectangle.Round(bounds);
             }
@@ -42,8 +42,8 @@ namespace FrigoTab {
             return new RectangleF(location, size);
         }
 
-        private static RectangleF CenterWithin (RectangleF rect, RectangleF bounds) {
-            SizeF size = ScaleWithin(rect.Size, bounds.Size);
+        private static RectangleF CenterWithin (Size rectSize, RectangleF bounds) {
+            SizeF size = ScaleWithin(rectSize, bounds.Size);
             SizeF margin = bounds.Size - size;
             PointF location = new PointF(bounds.X + margin.Width / 2, bounds.Y + margin.Height / 2);
             return new RectangleF(location, size);
