@@ -5,7 +5,7 @@ namespace FrigoTab {
 
     public class ApplicationWindow : IDisposable {
 
-        public readonly WindowHandle Handle;
+        public readonly WindowHandle Application;
         public readonly Rectangle Bounds;
         public readonly int Index;
         public readonly Icon Icon;
@@ -24,16 +24,16 @@ namespace FrigoTab {
             }
         }
 
-        public ApplicationWindow (Session session, WindowHandle handle, ScreenRect bounds, int index) {
-            Handle = handle;
+        public ApplicationWindow (Session session, WindowHandle application, ScreenRect bounds, int index) {
+            Application = application;
             Bounds = bounds.ToRectangle();
             Index = index;
 
-            Icon = IconManager.IconFromSendMessageTimeout(Handle);
-            Icon = Icon ?? IconManager.IconFromGetClassLongPtr(Handle);
+            Icon = IconManager.IconFromSendMessageTimeout(Application);
+            Icon = Icon ?? IconManager.IconFromGetClassLongPtr(Application);
             Icon = Icon ?? Program.Icon;
 
-            _thumbnail = new Thumbnail(handle, session.Handle, bounds);
+            _thumbnail = new Thumbnail(application, session.Handle, bounds);
             Overlay = new Overlay(session, this);
         }
 
