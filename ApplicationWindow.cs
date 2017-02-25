@@ -8,9 +8,9 @@ namespace FrigoTab {
         public readonly WindowHandle Application;
         public readonly int Index;
         public readonly Icon Icon;
-        public readonly Overlay Overlay;
         private Rectangle _bounds;
         private readonly Thumbnail _thumbnail;
+        private readonly Overlay _overlay;
         private bool _selected;
 
         public bool Selected {
@@ -20,7 +20,7 @@ namespace FrigoTab {
                     return;
                 }
                 _selected = value;
-                Overlay.Draw();
+                _overlay.Draw();
             }
         }
 
@@ -29,9 +29,13 @@ namespace FrigoTab {
             set {
                 _bounds = value;
                 _thumbnail.SetDestinationRect(new ScreenRect(value));
-                Overlay.Bounds = value;
-                Overlay.Draw();
+                _overlay.Bounds = value;
+                _overlay.Draw();
             }
+        }
+
+        public bool Visible {
+            set { _overlay.Visible = value; }
         }
 
         public ApplicationWindow (Session session, WindowHandle application, int index) {
@@ -43,11 +47,11 @@ namespace FrigoTab {
             Icon = Icon ?? Program.Icon;
 
             _thumbnail = new Thumbnail(application, session.Handle);
-            Overlay = new Overlay(session, this);
+            _overlay = new Overlay(session, this);
         }
 
         public void Dispose () {
-            Overlay.Close();
+            _overlay.Close();
             _thumbnail.Dispose();
         }
 
