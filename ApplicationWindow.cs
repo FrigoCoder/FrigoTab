@@ -8,10 +8,20 @@ namespace FrigoTab {
         public readonly WindowHandle Application;
         public readonly int Index;
         public readonly Icon Icon;
-        private Rectangle _bounds;
         private readonly Thumbnail _thumbnail;
         private readonly Overlay _overlay;
+        private Rectangle _bounds;
         private bool _selected;
+
+        public Rectangle Bounds {
+            get { return _bounds; }
+            set {
+                _bounds = value;
+                _thumbnail.Update(new ScreenRect(value));
+                _overlay.Bounds = value;
+                _overlay.Draw();
+            }
+        }
 
         public bool Selected {
             get { return _selected; }
@@ -20,16 +30,6 @@ namespace FrigoTab {
                     return;
                 }
                 _selected = value;
-                _overlay.Draw();
-            }
-        }
-
-        public Rectangle Bounds {
-            get { return _bounds; }
-            set {
-                _bounds = value;
-                _thumbnail.Update(new ScreenRect(value));
-                _overlay.Bounds = value;
                 _overlay.Draw();
             }
         }
