@@ -17,6 +17,12 @@ namespace FrigoTab {
             _destination = destination;
             DwmRegisterThumbnail(destination, source, out _thumbnail);
             SetSourceRect(new ClientRect(Point.Empty, GetSourceSize()));
+            for( int i = 0; i < 10; i++ ) {
+                DwmThumbnailProperties properties = new DwmThumbnailProperties() {
+                    Flags = 0
+                };
+                DwmUpdateThumbnailProperties(_thumbnail, ref properties);
+            }
         }
 
         public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect bounds) : this(source, destination) {
@@ -27,7 +33,11 @@ namespace FrigoTab {
             DwmUnregisterThumbnail(_thumbnail);
         }
 
-        private Size GetSourceSize () {
+        public void SetDestinationRect (ScreenRect bounds) {
+            SetDestinationRect(bounds.ScreenToClient(_destination));
+        }
+
+        public Size GetSourceSize () {
             Size size;
             DwmQueryThumbnailSourceSize(_thumbnail, out size);
             return size;
@@ -39,10 +49,6 @@ namespace FrigoTab {
                 Source = bounds
             };
             DwmUpdateThumbnailProperties(_thumbnail, ref properties);
-        }
-
-        private void SetDestinationRect (ScreenRect bounds) {
-            SetDestinationRect(bounds.ScreenToClient(_destination));
         }
 
         private void SetDestinationRect (ClientRect bounds) {

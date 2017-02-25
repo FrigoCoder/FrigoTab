@@ -12,10 +12,8 @@ namespace FrigoTab {
 
         public Overlay (Session session, ApplicationWindow window) {
             Owner = session;
-            Bounds = window.Bounds;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             _window = window;
-            Draw();
         }
 
         public void Draw () {
