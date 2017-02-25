@@ -8,15 +8,13 @@ namespace FrigoTab {
 
     public class Layout {
 
-        public readonly Dictionary<WindowHandle, ScreenRect> Bounds = new Dictionary<WindowHandle, ScreenRect>();
-
-        public Layout (IList<WindowHandle> windows) {
+        public Layout (IList<ApplicationWindow> windows) {
             foreach( Screen screen in Screen.AllScreens ) {
                 LayoutScreen(screen, GetWindowsOnScreen(windows, screen));
             }
         }
 
-        private void LayoutScreen (Screen screen, IList<WindowHandle> windows) {
+        private void LayoutScreen (Screen screen, IList<ApplicationWindow> windows) {
             int n = windows.Count;
             if( n == 0 ) {
                 return;
@@ -30,12 +28,12 @@ namespace FrigoTab {
                 RectangleF cell = GetCellBounds(screen, columns, rows, i % columns, i / columns);
                 RectangleF bounds = CenterWithin(windows[i].GetRect().ToRectangleF(), cell);
                 bounds.Offset(screen.WorkingArea.Location);
-                Bounds[windows[i]] = ScreenRect.Round(bounds);
+                windows[i].Bounds = Rectangle.Round(bounds);
             }
         }
 
-        private static List<WindowHandle> GetWindowsOnScreen (IList<WindowHandle> windows, Screen screen) {
-            return windows.Where(window => Screen.FromHandle(window).Equals(screen)).ToList();
+        private static List<ApplicationWindow> GetWindowsOnScreen (IList<ApplicationWindow> windows, Screen screen) {
+            return windows.Where(window => Screen.FromHandle(window.Application).Equals(screen)).ToList();
         }
 
         private static RectangleF GetCellBounds (Screen screen, int columns, int rows, int column, int row) {

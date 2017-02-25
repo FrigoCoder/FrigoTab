@@ -2,7 +2,6 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Windows.Forms;
 
 namespace FrigoTab {
 
@@ -42,13 +41,6 @@ namespace FrigoTab {
             _handle = handle;
         }
 
-        public ScreenRect GetRect () {
-            if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
-                return GetRestoredRect();
-            }
-            return GetWindowRect();
-        }
-
         public ScreenRect GetWindowRect () {
             ScreenRect lpRect;
             GetWindowRect(_handle, out lpRect);
@@ -76,56 +68,12 @@ namespace FrigoTab {
             return (WindowExStyles) GetWindowLongPtr(_handle, WindowLong.ExStyle);
         }
 
-        private ScreenRect GetRestoredRect () {
-            WindowPlacement placement = GetWindowPlacement();
-            if( placement.Flags.HasFlag(WindowPlacementFlags.RestoreToMaximized) ) {
-                return new ScreenRect(GetMaximizedLocation(), GetMaximizedSize());
-            }
-            return placement.NormalRectangle;
-        }
-
-        private Point GetMaximizedLocation () {
+        public Point GetLocation () {
             Point[] points = {
                 new Point(0, 0)
             };
             int xy = MapWindowPoints(_handle, IntPtr.Zero, points, points.Length);
             return new Point(xy & 0xffff, (xy >> 16) & 0xffff);
-        }
-
-        private Size GetMaximizedSize () {
-            using( Form form = new Form() ) {
-                IntPtr thumbnail;
-                DwmRegisterThumbnail(form.Handle, _handle, out thumbnail);
-                Size size;
-                DwmQueryThumbnailSourceSize(thumbnail, out size);
-                DwmUnregisterThumbnail(thumbnail);
-                return size;
-            }
-        }
-
-        private WindowPlacement GetWindowPlacement () {
-            WindowPlacement placement = new WindowPlacement {
-                Length = Marshal.SizeOf(typeof(WindowPlacement))
-            };
-            GetWindowPlacement(_handle, ref placement);
-            return placement;
-        }
-
-        private struct WindowPlacement {
-
-            public int Length;
-            public WindowPlacementFlags Flags;
-            public ShowWindowCommand ShowCommand;
-            public Point MinimumPosition;
-            public Point MaximumPosition;
-            public ScreenRect NormalRectangle;
-
-        }
-
-        private enum WindowPlacementFlags {
-
-            RestoreToMaximized = 2
-
         }
 
         private enum ShowWindowCommand {
@@ -160,19 +108,7 @@ namespace FrigoTab {
         private static extern bool SetForegroundWindow (IntPtr hwnd);
 
         [DllImport ("user32.dll")]
-        private static extern bool GetWindowPlacement (IntPtr hWnd, ref WindowPlacement lpwndpl);
-
-        [DllImport ("user32.dll")]
         private static extern int MapWindowPoints (IntPtr hWndFrom, IntPtr hWndTo, Point[] lpPoints, int cPoints);
-
-        [DllImport ("dwmapi.dll")]
-        private static extern int DwmRegisterThumbnail (IntPtr dest, IntPtr src, out IntPtr thumb);
-
-        [DllImport ("dwmapi.dll")]
-        private static extern int DwmUnregisterThumbnail (IntPtr thumb);
-
-        [DllImport ("dwmapi.dll")]
-        private static extern int DwmQueryThumbnailSourceSize (IntPtr thumb, out Size pSize);
 
     }
 

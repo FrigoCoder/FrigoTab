@@ -37,10 +37,11 @@ namespace FrigoTab {
                 _backgrounds.Add(new Thumbnail(window, Handle, window.GetWindowRect()));
             }
 
-            Layout layout = new Layout(finder.Windows);
             foreach( WindowHandle window in finder.Windows ) {
-                _applications.Add(new ApplicationWindow(this, window, layout.Bounds[window], _applications.Count));
+                _applications.Add(new ApplicationWindow(this, window, _applications.Count));
             }
+
+            Layout layout = new Layout(_applications);
 
             SelectedWindow = _applications[0];
 
