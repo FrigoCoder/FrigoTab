@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace FrigoTab {
 
-    public class IconManager {
+    public static class IconManager {
 
         public delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
 

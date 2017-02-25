@@ -5,7 +5,7 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class LayerUpdater {
+    public static class LayerUpdater {
 
         public delegate void Renderer (Graphics graphics);
 
