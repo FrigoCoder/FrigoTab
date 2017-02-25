@@ -28,7 +28,7 @@ namespace FrigoTab {
             get { return _bounds; }
             set {
                 _bounds = value;
-                _thumbnail.SetDestinationRect(new ScreenRect(value));
+                _thumbnail.Update(new ScreenRect(value));
                 _overlay.Bounds = value;
                 _overlay.Draw();
             }
