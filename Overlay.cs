@@ -2,7 +2,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
-using System.Runtime.InteropServices;
 
 namespace FrigoTab {
 
@@ -17,18 +16,7 @@ namespace FrigoTab {
         }
 
         public void Draw () {
-            IntPtr screenDc = GetDC(IntPtr.Zero);
-            IntPtr memDc = CreateCompatibleDC(screenDc);
-            IntPtr hBitmap = CreateCompatibleBitmap(screenDc, Bounds.Width, Bounds.Height);
-            IntPtr hOldBitmap = SelectObject(memDc, hBitmap);
-            using( Graphics graphics = Graphics.FromHdc(memDc) ) {
-                Render(graphics);
-            }
-            UpdateLayeredWindow(memDc);
-            SelectObject(memDc, hOldBitmap);
-            DeleteDC(memDc);
-            DeleteObject(hBitmap);
-            ReleaseDC(IntPtr.Zero, screenDc);
+            LayerUpdater.Update(this, Render);
         }
 
         private void Render (Graphics graphics) {
@@ -88,48 +76,6 @@ namespace FrigoTab {
             }
         }
 
-        private void UpdateLayeredWindow (IntPtr hdc) {
-            Point pptDst = Bounds.Location;
-            Size pSize = Bounds.Size;
-            Point pptSrc = Point.Empty;
-            BlendFunction pblend = new BlendFunction {
-                BlendOperation = BlendOperation.SourceOver,
-                BlendFlags = 0,
-                SourceConstantAlpha = 0xff,
-                AlphaFormat = AlphaFormat.SourceAlpha
-            };
-            const UpdateLayeredWindowFlags flag = UpdateLayeredWindowFlags.Alpha;
-            UpdateLayeredWindow(Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, ref pblend, flag);
-        }
-
-        private struct BlendFunction {
-
-            public BlendOperation BlendOperation;
-            public byte BlendFlags;
-            public byte SourceConstantAlpha;
-            public AlphaFormat AlphaFormat;
-
-        }
-
-        private enum BlendOperation : byte {
-
-            SourceOver = 0
-
-        }
-
-        private enum AlphaFormat : byte {
-
-            SourceAlpha = 1
-
-        }
-
-        [Flags]
-        private enum UpdateLayeredWindowFlags {
-
-            Alpha = 2
-
-        }
-
         private static void FillRectangle (Graphics graphics, RectangleF bounds, Color color) {
             PointF[] points = new PointF[5];
             points[0] = new PointF(bounds.Left, bounds.Top);
@@ -147,38 +93,6 @@ namespace FrigoTab {
             PointF location = new PointF(bounds.X + margins.Width / 2, bounds.Y + margins.Height / 2);
             return new RectangleF(location, rect);
         }
-
-        [DllImport ("user32.dll")]
-        private static extern IntPtr GetDC (IntPtr hwnd);
-
-        [DllImport ("gdi32.dll")]
-        private static extern IntPtr CreateCompatibleDC (IntPtr hdc);
-
-        [DllImport ("gdi32.dll")]
-        private static extern IntPtr CreateCompatibleBitmap (IntPtr hdc, int cx, int cy);
-
-        [DllImport ("gdi32.dll")]
-        private static extern IntPtr SelectObject (IntPtr hdc, IntPtr hobj);
-
-        [DllImport ("gdi32.dll")]
-        private static extern bool DeleteDC (IntPtr hdc);
-
-        [DllImport ("gdi32.dll")]
-        private static extern bool DeleteObject (IntPtr hobj);
-
-        [DllImport ("user32.dll")]
-        private static extern int ReleaseDC (IntPtr hwnd, IntPtr hdc);
-
-        [DllImport ("user32.dll")]
-        private static extern bool UpdateLayeredWindow (IntPtr hwnd,
-            IntPtr hdcDst,
-            ref Point pptDst,
-            ref Size psize,
-            IntPtr hdcSrc,
-            ref Point pptSrc,
-            int crKey,
-            ref BlendFunction pblend,
-            UpdateLayeredWindowFlags dwFlags);
 
     }
 
