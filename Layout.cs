@@ -8,7 +8,7 @@ namespace FrigoTab {
 
     public class Layout {
 
-        public Layout (IList<ApplicationWindow> windows) {
+        public void LayoutWindows (IList<ApplicationWindow> windows) {
             foreach( Screen screen in Screen.AllScreens ) {
                 LayoutScreen(screen, GetWindowsOnScreen(windows, screen));
             }
