@@ -32,13 +32,6 @@ namespace FrigoTab {
         public Point Location => new Point(_left, _top);
         public Size Size => new Size(_right - _left, _bottom - _top);
 
-        public ScreenRect (Point location, Size size) {
-            _left = location.X;
-            _top = location.Y;
-            _right = location.X + size.Width;
-            _bottom = location.Y + size.Height;
-        }
-
         public ScreenRect (Rectangle bounds) {
             _left = bounds.Left;
             _top = bounds.Top;
@@ -60,18 +53,6 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern bool ScreenToClient (IntPtr hWnd, ref Point lpPoint);
-
-    }
-
-    public struct WorkspaceRect {
-
-        private readonly int _left;
-        private readonly int _top;
-        private readonly int _right;
-        private readonly int _bottom;
-
-        public Point Location => new Point(_left, _top);
-        public Size Size => new Size(_right - _left, _bottom - _top);
 
     }
 
