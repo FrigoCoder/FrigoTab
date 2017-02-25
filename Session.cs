@@ -41,7 +41,8 @@ namespace FrigoTab {
                 _applications.Add(new ApplicationWindow(this, window, _applications.Count));
             }
 
-            Layout layout = new Layout(_applications);
+            Layout layout = new Layout();
+            layout.LayoutWindows(_applications);
 
             SelectedWindow = _applications[0];
 
