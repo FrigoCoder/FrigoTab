@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -68,14 +67,6 @@ namespace FrigoTab {
             return (WindowExStyles) GetWindowLongPtr(_handle, WindowLong.ExStyle);
         }
 
-        public Point GetLocation () {
-            Point[] points = {
-                new Point(0, 0)
-            };
-            int xy = MapWindowPoints(_handle, IntPtr.Zero, points, points.Length);
-            return new Point(xy & 0xffff, (xy >> 16) & 0xffff);
-        }
-
         private enum ShowWindowCommand {
 
             Restore = 9
@@ -106,9 +97,6 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern bool SetForegroundWindow (IntPtr hwnd);
-
-        [DllImport ("user32.dll")]
-        private static extern int MapWindowPoints (IntPtr hWndFrom, IntPtr hWndTo, Point[] lpPoints, int cPoints);
 
     }
 

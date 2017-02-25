@@ -51,10 +51,8 @@ namespace FrigoTab {
             _thumbnail.Dispose();
         }
 
-        public ScreenRect GetRect () {
-            Point location = Application.GetLocation();
-            Size size = _thumbnail.GetSourceSize();
-            return new ScreenRect(location, size);
+        public Size GetSourceSize () {
+            return _thumbnail.GetSourceSize();
         }
 
     }
