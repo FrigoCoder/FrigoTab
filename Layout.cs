@@ -14,7 +14,7 @@ namespace FrigoTab {
             }
         }
 
-        private void LayoutScreen (Screen screen, IList<ApplicationWindow> windows) {
+        private static void LayoutScreen (Screen screen, IList<ApplicationWindow> windows) {
             int n = windows.Count;
             if( n == 0 ) {
                 return;
