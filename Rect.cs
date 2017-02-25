@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Runtime.InteropServices;
 
 namespace FrigoTab {
 
+    [SuppressMessage ("ReSharper", "NotAccessedField.Local")]
     public struct ClientRect {
 
         private readonly int _left;
@@ -22,22 +24,13 @@ namespace FrigoTab {
 
     public struct ScreenRect {
 
-        public static ScreenRect Round (RectangleF rect) => new ScreenRect(Rectangle.Round(rect));
-
         private readonly int _left;
         private readonly int _top;
         private readonly int _right;
         private readonly int _bottom;
 
-        public Point Location => new Point(_left, _top);
-        public Size Size => new Size(_right - _left, _bottom - _top);
-
-        public ScreenRect (Point location, Size size) {
-            _left = location.X;
-            _top = location.Y;
-            _right = location.X + size.Width;
-            _bottom = location.Y + size.Height;
-        }
+        private Point Location => new Point(_left, _top);
+        private Size Size => new Size(_right - _left, _bottom - _top);
 
         public ScreenRect (Rectangle bounds) {
             _left = bounds.Left;
@@ -45,10 +38,6 @@ namespace FrigoTab {
             _right = bounds.Right;
             _bottom = bounds.Bottom;
         }
-
-        public Rectangle ToRectangle () => Rectangle.FromLTRB(_left, _top, _right, _bottom);
-
-        public RectangleF ToRectangleF () => RectangleF.FromLTRB(_left, _top, _right, _bottom);
 
         public ClientRect ScreenToClient (WindowHandle window) {
             Point location = Location;
