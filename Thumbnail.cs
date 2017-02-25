@@ -13,10 +13,13 @@ namespace FrigoTab {
         private readonly WindowHandle _destination;
         private readonly IntPtr _thumbnail;
 
-        public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect bounds) {
+        public Thumbnail (WindowHandle source, WindowHandle destination) {
             _destination = destination;
             DwmRegisterThumbnail(destination, source, out _thumbnail);
             SetSourceRect(new ClientRect(Point.Empty, GetSourceSize()));
+        }
+
+        public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect bounds) : this(source, destination) {
             SetDestinationRect(bounds);
         }
 
