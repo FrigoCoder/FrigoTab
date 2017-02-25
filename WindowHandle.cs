@@ -85,7 +85,26 @@ namespace FrigoTab {
         }
 
         private ScreenRect GetMaximizedRect () {
-            return new ScreenRect(Screen.FromHandle(_handle).WorkingArea);
+            return new ScreenRect(GetMaximizedLocation(), GetMaximizedSize());
+        }
+
+        private Point GetMaximizedLocation () {
+            Point[] points = {
+                new Point(0, 0)
+            };
+            int xy = MapWindowPoints(_handle, IntPtr.Zero, points, points.Length);
+            return new Point(xy & 0xffff, (xy >> 16) & 0xffff);
+        }
+
+        private Size GetMaximizedSize () {
+            using( Form form = new Form() ) {
+                IntPtr thumbnail;
+                DwmRegisterThumbnail(form.Handle, _handle, out thumbnail);
+                Size size;
+                DwmQueryThumbnailSourceSize(thumbnail, out size);
+                DwmUnregisterThumbnail(thumbnail);
+                return size;
+            }
         }
 
         private WindowPlacement GetWindowPlacement () {
@@ -146,6 +165,18 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern bool GetWindowPlacement (IntPtr hWnd, ref WindowPlacement lpwndpl);
+
+        [DllImport ("user32.dll")]
+        private static extern int MapWindowPoints (IntPtr hWndFrom, IntPtr hWndTo, Point[] lpPoints, int cPoints);
+
+        [DllImport ("dwmapi.dll")]
+        private static extern int DwmRegisterThumbnail (IntPtr dest, IntPtr src, out IntPtr thumb);
+
+        [DllImport ("dwmapi.dll")]
+        private static extern int DwmUnregisterThumbnail (IntPtr thumb);
+
+        [DllImport ("dwmapi.dll")]
+        private static extern int DwmQueryThumbnailSourceSize (IntPtr thumb, out Size pSize);
 
     }
 
