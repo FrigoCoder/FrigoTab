@@ -33,7 +33,7 @@ namespace FrigoTab {
         }
 
         private static List<ApplicationWindow> GetWindowsOnScreen (IList<ApplicationWindow> windows, Screen screen) {
-            return windows.Where(window => Screen.FromHandle(window.Application).Equals(screen)).ToList();
+            return windows.Where(window => window.GetScreen().Equals(screen)).ToList();
         }
 
         private static RectangleF GetCellBounds (Screen screen, int columns, int rows, int column, int row) {
