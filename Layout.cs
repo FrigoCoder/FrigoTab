@@ -32,7 +32,7 @@ namespace FrigoTab {
             }
         }
 
-        private static List<ApplicationWindow> GetWindowsOnScreen (IList<ApplicationWindow> windows, Screen screen) {
+        private static List<ApplicationWindow> GetWindowsOnScreen (IEnumerable<ApplicationWindow> windows, Screen screen) {
             return windows.Where(window => window.GetScreen().Equals(screen)).ToList();
         }
 
