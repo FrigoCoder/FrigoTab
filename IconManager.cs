@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Runtime.InteropServices;
 
@@ -7,14 +6,9 @@ namespace FrigoTab {
 
     public static class IconManager {
 
-        public static void Register (ApplicationWindow window, WindowHandle application) {
-            _registered.Add(window);
-            IntPtr handle = GCHandle.ToIntPtr(GCHandle.Alloc(window));
-            SendMessageCallback(application, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, _callback, handle);
-        }
-
-        public static void Unregister (ApplicationWindow window) {
-            _registered.Remove(window);
+        public static void RegisterIconCallback (WindowHandle window, Action<Icon> callback) {
+            IntPtr handle = GCHandle.ToIntPtr(GCHandle.Alloc(callback));
+            SendMessageCallback(window, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, _callback, handle);
         }
 
         private enum WindowMessages {
@@ -31,20 +25,16 @@ namespace FrigoTab {
 
         private delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
 
-        private static readonly IList<ApplicationWindow> _registered = new List<ApplicationWindow>();
-
         private static readonly SendMessageDelegate _callback = Callback;
 
         private static void Callback (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult) {
             GCHandle handle = GCHandle.FromIntPtr(dwData);
-            ApplicationWindow window = (ApplicationWindow) handle.Target;
+            Action<Icon> callback = (Action<Icon>) handle.Target;
             handle.Free();
-            if( _registered.Contains(window) ) {
-                if( lResult != IntPtr.Zero ) {
-                    window.AppIcon = Icon.FromHandle(lResult);
-                }
+
+            if( lResult != IntPtr.Zero ) {
+                callback(Icon.FromHandle(lResult));
             }
-            Unregister(window);
         }
 
         [DllImport ("user32.dll")]
