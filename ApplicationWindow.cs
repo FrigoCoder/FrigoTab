@@ -21,7 +21,7 @@ namespace FrigoTab {
             _index = index;
             _thumbnail = new Thumbnail(application, session.Handle);
             _appIcon = _application.IconFromGetClassLongPtr() ?? Program.Icon;
-            IconManager.RegisterIconCallback(_application, SetIcon);
+            _application.RegisterIconCallback(SetIcon);
         }
 
         public new Rectangle Bounds {
