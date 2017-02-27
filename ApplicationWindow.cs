@@ -8,24 +8,24 @@ namespace FrigoTab {
 
     public class ApplicationWindow : FrigoForm, IDisposable {
 
-        public readonly int Index;
+        private readonly Session _session;
         private readonly WindowHandle _application;
+        private readonly int _index;
         private Icon _appIcon;
         private readonly Thumbnail _thumbnail;
         private bool _selected;
 
         public ApplicationWindow (Session session, WindowHandle application, int index) {
-            Owner = session;
-            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
+            Owner = _session = session;
+            ExStyle |= WindowExStyles.Layered;
             _application = application;
-            Index = index;
+            _index = index;
             _appIcon = IconManager.IconFromGetClassLongPtr(_application) ?? Program.Icon;
             _thumbnail = new Thumbnail(application, session.Handle);
             IconManager.Register(this, _application);
         }
 
         public new Rectangle Bounds {
-            get { return base.Bounds; }
             set {
                 base.Bounds = value;
                 _thumbnail.Update(new ScreenRect(value));
@@ -34,7 +34,7 @@ namespace FrigoTab {
         }
 
         public Icon AppIcon {
-            get { return _appIcon; }
+            private get { return _appIcon; }
             set {
                 _appIcon = value;
                 RenderOverlay();
@@ -68,6 +68,29 @@ namespace FrigoTab {
 
         public Size GetSourceSize () {
             return _thumbnail.GetSourceSize();
+        }
+
+        public void KeyEventHandler (KeyEventArgs e) {
+            if( (char) e.KeyCode - '1' == _index ) {
+                _application.SetForeground();
+                _session.Dispose();
+            }
+        }
+
+        protected override void OnMouseEnter (EventArgs e) {
+            base.OnMouseEnter(e);
+            Selected = true;
+        }
+
+        protected override void OnMouseLeave (EventArgs e) {
+            base.OnMouseLeave(e);
+            Selected = false;
+        }
+
+        protected override void OnMouseClick (MouseEventArgs e) {
+            base.OnMouseClick(e);
+            _application.SetForeground();
+            _session.Dispose();
         }
 
         private void RenderOverlay () {
@@ -116,7 +139,7 @@ namespace FrigoTab {
         }
 
         private void RenderNumber (Graphics graphics) {
-            string text = (Index + 1).ToString();
+            string text = (_index + 1).ToString();
 
             Font font = new Font("Segoe UI", 72f, FontStyle.Bold);
             SizeF textSize = graphics.MeasureString(text, font);
