@@ -50,7 +50,7 @@ namespace FrigoTab {
             handle.Free();
             if( _registered.Contains(window) ) {
                 if( lResult != IntPtr.Zero ) {
-                    window.Icon = Icon.FromHandle(lResult);
+                    window.AppIcon = Icon.FromHandle(lResult);
                 }
             }
             Unregister(window);
