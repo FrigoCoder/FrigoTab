@@ -4,31 +4,31 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class ApplicationWindow : IDisposable {
+    public class ApplicationWindow : FrigoForm, IDisposable {
 
         public readonly int Index;
         private readonly WindowHandle _application;
         private Icon _appIcon;
         private readonly Thumbnail _thumbnail;
         private readonly Overlay _overlay;
-        private Rectangle _bounds;
         private bool _selected;
 
         public ApplicationWindow (Session session, WindowHandle application, int index) {
+            Owner = session;
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             _application = application;
             Index = index;
             _appIcon = IconManager.IconFromGetClassLongPtr(_application) ?? Program.Icon;
             _thumbnail = new Thumbnail(application, session.Handle);
-            _overlay = new Overlay(session, this);
+            _overlay = new Overlay(this);
             IconManager.Register(this, _application);
         }
 
-        public Rectangle Bounds {
-            get { return _bounds; }
+        public new Rectangle Bounds {
+            get { return base.Bounds; }
             set {
-                _bounds = value;
+                base.Bounds = value;
                 _thumbnail.Update(new ScreenRect(value));
-                _overlay.Bounds = value;
                 _overlay.Draw();
             }
         }
@@ -52,13 +52,9 @@ namespace FrigoTab {
             }
         }
 
-        public bool Visible {
-            set { _overlay.Visible = value; }
-        }
-
-        public void Dispose () {
+        public new void Dispose () {
             IconManager.Unregister(this);
-            _overlay.Close();
+            Close();
             _thumbnail.Dispose();
         }
 
