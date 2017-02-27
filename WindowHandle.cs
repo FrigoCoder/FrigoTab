@@ -35,12 +35,10 @@ namespace FrigoTab {
             return handle._handle;
         }
 
-        public Icon Icon;
         private readonly IntPtr _handle;
 
         private WindowHandle (IntPtr handle) {
             _handle = handle;
-            Icon = IconFromGetClassLongPtr() ?? Program.Icon;
         }
 
         public ScreenRect GetWindowRect () {
@@ -70,7 +68,7 @@ namespace FrigoTab {
             return (WindowExStyles) GetWindowLongPtr(_handle, WindowLong.ExStyle);
         }
 
-        private Icon IconFromGetClassLongPtr () {
+        public Icon IconFromGetClassLongPtr () {
             IntPtr icon = GetClassLongPtr(_handle, ClassLong.Icon);
             return icon == IntPtr.Zero ? null : Icon.FromHandle(icon);
         }
