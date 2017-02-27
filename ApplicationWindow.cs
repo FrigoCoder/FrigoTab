@@ -13,6 +13,18 @@ namespace FrigoTab {
         private Rectangle _bounds;
         private bool _selected;
 
+        public ApplicationWindow (Session session, WindowHandle application, int index) {
+            Application = application;
+            Index = index;
+
+            Icon = IconManager.IconFromSendMessageTimeout(Application);
+            Icon = Icon ?? IconManager.IconFromGetClassLongPtr(Application);
+            Icon = Icon ?? Program.Icon;
+
+            _thumbnail = new Thumbnail(application, session.Handle);
+            _overlay = new Overlay(session, this);
+        }
+
         public Rectangle Bounds {
             get { return _bounds; }
             set {
@@ -36,18 +48,6 @@ namespace FrigoTab {
 
         public bool Visible {
             set { _overlay.Visible = value; }
-        }
-
-        public ApplicationWindow (Session session, WindowHandle application, int index) {
-            Application = application;
-            Index = index;
-
-            Icon = IconManager.IconFromSendMessageTimeout(Application);
-            Icon = Icon ?? IconManager.IconFromGetClassLongPtr(Application);
-            Icon = Icon ?? Program.Icon;
-
-            _thumbnail = new Thumbnail(application, session.Handle);
-            _overlay = new Overlay(session, this);
         }
 
         public void Dispose () {
