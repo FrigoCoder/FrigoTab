@@ -10,7 +10,7 @@ namespace FrigoTab {
         public delegate void Renderer (Graphics graphics);
 
         public static void Update (Form form, Renderer renderer) {
-            if( !form.IsHandleCreated ) {
+            if( form.IsDisposed ) {
                 return;
             }
             IntPtr screenDc = GetDC(IntPtr.Zero);
