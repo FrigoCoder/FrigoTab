@@ -14,22 +14,6 @@ namespace FrigoTab {
         private readonly IList<Thumbnail> _backgrounds = new List<Thumbnail>();
         private ApplicationWindow _selectedWindow;
 
-        private ApplicationWindow SelectedWindow {
-            get { return _selectedWindow; }
-            set {
-                if( _selectedWindow == value ) {
-                    return;
-                }
-                if( _selectedWindow != null ) {
-                    _selectedWindow.Selected = false;
-                }
-                _selectedWindow = value;
-                if( _selectedWindow != null ) {
-                    _selectedWindow.Selected = true;
-                }
-            }
-        }
-
         public Session (WindowFinder finder) {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
 
@@ -50,6 +34,22 @@ namespace FrigoTab {
                 window.Visible = true;
             }
             SetForeground();
+        }
+
+        private ApplicationWindow SelectedWindow {
+            get { return _selectedWindow; }
+            set {
+                if( _selectedWindow == value ) {
+                    return;
+                }
+                if( _selectedWindow != null ) {
+                    _selectedWindow.Selected = false;
+                }
+                _selectedWindow = value;
+                if( _selectedWindow != null ) {
+                    _selectedWindow.Selected = true;
+                }
+            }
         }
 
         public new void Dispose () {
