@@ -8,7 +8,6 @@ namespace FrigoTab {
 
     public class ApplicationWindow : FrigoForm, IDisposable {
 
-        private readonly Session _session;
         private readonly WindowHandle _application;
         private readonly int _index;
         private readonly Thumbnail _thumbnail;
@@ -16,7 +15,7 @@ namespace FrigoTab {
         private bool _selected;
 
         public ApplicationWindow (Session session, WindowHandle application, int index) {
-            Owner = _session = session;
+            Owner = session;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             _application = application;
             _index = index;
@@ -43,7 +42,7 @@ namespace FrigoTab {
         }
 
         public bool Selected {
-            get { return _selected; }
+            private get { return _selected; }
             set {
                 if( _selected == value ) {
                     return;
