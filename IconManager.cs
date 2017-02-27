@@ -10,7 +10,7 @@ namespace FrigoTab {
         public static void Register (ApplicationWindow window, WindowHandle application) {
             _registered.Add(window);
             IntPtr handle = GCHandle.ToIntPtr(GCHandle.Alloc(window));
-            SendMessageCallback(application, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, Callback, handle);
+            SendMessageCallback(application, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, _callback, handle);
         }
 
         public static void Unregister (ApplicationWindow window) {
@@ -43,6 +43,8 @@ namespace FrigoTab {
         private delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
 
         private static readonly IList<ApplicationWindow> _registered = new List<ApplicationWindow>();
+
+        private static readonly SendMessageDelegate _callback = Callback;
 
         private static void Callback (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult) {
             GCHandle handle = GCHandle.FromIntPtr(dwData);
