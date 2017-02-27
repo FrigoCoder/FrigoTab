@@ -110,9 +110,7 @@
     <Compile Include="IconManager.cs" />
     <Compile Include="LayerUpdater.cs" />
     <Compile Include="Layout.cs" />
-    <Compile Include="Overlay.cs">
-      <SubType>Form</SubType>
-    </Compile>
+    <Compile Include="Overlay.cs" />
     <Compile Include="Rect.cs" />
     <Compile Include="SessionManager.cs" />
     <Compile Include="KeyHook.cs" />
@@ -123,7 +121,9 @@
     </Compile>
     <Compile Include="SysTrayIcon.cs" />
     <Compile Include="Thumbnail.cs" />
-    <Compile Include="ApplicationWindow.cs" />
+    <Compile Include="ApplicationWindow.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="WindowFinder.cs" />
     <Compile Include="WindowHandle.cs" />
   </ItemGroup>
