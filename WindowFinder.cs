@@ -21,6 +21,10 @@ namespace FrigoTab {
                 case WindowType.ToolWindow:
                     ToolWindows.Add(handle);
                     break;
+                case WindowType.Hidden:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
             return true;
         }

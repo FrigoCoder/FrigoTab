@@ -52,7 +52,7 @@ namespace FrigoTab {
 
         }
 
-        private static void UpdateLayeredWindow (Form form, IntPtr hdc) {
+        private static void UpdateLayeredWindow (Control form, IntPtr hdc) {
             Point pptDst = form.Bounds.Location;
             Size pSize = form.Bounds.Size;
             Point pptSrc = Point.Empty;
