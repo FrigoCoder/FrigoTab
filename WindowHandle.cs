@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -34,10 +35,12 @@ namespace FrigoTab {
             return handle._handle;
         }
 
+        public Icon Icon;
         private readonly IntPtr _handle;
 
         private WindowHandle (IntPtr handle) {
             _handle = handle;
+            Icon = IconFromGetClassLongPtr() ?? Program.Icon;
         }
 
         public ScreenRect GetWindowRect () {
@@ -65,6 +68,17 @@ namespace FrigoTab {
 
         public WindowExStyles GetWindowExStyles () {
             return (WindowExStyles) GetWindowLongPtr(_handle, WindowLong.ExStyle);
+        }
+
+        private Icon IconFromGetClassLongPtr () {
+            IntPtr icon = GetClassLongPtr(_handle, ClassLong.Icon);
+            return icon == IntPtr.Zero ? null : Icon.FromHandle(icon);
+        }
+
+        private enum ClassLong {
+
+            Icon = -14
+
         }
 
         private enum ShowWindowCommand {
@@ -97,6 +111,9 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern bool SetForegroundWindow (IntPtr hwnd);
+
+        [DllImport ("user32.dll")]
+        private static extern IntPtr GetClassLongPtr (IntPtr hWnd, ClassLong nIndex);
 
     }
 
