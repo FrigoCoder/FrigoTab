@@ -45,7 +45,9 @@ namespace FrigoTab {
         private static readonly IList<ApplicationWindow> _registered = new List<ApplicationWindow>();
 
         private static void Callback (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult) {
-            ApplicationWindow window = (ApplicationWindow) GCHandle.FromIntPtr(dwData).Target;
+            GCHandle handle = GCHandle.FromIntPtr(dwData);
+            ApplicationWindow window = (ApplicationWindow) handle.Target;
+            handle.Free();
             if( _registered.Contains(window) ) {
                 if( lResult != IntPtr.Zero ) {
                     window.Icon = Icon.FromHandle(lResult);
