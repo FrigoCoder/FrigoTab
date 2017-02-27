@@ -12,7 +12,6 @@ namespace FrigoTab {
 
         private readonly IList<ApplicationWindow> _applications = new List<ApplicationWindow>();
         private readonly IList<Thumbnail> _backgrounds = new List<Thumbnail>();
-        private ApplicationWindow _selectedWindow;
 
         public Session (WindowFinder finder) {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
@@ -27,29 +26,11 @@ namespace FrigoTab {
 
             FrigoTab.Layout.LayoutWindows(_applications);
 
-            SelectedWindow = _applications[0];
-
             Visible = true;
             foreach( ApplicationWindow window in _applications ) {
                 window.Visible = true;
             }
             SetForeground();
-        }
-
-        private ApplicationWindow SelectedWindow {
-            get { return _selectedWindow; }
-            set {
-                if( _selectedWindow == value ) {
-                    return;
-                }
-                if( _selectedWindow != null ) {
-                    _selectedWindow.Selected = false;
-                }
-                _selectedWindow = value;
-                if( _selectedWindow != null ) {
-                    _selectedWindow.Selected = true;
-                }
-            }
         }
 
         public new void Dispose () {
@@ -65,29 +46,10 @@ namespace FrigoTab {
 
         protected override void OnKeyDown (KeyEventArgs e) {
             base.OnKeyDown(e);
-            _applications.Where(window => window.Index == (char) e.KeyCode - '1').ToList().ForEach(window => {
-                SelectedWindow = window;
-                End();
-            });
-            if( e.KeyCode == Keys.Escape ) {
-                Dispose();
+            foreach( ApplicationWindow window in _applications ) {
+                window.KeyEventHandler(e);
             }
-        }
-
-        protected override void OnMouseMove (MouseEventArgs e) {
-            base.OnMouseMove(e);
-            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(ClientToScreen(e.Location)));
-        }
-
-        protected override void OnMouseClick (MouseEventArgs e) {
-            base.OnMouseClick(e);
-            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(ClientToScreen(e.Location)));
-            End();
-        }
-
-        private void End () {
-            if( SelectedWindow != null ) {
-                SelectedWindow.SetForeground();
+            if( e.KeyCode == Keys.Escape ) {
                 Dispose();
             }
         }
@@ -104,11 +66,6 @@ namespace FrigoTab {
             }
         }
 
-        private Point ClientToScreen (Point location) {
-            ClientToScreen(Handle, ref location);
-            return location;
-        }
-
         [DllImport ("kernel32.dll")]
         private static extern int GetCurrentThreadId ();
 
@@ -120,9 +77,6 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern bool AttachThreadInput (int idAttach, int idAttachTo, bool fAttach);
-
-        [DllImport ("user32.dll")]
-        private static extern bool ClientToScreen (IntPtr hWnd, ref Point lpPoint);
 
     }
 
