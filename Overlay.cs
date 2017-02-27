@@ -37,7 +37,7 @@ namespace FrigoTab {
             const int pad = 8;
 
             Icon icon = _window.Icon;
-            string text = _window.Application.GetWindowText();
+            string text = _window.GetWindowText();
 
             Font font = new Font("Segoe UI", 11f);
             SizeF textSize = graphics.MeasureString(text, font);

@@ -87,7 +87,7 @@ namespace FrigoTab {
 
         private void End () {
             if( SelectedWindow != null ) {
-                SelectedWindow.Application.SetForeground();
+                SelectedWindow.SetForeground();
                 Dispose();
             }
         }

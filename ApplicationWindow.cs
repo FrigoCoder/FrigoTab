@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Drawing;
+using System.Windows.Forms;
 
 namespace FrigoTab {
 
     public class ApplicationWindow : IDisposable {
 
-        public readonly WindowHandle Application;
         public readonly int Index;
+        private readonly WindowHandle _application;
         private Icon _icon;
         private readonly Thumbnail _thumbnail;
         private readonly Overlay _overlay;
@@ -14,12 +15,12 @@ namespace FrigoTab {
         private bool _selected;
 
         public ApplicationWindow (Session session, WindowHandle application, int index) {
-            Application = application;
+            _application = application;
             Index = index;
-            _icon = IconManager.IconFromGetClassLongPtr(Application) ?? Program.Icon;
+            _icon = IconManager.IconFromGetClassLongPtr(_application) ?? Program.Icon;
             _thumbnail = new Thumbnail(application, session.Handle);
             _overlay = new Overlay(session, this);
-            IconManager.Register(this, Application);
+            IconManager.Register(this, _application);
         }
 
         public Rectangle Bounds {
@@ -59,6 +60,18 @@ namespace FrigoTab {
             IconManager.Unregister(this);
             _overlay.Close();
             _thumbnail.Dispose();
+        }
+
+        public Screen GetScreen () {
+            return Screen.FromHandle(_application);
+        }
+
+        public string GetWindowText () {
+            return _application.GetWindowText();
+        }
+
+        public void SetForeground () {
+            _application.SetForeground();
         }
 
         public Size GetSourceSize () {
