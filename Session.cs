@@ -12,6 +12,7 @@ namespace FrigoTab {
 
         private readonly IList<ApplicationWindow> _applications = new List<ApplicationWindow>();
         private readonly IList<Thumbnail> _backgrounds = new List<Thumbnail>();
+        private ApplicationWindow _selectedWindow;
 
         public Session (WindowFinder finder) {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
@@ -33,6 +34,22 @@ namespace FrigoTab {
             SetForeground();
         }
 
+        private ApplicationWindow SelectedWindow {
+            get { return _selectedWindow; }
+            set {
+                if( _selectedWindow == value ) {
+                    return;
+                }
+                if( _selectedWindow != null ) {
+                    _selectedWindow.Selected = false;
+                }
+                _selectedWindow = value;
+                if( _selectedWindow != null ) {
+                    _selectedWindow.Selected = true;
+                }
+            }
+        }
+
         public new void Dispose () {
             Visible = false;
             foreach( ApplicationWindow window in _applications ) {
@@ -46,12 +63,33 @@ namespace FrigoTab {
 
         protected override void OnKeyDown (KeyEventArgs e) {
             base.OnKeyDown(e);
-            foreach( ApplicationWindow window in _applications ) {
-                window.KeyEventHandler(e);
+            int index = (char) e.KeyCode - '1';
+            if( (index >= 0) && (index < _applications.Count) ) {
+                SelectedWindow = _applications[index];
+                End();
             }
             if( e.KeyCode == Keys.Escape ) {
                 Dispose();
             }
+        }
+
+        protected override void OnMouseMove (MouseEventArgs e) {
+            base.OnMouseMove(e);
+            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(PointToScreen(e.Location)));
+        }
+
+        protected override void OnMouseDown (MouseEventArgs e) {
+            base.OnMouseDown(e);
+            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(PointToScreen(e.Location)));
+            End();
+        }
+
+        private void End () {
+            if( SelectedWindow == null ) {
+                return;
+            }
+            SelectedWindow.SetForeground();
+            Dispose();
         }
 
         private void SetForeground () {
