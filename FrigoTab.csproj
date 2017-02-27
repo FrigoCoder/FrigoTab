@@ -110,7 +110,9 @@
     <Compile Include="IconManager.cs" />
     <Compile Include="LayerUpdater.cs" />
     <Compile Include="Layout.cs" />
-    <Compile Include="Overlay.cs" />
+    <Compile Include="Overlay.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Rect.cs" />
     <Compile Include="SessionManager.cs" />
     <Compile Include="KeyHook.cs" />

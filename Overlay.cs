@@ -5,16 +5,18 @@ using System.Drawing.Text;
 
 namespace FrigoTab {
 
-    public class Overlay {
+    public class Overlay : FrigoForm {
 
         private readonly ApplicationWindow _window;
 
         public Overlay (ApplicationWindow window) {
+            Owner = window;
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             _window = window;
         }
 
         public void Draw () {
-            LayerUpdater.Update(_window, Render);
+            LayerUpdater.Update(this, Render);
         }
 
         private void Render (Graphics graphics) {
