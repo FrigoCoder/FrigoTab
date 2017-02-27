@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Runtime.InteropServices;
 
@@ -6,27 +7,19 @@ namespace FrigoTab {
 
     public static class IconManager {
 
-        public delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
+        public static void Register (ApplicationWindow window, WindowHandle application) {
+            _registered.Add(window);
+            IntPtr handle = GCHandle.ToIntPtr(GCHandle.Alloc(window));
+            SendMessageCallback(application, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, Callback, handle);
+        }
+
+        public static void Unregister (ApplicationWindow window) {
+            _registered.Remove(window);
+        }
 
         public static Icon IconFromGetClassLongPtr (WindowHandle handle) {
             IntPtr icon = GetClassLongPtr(handle, ClassLong.Icon);
             return icon != IntPtr.Zero ? Icon.FromHandle(icon) : null;
-        }
-
-        public static Icon IconFromSendMessageTimeout (WindowHandle handle) {
-            IntPtr icon;
-            SendMessageTimeout(handle,
-                WindowMessages.GetIcon,
-                (IntPtr) GetIconSize.Big,
-                (IntPtr) 0,
-                SendMessageTimeoutFlags.AbortIfHung | SendMessageTimeoutFlags.Block,
-                500,
-                out icon);
-            return icon != IntPtr.Zero ? Icon.FromHandle(icon) : null;
-        }
-
-        public static void IconFromSendMessageCallback (WindowHandle handle, SendMessageDelegate callback) {
-            SendMessageCallback(handle, WindowMessages.GetIcon, (IntPtr) GetIconSize.Big, (IntPtr) 0, callback, 0);
         }
 
         private enum ClassLong {
@@ -47,33 +40,30 @@ namespace FrigoTab {
 
         }
 
-        [Flags]
-        private enum SendMessageTimeoutFlags {
+        private delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
 
-            Block = 1,
-            AbortIfHung = 2
+        private static readonly IList<ApplicationWindow> _registered = new List<ApplicationWindow>();
 
+        private static void Callback (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult) {
+            ApplicationWindow window = (ApplicationWindow) GCHandle.FromIntPtr(dwData).Target;
+            if( _registered.Contains(window) ) {
+                if( lResult != IntPtr.Zero ) {
+                    window.Icon = Icon.FromHandle(lResult);
+                }
+            }
+            Unregister(window);
         }
 
         [DllImport ("user32.dll")]
         private static extern IntPtr GetClassLongPtr (IntPtr hWnd, ClassLong nIndex);
 
         [DllImport ("user32.dll")]
-        private static extern IntPtr SendMessageTimeout (IntPtr hwnd,
-            WindowMessages message,
-            IntPtr wparam,
-            IntPtr lparam,
-            SendMessageTimeoutFlags flags,
-            int timeout,
-            out IntPtr result);
-
-        [DllImport ("user32.dll")]
         private static extern bool SendMessageCallback (IntPtr hWnd,
             WindowMessages message,
-            IntPtr wParam,
+            GetIconSize wParam,
             IntPtr lParam,
             SendMessageDelegate lpCallBack,
-            long dwData);
+            IntPtr dwData);
 
     }
 
