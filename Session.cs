@@ -16,7 +16,6 @@ namespace FrigoTab {
 
         public Session (WindowFinder finder) {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
-            KeyPreview = true;
 
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
                 _backgrounds.Add(new Thumbnail(window, Handle, window.GetWindowRect()));
