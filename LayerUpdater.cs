@@ -10,6 +10,9 @@ namespace FrigoTab {
         public delegate void Renderer (Graphics graphics);
 
         public static void Update (Form form, Renderer renderer) {
+            if( !form.IsHandleCreated ) {
+                return;
+            }
             IntPtr screenDc = GetDC(IntPtr.Zero);
             IntPtr memDc = CreateCompatibleDC(screenDc);
             IntPtr hBitmap = CreateCompatibleBitmap(screenDc, form.Bounds.Width, form.Bounds.Height);
