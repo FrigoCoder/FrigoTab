@@ -51,7 +51,7 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>AppIcon.ico</ApplicationIcon>
+    <ApplicationIcon>Program.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
@@ -141,7 +141,7 @@
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
-    <Content Include="AppIcon.ico" />
+    <Content Include="Program.ico" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Properties\app.manifest" />
