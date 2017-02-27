@@ -11,8 +11,8 @@ namespace FrigoTab {
         private readonly Session _session;
         private readonly WindowHandle _application;
         private readonly int _index;
-        private Icon _appIcon;
         private readonly Thumbnail _thumbnail;
+        private Icon _appIcon;
         private bool _selected;
 
         public ApplicationWindow (Session session, WindowHandle application, int index) {
@@ -20,8 +20,8 @@ namespace FrigoTab {
             ExStyle |= WindowExStyles.Layered;
             _application = application;
             _index = index;
-            _appIcon = IconManager.IconFromGetClassLongPtr(_application) ?? Program.Icon;
             _thumbnail = new Thumbnail(application, session.Handle);
+            _appIcon = IconManager.IconFromGetClassLongPtr(_application) ?? Program.Icon;
             IconManager.Register(this, _application);
         }
 
