@@ -15,11 +15,11 @@ namespace FrigoTab {
 
         public ApplicationWindow (Session session, WindowHandle application, int index) {
             Owner = session;
-            ExStyle |= WindowExStyles.Layered;
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             _application = application;
             Index = index;
             _appIcon = IconManager.IconFromGetClassLongPtr(_application) ?? Program.Icon;
-            _thumbnail = new Thumbnail(application, Handle);
+            _thumbnail = new Thumbnail(application, session.Handle);
             _overlay = new Overlay(this);
             IconManager.Register(this, _application);
         }
@@ -29,7 +29,6 @@ namespace FrigoTab {
             set {
                 base.Bounds = value;
                 _thumbnail.Update(new ScreenRect(value));
-                _overlay.Bounds = value;
                 _overlay.Draw();
             }
         }
@@ -50,13 +49,6 @@ namespace FrigoTab {
                 }
                 _selected = value;
                 _overlay.Draw();
-            }
-        }
-
-        public new bool Visible {
-            set {
-                base.Visible = value;
-                _overlay.Visible = value;
             }
         }
 
