@@ -17,7 +17,7 @@ namespace FrigoTab {
 
         public ApplicationWindow (Session session, WindowHandle application, int index) {
             Owner = _session = session;
-            ExStyle |= WindowExStyles.Layered;
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             _application = application;
             _index = index;
             _thumbnail = new Thumbnail(application, session.Handle);
@@ -26,6 +26,7 @@ namespace FrigoTab {
         }
 
         public new Rectangle Bounds {
+            get { return base.Bounds; }
             set {
                 base.Bounds = value;
                 _thumbnail.Update(new ScreenRect(value));
@@ -41,6 +42,17 @@ namespace FrigoTab {
             }
         }
 
+        public bool Selected {
+            get { return _selected; }
+            set {
+                if( _selected == value ) {
+                    return;
+                }
+                _selected = value;
+                RenderOverlay();
+            }
+        }
+
         public new void Dispose () {
             IconManager.Unregister(this);
             Close();
@@ -51,33 +63,12 @@ namespace FrigoTab {
             return Screen.FromHandle(_application);
         }
 
+        public void SetForeground () {
+            _application.SetForeground();
+        }
+
         public Size GetSourceSize () {
             return _thumbnail.GetSourceSize();
-        }
-
-        public void KeyEventHandler (KeyEventArgs e) {
-            if( (char) e.KeyCode - '1' == _index ) {
-                _application.SetForeground();
-                _session.Dispose();
-            }
-        }
-
-        protected override void OnMouseEnter (EventArgs e) {
-            base.OnMouseEnter(e);
-            _selected = true;
-            RenderOverlay();
-        }
-
-        protected override void OnMouseLeave (EventArgs e) {
-            base.OnMouseLeave(e);
-            _selected = false;
-            RenderOverlay();
-        }
-
-        protected override void OnMouseClick (MouseEventArgs e) {
-            base.OnMouseClick(e);
-            _application.SetForeground();
-            _session.Dispose();
         }
 
         private void RenderOverlay () {
@@ -93,8 +84,9 @@ namespace FrigoTab {
         }
 
         private void RenderFrame (Graphics graphics) {
-            Color color = _selected ? Color.FromArgb(128, 0, 0, 255) : Color.FromArgb(1, 0, 0, 0);
-            FillRectangle(graphics, graphics.VisibleClipBounds, color);
+            if( Selected ) {
+                FillRectangle(graphics, graphics.VisibleClipBounds, Color.FromArgb(128, 0, 0, 255));
+            }
         }
 
         private void RenderTitle (Graphics graphics) {
