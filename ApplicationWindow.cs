@@ -20,7 +20,7 @@ namespace FrigoTab {
             _application = application;
             _index = index;
             _thumbnail = new Thumbnail(application, session.Handle);
-            _appIcon = _application.Icon;
+            _appIcon = _application.IconFromGetClassLongPtr() ?? Program.Icon;
             IconManager.RegisterIconCallback(_application, SetIcon);
         }
 
