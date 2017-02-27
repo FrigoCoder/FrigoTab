@@ -41,17 +41,6 @@ namespace FrigoTab {
             }
         }
 
-        public bool Selected {
-            get { return _selected; }
-            set {
-                if( _selected == value ) {
-                    return;
-                }
-                _selected = value;
-                RenderOverlay();
-            }
-        }
-
         public new void Dispose () {
             IconManager.Unregister(this);
             Close();
@@ -60,10 +49,6 @@ namespace FrigoTab {
 
         public Screen GetScreen () {
             return Screen.FromHandle(_application);
-        }
-
-        public void SetForeground () {
-            _application.SetForeground();
         }
 
         public Size GetSourceSize () {
@@ -79,12 +64,14 @@ namespace FrigoTab {
 
         protected override void OnMouseEnter (EventArgs e) {
             base.OnMouseEnter(e);
-            Selected = true;
+            _selected = true;
+            RenderOverlay();
         }
 
         protected override void OnMouseLeave (EventArgs e) {
             base.OnMouseLeave(e);
-            Selected = false;
+            _selected = false;
+            RenderOverlay();
         }
 
         protected override void OnMouseClick (MouseEventArgs e) {
@@ -106,7 +93,7 @@ namespace FrigoTab {
         }
 
         private void RenderFrame (Graphics graphics) {
-            Color color = Selected ? Color.FromArgb(128, 0, 0, 255) : Color.FromArgb(1, 0, 0, 0);
+            Color color = _selected ? Color.FromArgb(128, 0, 0, 255) : Color.FromArgb(1, 0, 0, 0);
             FillRectangle(graphics, graphics.VisibleClipBounds, color);
         }
 
