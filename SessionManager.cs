@@ -17,6 +17,10 @@ namespace FrigoTab {
             _session?.HandleKeyEvents(e);
         }
 
+        public void MouseCallBack (MouseHookEventArgs e) {
+            _session?.HandleMouseEvents(e);
+        }
+
         public void Dispose () {
             _session?.Dispose();
         }
