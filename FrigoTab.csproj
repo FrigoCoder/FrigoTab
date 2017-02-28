@@ -109,6 +109,8 @@
     </Compile>
     <Compile Include="LayerUpdater.cs" />
     <Compile Include="Layout.cs" />
+    <Compile Include="MouseHook.cs" />
+    <Compile Include="MouseHookEventArgs.cs" />
     <Compile Include="Rect.cs" />
     <Compile Include="SessionManager.cs" />
     <Compile Include="KeyHook.cs" />
