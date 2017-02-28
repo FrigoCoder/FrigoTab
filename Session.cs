@@ -11,7 +11,7 @@ namespace FrigoTab {
     public class Session : FrigoForm, IDisposable {
 
         private readonly IList<Thumbnail> _backgrounds = new List<Thumbnail>();
-        private readonly IDictionary<Screen, ScreenForm> _screenForms = new Dictionary<Screen, ScreenForm>();
+        private readonly IList<ScreenForm> _screenForms = new List<ScreenForm>();
         private readonly IList<ApplicationWindow> _applications = new List<ApplicationWindow>();
         private ApplicationWindow _selectedWindow;
 
@@ -24,7 +24,7 @@ namespace FrigoTab {
             }
 
             foreach( Screen screen in Screen.AllScreens ) {
-                _screenForms[screen] = new ScreenForm(this, screen);
+                _screenForms.Add(new ScreenForm(this, screen));
             }
 
             foreach( WindowHandle window in finder.Windows ) {
@@ -34,7 +34,7 @@ namespace FrigoTab {
             FrigoTab.Layout.LayoutWindows(_applications);
 
             Visible = true;
-            foreach( ScreenForm screenForm in _screenForms.Values ) {
+            foreach( ScreenForm screenForm in _screenForms ) {
                 screenForm.Visible = true;
             }
             foreach( ApplicationWindow window in _applications ) {
@@ -64,7 +64,7 @@ namespace FrigoTab {
             foreach( ApplicationWindow window in _applications ) {
                 window.Dispose();
             }
-            foreach( ScreenForm screenForm in _screenForms.Values ) {
+            foreach( ScreenForm screenForm in _screenForms ) {
                 screenForm.Dispose();
             }
             foreach( Thumbnail thumbnail in _backgrounds ) {
@@ -103,7 +103,7 @@ namespace FrigoTab {
         }
 
         private bool IsOnAToolbar (Point point) {
-            return _screenForms.Values.FirstOrDefault(form => form.Bounds.Contains(point)) == null;
+            return _screenForms.FirstOrDefault(form => form.Bounds.Contains(point)) == null;
         }
 
         private void End () {
