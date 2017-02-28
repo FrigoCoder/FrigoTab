@@ -21,7 +21,7 @@ namespace FrigoTab {
             _index = index;
             _thumbnail = new Thumbnail(application, session.Handle);
             _appIcon = _application.IconFromGetClassLongPtr() ?? Program.Icon;
-            _application.RegisterIconCallback(SetIcon);
+            _application.RegisterIconCallback(icon => AppIcon = icon);
         }
 
         public new Rectangle Bounds {
@@ -44,6 +44,14 @@ namespace FrigoTab {
             }
         }
 
+        private Icon AppIcon {
+            get { return _appIcon; }
+            set {
+                _appIcon = value;
+                RenderOverlay();
+            }
+        }
+
         public new void Dispose () {
             Close();
             _thumbnail.Dispose();
@@ -59,11 +67,6 @@ namespace FrigoTab {
 
         public Size GetSourceSize () {
             return _thumbnail.GetSourceSize();
-        }
-
-        private void SetIcon (Icon icon) {
-            _appIcon = icon;
-            RenderOverlay();
         }
 
         private void RenderOverlay () {
@@ -87,7 +90,7 @@ namespace FrigoTab {
         private void RenderTitle (Graphics graphics) {
             const int pad = 8;
 
-            Icon icon = _appIcon;
+            Icon icon = AppIcon;
             string text = _application.GetWindowText();
 
             Font font = new Font("Segoe UI", 11f);
