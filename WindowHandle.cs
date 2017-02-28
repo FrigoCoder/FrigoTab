@@ -73,9 +73,9 @@ namespace FrigoTab {
             return icon == IntPtr.Zero ? null : Icon.FromHandle(icon);
         }
 
-        public void RegisterIconCallback (Action<Icon> callback) {
-            IntPtr callbackHandle = GCHandle.ToIntPtr(GCHandle.Alloc(callback));
-            SendMessageCallback(_handle, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, _callback, callbackHandle);
+        public void RegisterIconCallback (Action<Icon> action) {
+            IntPtr actionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(action));
+            SendMessageCallback(_handle, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, _callback, actionHandle);
         }
 
         private enum ClassLong {
