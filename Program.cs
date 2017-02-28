@@ -21,8 +21,12 @@ namespace FrigoTab {
                     using( KeyHook keyHook = new KeyHook() ) {
                         keyHook.KeyEvent += sessionManager.KeyCallBack;
 
-                        StartQuitTimer();
-                        Application.Run();
+                        using( MouseHook mouseHook = new MouseHook() ) {
+                            mouseHook.MouseEvent += sessionManager.MouseCallBack;
+
+                            StartQuitTimer();
+                            Application.Run();
+                        }
                     }
                 }
             }

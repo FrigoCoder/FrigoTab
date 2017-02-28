@@ -73,15 +73,11 @@ namespace FrigoTab {
             }
         }
 
-        protected override void OnMouseMove (MouseEventArgs e) {
-            base.OnMouseMove(e);
-            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(PointToScreen(e.Location)));
-        }
-
-        protected override void OnMouseDown (MouseEventArgs e) {
-            base.OnMouseDown(e);
-            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(PointToScreen(e.Location)));
-            End();
+        public void HandleMouseEvents (MouseHookEventArgs e) {
+            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(e.Point));
+            if( e.Click ) {
+                End();
+            }
         }
 
         private void End () {

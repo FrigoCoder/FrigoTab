@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 
 namespace FrigoTab {
 
-    public class MouseHook {
+    public class MouseHook : IDisposable {
 
         [SuppressMessage ("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
         private readonly LowLevelMouseProc _hookProc;
@@ -30,6 +30,17 @@ namespace FrigoTab {
 
         private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelMouseStruct lParam) {
             if( nCode >= 0 ) {
+                Wm w = (Wm) wParam;
+                if( Enum.IsDefined(typeof(Wm), w) ) {
+                    Point point = lParam.Point;
+                    bool click = (w == Wm.LeftDown) || (w == Wm.LeftUp) || (w == Wm.RightDown) || (w == Wm.RightUp);
+
+                    MouseHookEventArgs e = new MouseHookEventArgs(point, click);
+                    MouseEvent?.Invoke(e);
+                    if( e.Handled ) {
+                        return (IntPtr) 1;
+                    }
+                }
             }
             return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
         }
@@ -47,10 +58,10 @@ namespace FrigoTab {
         private enum Wm {
 
             MouseMove = 0x200,
-            LButtonDown = 0x201,
-            LButtonUp = 0x202,
-            RButtonDown = 0x204,
-            RButtonUp = 0x205,
+            LeftDown = 0x201,
+            LeftUp = 0x202,
+            RightDown = 0x204,
+            RightUp = 0x205,
             MouseWheel = 0x20a,
             MouseHWheel = 0x20e
 
