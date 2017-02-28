@@ -61,7 +61,7 @@ namespace FrigoTab {
             Close();
         }
 
-        public void HandleKeyEvents (object sender, KeyHookEventArgs e) {
+        public void HandleKeyEvents (KeyHookEventArgs e) {
             int index = (char) e.Key - '1';
             if( (index >= 0) && (index < _applications.Count) ) {
                 e.Handled = true;
