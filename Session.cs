@@ -63,16 +63,16 @@ namespace FrigoTab {
 
         public void HandleKeyEvents (KeyHookEventArgs e) {
             int index = (char) e.Key - '1';
-            if( !e.Alt && (index >= 0) && (index < _applications.Count) ) {
+            if( (index >= 0) && (index < _applications.Count) ) {
                 e.Handled = true;
                 SelectedWindow = _applications[index];
                 End();
             }
-            if( !e.Alt && (e.Key == Keys.Escape) ) {
+            if( e.Key == Keys.Escape ) {
                 e.Handled = true;
                 Dispose();
             }
-            if( e.Alt && (e.Key == Keys.F4) ) {
+            if( e.Key == (Keys.Alt | Keys.F4) ) {
                 e.Handled = true;
             }
         }

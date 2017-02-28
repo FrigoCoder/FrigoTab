@@ -9,12 +9,10 @@ namespace FrigoTab {
     public class KeyHookEventArgs {
 
         public readonly Keys Key;
-        public readonly bool Alt;
         public bool Handled;
 
-        public KeyHookEventArgs (Keys key, bool alt) {
+        public KeyHookEventArgs (Keys key) {
             Key = key;
-            Alt = alt;
         }
 
     }
@@ -45,9 +43,9 @@ namespace FrigoTab {
             if( nCode >= 0 ) {
                 Wm w = (Wm) wParam;
                 if( (w == Wm.KeyDown) || (w == Wm.KeyUp) || (w == Wm.SysKeyDown) || (w == Wm.SysKeyUp) ) {
-                    Keys key = lParam.VkCode;
                     bool alt = lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown);
-                    KeyHookEventArgs e = new KeyHookEventArgs(key, alt);
+                    Keys key = alt ? lParam.VkCode | Keys.Alt : lParam.VkCode;
+                    KeyHookEventArgs e = new KeyHookEventArgs(key);
                     KeyEvent?.Invoke(e);
                     if( e.Handled ) {
                         return (IntPtr) 1;
