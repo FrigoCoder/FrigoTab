@@ -68,6 +68,7 @@ namespace FrigoTab {
 
         }
 
+        [SuppressMessage ("ReSharper", "UnusedMember.Local")]
         private enum Wm {
 
             MouseMove = 0x200,
