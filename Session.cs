@@ -4,30 +4,41 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace FrigoTab {
 
     public class Session : FrigoForm, IDisposable {
 
-        private readonly IList<ApplicationWindow> _applications = new List<ApplicationWindow>();
         private readonly IList<Thumbnail> _backgrounds = new List<Thumbnail>();
+        private readonly IDictionary<Screen, ScreenForm> _screenForms = new Dictionary<Screen, ScreenForm>();
+        private readonly IList<ApplicationWindow> _applications = new List<ApplicationWindow>();
         private ApplicationWindow _selectedWindow;
 
         public Session (WindowFinder finder) {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
 
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
                 _backgrounds.Add(new Thumbnail(window, Handle, window.GetWindowRect()));
             }
 
+            foreach( Screen screen in Screen.AllScreens ) {
+                _screenForms[screen] = new ScreenForm(this, screen);
+            }
+
             foreach( WindowHandle window in finder.Windows ) {
-                _applications.Add(new ApplicationWindow(this, window, _applications.Count));
+                ScreenForm screenForm = _screenForms[window.GetScreen()];
+                _applications.Add(new ApplicationWindow(screenForm, window, _applications.Count));
             }
 
             FrigoTab.Layout.LayoutWindows(_applications);
 
             Visible = true;
+            foreach( ScreenForm screenForm in _screenForms.Values ) {
+                screenForm.Visible = true;
+            }
             foreach( ApplicationWindow window in _applications ) {
                 window.Visible = true;
             }
@@ -54,6 +65,9 @@ namespace FrigoTab {
             Visible = false;
             foreach( ApplicationWindow window in _applications ) {
                 window.Dispose();
+            }
+            foreach( ScreenForm screenForm in _screenForms.Values ) {
+                screenForm.Dispose();
             }
             foreach( Thumbnail thumbnail in _backgrounds ) {
                 thumbnail.Dispose();
