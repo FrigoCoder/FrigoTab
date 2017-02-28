@@ -28,7 +28,7 @@ namespace FrigoTab {
             }
 
             foreach( WindowHandle window in finder.Windows ) {
-                _applications.Add(new ApplicationWindow(_screenForms[window.GetScreen()], window, _applications.Count));
+                _applications.Add(new ApplicationWindow(this, window, _applications.Count));
             }
 
             FrigoTab.Layout.LayoutWindows(_applications);
@@ -94,13 +94,16 @@ namespace FrigoTab {
         public void HandleMouseEvents (MouseHookEventArgs e) {
             SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(e.Point));
             if( e.Click ) {
-                ScreenForm screenForm = _screenForms.Values.FirstOrDefault(form => form.Bounds.Contains(e.Point));
-                if( screenForm == null ) {
+                if( IsOnAToolbar(e.Point) ) {
                     Dispose();
                 } else {
                     End();
                 }
             }
+        }
+
+        private bool IsOnAToolbar (Point point) {
+            return _screenForms.Values.FirstOrDefault(form => form.Bounds.Contains(point)) == null;
         }
 
         private void End () {
