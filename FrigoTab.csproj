@@ -111,6 +111,9 @@
     <Compile Include="Layout.cs" />
     <Compile Include="MouseHook.cs" />
     <Compile Include="Rect.cs" />
+    <Compile Include="ScreenForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="SessionManager.cs" />
     <Compile Include="KeyHook.cs" />
     <Compile Include="Program.cs" />
