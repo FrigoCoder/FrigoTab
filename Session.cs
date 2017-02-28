@@ -4,7 +4,6 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading;
 using System.Windows.Forms;
 
 namespace FrigoTab {
@@ -29,8 +28,7 @@ namespace FrigoTab {
             }
 
             foreach( WindowHandle window in finder.Windows ) {
-                ScreenForm screenForm = _screenForms[window.GetScreen()];
-                _applications.Add(new ApplicationWindow(screenForm, window, _applications.Count));
+                _applications.Add(new ApplicationWindow(_screenForms[window.GetScreen()], window, _applications.Count));
             }
 
             FrigoTab.Layout.LayoutWindows(_applications);
@@ -96,7 +94,12 @@ namespace FrigoTab {
         public void HandleMouseEvents (MouseHookEventArgs e) {
             SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(e.Point));
             if( e.Click ) {
-                End();
+                ScreenForm screenForm = _screenForms.Values.FirstOrDefault(form => form.Bounds.Contains(e.Point));
+                if( screenForm == null ) {
+                    Dispose();
+                } else {
+                    End();
+                }
             }
         }
 
