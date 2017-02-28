@@ -14,7 +14,7 @@ namespace FrigoTab {
         private Icon _appIcon;
         private bool _selected;
 
-        public ApplicationWindow (Session session, WindowHandle application, int index) {
+        public ApplicationWindow (Form session, WindowHandle application, int index) {
             Owner = session;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             _application = application;
