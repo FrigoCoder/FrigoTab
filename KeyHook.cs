@@ -42,7 +42,7 @@ namespace FrigoTab {
         private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam) {
             if( nCode >= 0 ) {
                 Wm w = (Wm) wParam;
-                if( (w == Wm.KeyDown) || (w == Wm.KeyUp) || (w == Wm.SysKeyDown) || (w == Wm.SysKeyUp) ) {
+                if( Enum.IsDefined(typeof(Wm), w) ) {
                     bool alt = lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown);
                     Keys key = alt ? lParam.VkCode | Keys.Alt : lParam.VkCode;
                     KeyHookEventArgs e = new KeyHookEventArgs(key);
@@ -72,6 +72,7 @@ namespace FrigoTab {
 
         }
 
+        [SuppressMessage ("ReSharper", "UnusedMember.Local")]
         private enum Wm {
 
             KeyDown = 0x0100,
