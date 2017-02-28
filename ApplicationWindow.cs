@@ -14,12 +14,12 @@ namespace FrigoTab {
         private Icon _appIcon;
         private bool _selected;
 
-        public ApplicationWindow (Form session, WindowHandle application, int index) {
-            Owner = session;
+        public ApplicationWindow (Form owner, WindowHandle application, int index) {
+            Owner = owner;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             _application = application;
             _index = index;
-            _thumbnail = new Thumbnail(application, session.Handle);
+            _thumbnail = new Thumbnail(application, owner.Handle);
             _appIcon = _application.IconFromGetClassLongPtr() ?? Program.Icon;
             _application.RegisterIconCallback(icon => AppIcon = icon);
         }
