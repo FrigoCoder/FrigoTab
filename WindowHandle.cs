@@ -115,11 +115,11 @@ namespace FrigoTab {
 
         private static void Callback (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult) {
             GCHandle handle = GCHandle.FromIntPtr(dwData);
-            Action<Icon> callback = (Action<Icon>) handle.Target;
+            Action<Icon> action = (Action<Icon>) handle.Target;
             handle.Free();
 
             if( lResult != IntPtr.Zero ) {
-                callback(Icon.FromHandle(lResult));
+                action(Icon.FromHandle(lResult));
             }
         }
 
