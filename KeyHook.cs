@@ -13,7 +13,7 @@ namespace FrigoTab {
 
         private readonly IntPtr _hookId;
 
-        public event EventHandler<KeyHookEventArgs> KeyEvent;
+        public event Action<KeyHookEventArgs> KeyEvent;
 
         public KeyHook () {
             _hookProc = HookProc;
@@ -35,7 +35,7 @@ namespace FrigoTab {
                     Keys key = lParam.VkCode;
                     bool alt = lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown);
                     KeyHookEventArgs e = new KeyHookEventArgs(key, alt);
-                    KeyEvent?.Invoke(this, e);
+                    KeyEvent?.Invoke(e);
                     if( e.Handled ) {
                         return (IntPtr) 1;
                     }

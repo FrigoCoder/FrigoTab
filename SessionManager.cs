@@ -7,14 +7,14 @@ namespace FrigoTab {
 
         private Session _session;
 
-        public void KeyCallBack (object sender, KeyHookEventArgs e) {
+        public void KeyCallBack (KeyHookEventArgs e) {
             if( e.Alt && (e.Key == Keys.Tab) ) {
                 e.Handled = true;
                 if( _session == null ) {
                     BeginSession();
                 }
             }
-            _session?.HandleKeyEvents(sender, e);
+            _session?.HandleKeyEvents(e);
         }
 
         public void Dispose () {
