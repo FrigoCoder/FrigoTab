@@ -58,7 +58,7 @@ namespace FrigoTab {
         }
 
         public Screen GetScreen () {
-            return Screen.FromHandle(_application);
+            return _application.GetScreen();
         }
 
         public void SetForeground () {

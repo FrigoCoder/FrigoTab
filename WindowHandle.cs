@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Windows.Forms;
 
 namespace FrigoTab {
 
@@ -39,6 +40,10 @@ namespace FrigoTab {
 
         private WindowHandle (IntPtr handle) {
             _handle = handle;
+        }
+
+        public Screen GetScreen () {
+            return Screen.FromHandle(_handle);
         }
 
         public ScreenRect GetWindowRect () {
