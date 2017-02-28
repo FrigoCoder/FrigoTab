@@ -8,7 +8,7 @@ namespace FrigoTab {
         private Session _session;
 
         public void KeyCallBack (KeyHookEventArgs e) {
-            if( e.Alt && (e.Key == Keys.Tab) ) {
+            if( e.Key == (Keys.Alt | Keys.Tab) ) {
                 e.Handled = true;
                 if( _session == null ) {
                     BeginSession();
