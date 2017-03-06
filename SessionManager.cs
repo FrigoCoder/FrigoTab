@@ -1,11 +1,22 @@
 using System;
 using System.Windows.Forms;
 
+using Microsoft.Win32;
+
 namespace FrigoTab {
 
-    public class SessionManager : IDisposable {
+    public class SessionManager : FrigoForm, IDisposable {
 
         private Session _session;
+
+        public SessionManager () {
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
+            SystemEvents.DisplaySettingsChanged += RefreshSession;
+        }
+
+        ~SessionManager () {
+            SystemEvents.DisplaySettingsChanged -= RefreshSession;
+        }
 
         public void KeyCallBack (KeyHookEventArgs e) {
             if( e.Key == (Keys.Alt | Keys.Tab) ) {
@@ -21,8 +32,9 @@ namespace FrigoTab {
             _session?.HandleMouseEvents(e);
         }
 
-        public void Dispose () {
+        public new void Dispose () {
             _session?.Dispose();
+            base.Dispose();
         }
 
         private void BeginSession () {
@@ -37,6 +49,14 @@ namespace FrigoTab {
         private void EndSession (object sender, EventArgs e) {
             _session.FormClosed -= EndSession;
             _session = null;
+        }
+
+        private void RefreshSession (object sender, EventArgs e) {
+            if( _session == null ) {
+                return;
+            }
+            _session.Dispose();
+            BeginSession();
         }
 
     }

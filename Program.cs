@@ -14,18 +14,16 @@ namespace FrigoTab {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            using( SysTrayIcon sysTrayIcon = new SysTrayIcon() ) {
-                sysTrayIcon.Exit += Application.Exit;
-
-                using( SessionManager sessionManager = new SessionManager() ) {
-                    using( KeyHook keyHook = new KeyHook() ) {
-                        keyHook.KeyEvent += sessionManager.KeyCallBack;
-
-                        using( MouseHook mouseHook = new MouseHook() ) {
+            using( KeyHook keyHook = new KeyHook() ) {
+                using( MouseHook mouseHook = new MouseHook() ) {
+                    using( SysTrayIcon sysTrayIcon = new SysTrayIcon() ) {
+                        using( SessionManager sessionManager = new SessionManager() ) {
+                            keyHook.KeyEvent += sessionManager.KeyCallBack;
                             mouseHook.MouseEvent += sessionManager.MouseCallBack;
+                            sysTrayIcon.Exit += sessionManager.Dispose;
 
                             StartQuitTimer();
-                            Application.Run();
+                            Application.Run(sessionManager);
                         }
                     }
                 }
