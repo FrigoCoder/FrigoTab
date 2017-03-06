@@ -58,13 +58,13 @@ namespace FrigoTab {
                 ShowWindow(_handle, ShowWindowCommand.Restore);
             }
             SetForegroundWindow(_handle);
-            int current = GetCurrentThreadId();
+            int expected = GetWindowThreadProcessId(_handle, IntPtr.Zero);
             int foreground = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
-            if( current != foreground ) {
-                File.AppendAllText("log.txt", "Had to AttachThreadInput\n");
-                AttachThreadInput(current, foreground, true);
+            if( expected != foreground ) {
+                File.AppendAllText("log.txt", DateTime.Now + ": Had to AttachThreadInput\n");
+                AttachThreadInput(expected, foreground, true);
                 SetForegroundWindow(_handle);
-                AttachThreadInput(current, foreground, false);
+                AttachThreadInput(expected, foreground, false);
             }
         }
 
@@ -165,9 +165,6 @@ namespace FrigoTab {
             IntPtr lParam,
             SendMessageDelegate lpCallBack,
             IntPtr dwData);
-
-        [DllImport ("kernel32.dll")]
-        private static extern int GetCurrentThreadId ();
 
         [DllImport ("user32.dll")]
         private static extern int GetWindowThreadProcessId (IntPtr hWnd, IntPtr dwProcessId);
