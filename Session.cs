@@ -40,7 +40,7 @@ namespace FrigoTab {
             foreach( ApplicationWindow window in _applications ) {
                 window.Visible = true;
             }
-            SetForeground();
+            ((WindowHandle) Handle).SetForeground();
         }
 
         private ApplicationWindow SelectedWindow {
@@ -113,30 +113,6 @@ namespace FrigoTab {
             SelectedWindow.SetForeground();
             Dispose();
         }
-
-        private void SetForeground () {
-            Activate();
-            int current = GetCurrentThreadId();
-            int foreground = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
-            if( current != foreground ) {
-                File.AppendAllText("log.txt", "Had to AttachThreadInput\n");
-                AttachThreadInput(current, foreground, true);
-                Activate();
-                AttachThreadInput(current, foreground, false);
-            }
-        }
-
-        [DllImport ("kernel32.dll")]
-        private static extern int GetCurrentThreadId ();
-
-        [DllImport ("user32.dll")]
-        private static extern int GetWindowThreadProcessId (IntPtr hWnd, IntPtr dwProcessId);
-
-        [DllImport ("user32.dll")]
-        private static extern IntPtr GetForegroundWindow ();
-
-        [DllImport ("user32.dll")]
-        private static extern bool AttachThreadInput (int idAttach, int idAttachTo, bool fAttach);
 
     }
 
