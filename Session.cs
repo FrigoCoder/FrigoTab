@@ -58,7 +58,6 @@ namespace FrigoTab {
         }
 
         public new void Dispose () {
-            Visible = false;
             foreach( ApplicationWindow window in _applications ) {
                 window.Dispose();
             }
