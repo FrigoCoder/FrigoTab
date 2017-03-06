@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
@@ -57,6 +58,14 @@ namespace FrigoTab {
                 ShowWindow(_handle, ShowWindowCommand.Restore);
             }
             SetForegroundWindow(_handle);
+            int current = GetCurrentThreadId();
+            int foreground = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
+            if( current != foreground ) {
+                File.AppendAllText("log.txt", "Had to AttachThreadInput\n");
+                AttachThreadInput(current, foreground, true);
+                SetForegroundWindow(_handle);
+                AttachThreadInput(current, foreground, false);
+            }
         }
 
         public string GetWindowText () {
@@ -156,6 +165,18 @@ namespace FrigoTab {
             IntPtr lParam,
             SendMessageDelegate lpCallBack,
             IntPtr dwData);
+
+        [DllImport ("kernel32.dll")]
+        private static extern int GetCurrentThreadId ();
+
+        [DllImport ("user32.dll")]
+        private static extern int GetWindowThreadProcessId (IntPtr hWnd, IntPtr dwProcessId);
+
+        [DllImport ("user32.dll")]
+        private static extern IntPtr GetForegroundWindow ();
+
+        [DllImport ("user32.dll")]
+        private static extern bool AttachThreadInput (int idAttach, int idAttachTo, bool fAttach);
 
     }
 
