@@ -23,6 +23,7 @@ namespace FrigoTab {
         private readonly LowLevelKeyProc _hookProc;
 
         private readonly IntPtr _hookId;
+        private bool _disposed;
 
         public event Action<KeyHookEventArgs> KeyEvent;
 
@@ -35,8 +36,17 @@ namespace FrigoTab {
             }
         }
 
+        ~KeyHook () {
+            Dispose();
+        }
+
         public void Dispose () {
+            if( _disposed ) {
+                return;
+            }
             UnhookWindowsHookEx(_hookId);
+            _disposed = true;
+            GC.SuppressFinalize(this);
         }
 
         private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam) {
