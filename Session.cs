@@ -1,11 +1,10 @@
-using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class Session : FrigoForm, IDisposable {
+    public class Session : FrigoForm {
 
         private readonly Backgrounds _backgrounds;
         private readonly ScreenForms _screenForms;
