@@ -29,6 +29,8 @@ namespace FrigoTab {
             if( _active ) {
                 return;
             }
+            Visible = false;
+
             _backgrounds.Populate();
             _screenForms.Populate();
             _applications.Populate();
