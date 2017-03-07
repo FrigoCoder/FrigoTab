@@ -1,6 +1,9 @@
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+
+using Microsoft.Win32;
 
 namespace FrigoTab {
 
@@ -18,6 +21,8 @@ namespace FrigoTab {
             _backgrounds = new Backgrounds(this);
             _screenForms = new ScreenForms(this);
             _applications = new Applications(this);
+
+            SystemEvents.DisplaySettingsChanged += RefreshSession;
         }
 
         public void BeginSession () {
@@ -48,7 +53,7 @@ namespace FrigoTab {
             _backgrounds.Dispose();
         }
 
-        public void RefreshSession () {
+        public void RefreshSession (object sender, EventArgs e) {
             EndSession();
             BeginSession();
         }
@@ -85,6 +90,7 @@ namespace FrigoTab {
 
         protected override void Dispose (bool disposing) {
             EndSession();
+            SystemEvents.DisplaySettingsChanged -= RefreshSession;
             base.Dispose(disposing);
         }
 

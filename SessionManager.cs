@@ -1,7 +1,4 @@
-using System;
 using System.Windows.Forms;
-
-using Microsoft.Win32;
 
 namespace FrigoTab {
 
@@ -11,7 +8,6 @@ namespace FrigoTab {
 
         public SessionManager () {
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
-            SystemEvents.DisplaySettingsChanged += RefreshSession;
         }
 
         public void KeyCallBack (KeyHookEventArgs e) {
@@ -27,13 +23,8 @@ namespace FrigoTab {
         }
 
         protected override void Dispose (bool disposing) {
-            SystemEvents.DisplaySettingsChanged -= RefreshSession;
             _sessionForm.Close();
             base.Dispose(disposing);
-        }
-
-        private void RefreshSession (object sender, EventArgs e) {
-            _sessionForm.RefreshSession();
         }
 
     }
