@@ -1,5 +1,3 @@
-using System.Windows.Forms;
-
 namespace FrigoTab {
 
     public class SessionManager : FrigoForm {
@@ -11,10 +9,6 @@ namespace FrigoTab {
         }
 
         public void KeyCallBack (KeyHookEventArgs e) {
-            if( e.Key == (Keys.Alt | Keys.Tab) ) {
-                e.Handled = true;
-                _sessionForm.BeginSession();
-            }
             _sessionForm.HandleKeyEvents(e);
         }
 

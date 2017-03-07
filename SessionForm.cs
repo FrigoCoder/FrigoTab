@@ -59,11 +59,15 @@ namespace FrigoTab {
         }
 
         public void HandleKeyEvents (KeyHookEventArgs e) {
+            if( e.Key == (Keys.Alt | Keys.Tab) ) {
+                e.Handled = true;
+                BeginSession();
+            }
             if( _active ) {
                 if( ((Keys.D1 <= e.Key) && (e.Key <= Keys.D9)) || ((Keys.NumPad1 <= e.Key) && (e.Key <= Keys.NumPad9)) ) {
                     e.Handled = true;
                     _applications.SelectByIndex((char) e.Key - '1');
-                    End();
+                    ActivateEndSession();
                 }
                 if( e.Key == Keys.Escape ) {
                     e.Handled = true;
@@ -82,7 +86,7 @@ namespace FrigoTab {
                     if( _screenForms.IsOnAToolBar(e.Point) ) {
                         EndSession();
                     } else {
-                        End();
+                        ActivateEndSession();
                     }
                 }
             }
@@ -94,7 +98,7 @@ namespace FrigoTab {
             base.Dispose(disposing);
         }
 
-        private void End () {
+        private void ActivateEndSession () {
             if( _applications.Selected == null ) {
                 return;
             }
