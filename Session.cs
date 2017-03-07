@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -10,7 +9,7 @@ namespace FrigoTab {
 
         private readonly Backgrounds _backgrounds;
         private readonly ScreenForms _screenForms;
-        private readonly IList<ApplicationWindow> _applications = new List<ApplicationWindow>();
+        private readonly Applications _applications;
         private ApplicationWindow _selectedWindow;
 
         public Session (WindowFinder finder) {
@@ -23,40 +22,17 @@ namespace FrigoTab {
             _screenForms = new ScreenForms(this);
             _screenForms.Populate();
 
-            foreach( WindowHandle window in finder.Windows ) {
-                _applications.Add(new ApplicationWindow(this, window, _applications.Count));
-            }
-
-            FrigoTab.Layout.LayoutWindows(_applications);
+            _applications = new Applications(this);
+            _applications.Populate();
 
             Visible = true;
             _screenForms.Visible = true;
-            foreach( ApplicationWindow window in _applications ) {
-                window.Visible = true;
-            }
+            _applications.Visible = true;
             ((WindowHandle) Handle).SetForeground();
         }
 
-        private ApplicationWindow SelectedWindow {
-            get { return _selectedWindow; }
-            set {
-                if( _selectedWindow == value ) {
-                    return;
-                }
-                if( _selectedWindow != null ) {
-                    _selectedWindow.Selected = false;
-                }
-                _selectedWindow = value;
-                if( _selectedWindow != null ) {
-                    _selectedWindow.Selected = true;
-                }
-            }
-        }
-
         public new void Dispose () {
-            foreach( ApplicationWindow window in _applications ) {
-                window.Dispose();
-            }
+            _applications.Dispose();
             _screenForms.Dispose();
             _backgrounds.Dispose();
             Close();
@@ -64,12 +40,9 @@ namespace FrigoTab {
 
         public void HandleKeyEvents (KeyHookEventArgs e) {
             if( ((Keys.D1 <= e.Key) && (e.Key <= Keys.D9)) || ((Keys.NumPad1 <= e.Key) && (e.Key <= Keys.NumPad9)) ) {
-                int index = (char) e.Key - '1';
-                if( (index >= 0) && (index < _applications.Count) ) {
-                    e.Handled = true;
-                    SelectedWindow = _applications[index];
-                    End();
-                }
+                e.Handled = true;
+                _applications.SelectByIndex((char) e.Key - '1');
+                End();
             }
             if( e.Key == Keys.Escape ) {
                 e.Handled = true;
@@ -81,7 +54,7 @@ namespace FrigoTab {
         }
 
         public void HandleMouseEvents (MouseHookEventArgs e) {
-            SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(e.Point));
+            _applications.SelectByPoint(e.Point);
             if( e.Click ) {
                 if( _screenForms.IsOnAToolBar(e.Point) ) {
                     Dispose();
@@ -92,10 +65,10 @@ namespace FrigoTab {
         }
 
         private void End () {
-            if( SelectedWindow == null ) {
+            if( _applications.Selected == null ) {
                 return;
             }
-            SelectedWindow.SetForeground();
+            _applications.Selected.SetForeground();
             Dispose();
         }
 
