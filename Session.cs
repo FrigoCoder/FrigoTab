@@ -9,7 +9,7 @@ namespace FrigoTab {
     public class Session : FrigoForm, IDisposable {
 
         private readonly Backgrounds _backgrounds;
-        private readonly IList<ScreenForm> _screenForms = new List<ScreenForm>();
+        private readonly ScreenForms _screenForms;
         private readonly IList<ApplicationWindow> _applications = new List<ApplicationWindow>();
         private ApplicationWindow _selectedWindow;
 
@@ -20,9 +20,8 @@ namespace FrigoTab {
             _backgrounds = new Backgrounds(this);
             _backgrounds.Populate();
 
-            foreach( Screen screen in Screen.AllScreens ) {
-                _screenForms.Add(new ScreenForm(this, screen));
-            }
+            _screenForms = new ScreenForms(this);
+            _screenForms.Populate();
 
             foreach( WindowHandle window in finder.Windows ) {
                 _applications.Add(new ApplicationWindow(this, window, _applications.Count));
@@ -31,9 +30,7 @@ namespace FrigoTab {
             FrigoTab.Layout.LayoutWindows(_applications);
 
             Visible = true;
-            foreach( ScreenForm screenForm in _screenForms ) {
-                screenForm.Visible = true;
-            }
+            _screenForms.Visible = true;
             foreach( ApplicationWindow window in _applications ) {
                 window.Visible = true;
             }
@@ -60,9 +57,7 @@ namespace FrigoTab {
             foreach( ApplicationWindow window in _applications ) {
                 window.Dispose();
             }
-            foreach( ScreenForm screenForm in _screenForms ) {
-                screenForm.Dispose();
-            }
+            _screenForms.Dispose();
             _backgrounds.Dispose();
             Close();
         }
@@ -88,16 +83,12 @@ namespace FrigoTab {
         public void HandleMouseEvents (MouseHookEventArgs e) {
             SelectedWindow = _applications.FirstOrDefault(window => window.Bounds.Contains(e.Point));
             if( e.Click ) {
-                if( IsOnAToolbar(e.Point) ) {
+                if( _screenForms.IsOnAToolBar(e.Point) ) {
                     Dispose();
                 } else {
                     End();
                 }
             }
-        }
-
-        private bool IsOnAToolbar (Point point) {
-            return _screenForms.FirstOrDefault(form => form.Bounds.Contains(point)) == null;
         }
 
         private void End () {
