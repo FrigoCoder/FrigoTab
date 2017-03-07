@@ -50,19 +50,28 @@ namespace FrigoTab {
         }
 
         private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam) {
-            if( nCode >= 0 ) {
-                Wm w = (Wm) wParam;
-                if( Enum.IsDefined(typeof(Wm), w) ) {
-                    bool alt = lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown);
-                    Keys key = alt ? lParam.VkCode | Keys.Alt : lParam.VkCode;
-                    KeyHookEventArgs e = new KeyHookEventArgs(key);
-                    KeyEvent?.Invoke(e);
-                    if( e.Handled ) {
-                        return (IntPtr) 1;
-                    }
-                }
+            if( HookProcInner(nCode, (Wm) wParam, ref lParam) ) {
+                return (IntPtr) 1;
             }
             return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
+        }
+
+        private bool HookProcInner (int nCode, Wm wParam, ref LowLevelKeyStruct lParam) {
+            if( nCode < 0 ) {
+                return false;
+            }
+            if( !Enum.IsDefined(typeof(Wm), wParam) ) {
+                return false;
+            }
+            if( lParam.Flags.HasFlag(LowLevelKeyFlags.Injected) ) {
+                return false;
+            }
+
+            bool alt = lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown);
+            Keys key = alt ? lParam.VkCode | Keys.Alt : lParam.VkCode;
+            KeyHookEventArgs e = new KeyHookEventArgs(key);
+            KeyEvent?.Invoke(e);
+            return e.Handled;
         }
 
         private struct LowLevelKeyStruct {
@@ -78,6 +87,7 @@ namespace FrigoTab {
         [Flags]
         private enum LowLevelKeyFlags {
 
+            Injected = 16,
             AltDown = 32
 
         }
