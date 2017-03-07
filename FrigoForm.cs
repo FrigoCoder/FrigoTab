@@ -6,7 +6,7 @@ namespace FrigoTab {
 
         protected WindowExStyles ExStyle = WindowExStyles.ToolWindow | WindowExStyles.NoActivate;
 
-        public FrigoForm () {
+        protected FrigoForm () {
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             TopMost = true;
