@@ -30,17 +30,6 @@ namespace FrigoTab {
             ((WindowHandle) Handle).SetForeground();
         }
 
-        public new void Dispose () {
-            _applications.Visible = false;
-            _screenForms.Visible = false;
-            Visible = false;
-
-            _applications.Dispose();
-            _screenForms.Dispose();
-            _backgrounds.Dispose();
-            Close();
-        }
-
         public void HandleKeyEvents (KeyHookEventArgs e) {
             if( ((Keys.D1 <= e.Key) && (e.Key <= Keys.D9)) || ((Keys.NumPad1 <= e.Key) && (e.Key <= Keys.NumPad9)) ) {
                 e.Handled = true;
@@ -49,7 +38,7 @@ namespace FrigoTab {
             }
             if( e.Key == Keys.Escape ) {
                 e.Handled = true;
-                Dispose();
+                Close();
             }
             if( e.Key == (Keys.Alt | Keys.F4) ) {
                 e.Handled = true;
@@ -60,11 +49,22 @@ namespace FrigoTab {
             _applications.SelectByPoint(e.Point);
             if( e.Click ) {
                 if( _screenForms.IsOnAToolBar(e.Point) ) {
-                    Dispose();
+                    Close();
                 } else {
                     End();
                 }
             }
+        }
+
+        protected override void Dispose (bool disposing) {
+            _applications.Visible = false;
+            _screenForms.Visible = false;
+            Visible = false;
+
+            _applications.Dispose();
+            _screenForms.Dispose();
+            _backgrounds.Dispose();
+            base.Dispose(disposing);
         }
 
         private void End () {
@@ -72,7 +72,7 @@ namespace FrigoTab {
                 return;
             }
             _applications.Selected.SetForeground();
-            Dispose();
+            Close();
         }
 
     }

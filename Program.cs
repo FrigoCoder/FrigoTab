@@ -20,7 +20,7 @@ namespace FrigoTab {
                         using( SessionManager sessionManager = new SessionManager() ) {
                             keyHook.KeyEvent += sessionManager.KeyCallBack;
                             mouseHook.MouseEvent += sessionManager.MouseCallBack;
-                            sysTrayIcon.Exit += sessionManager.Dispose;
+                            sysTrayIcon.Exit += sessionManager.Close;
 
                             StartQuitTimer();
                             Application.Run(sessionManager);
