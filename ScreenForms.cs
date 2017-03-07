@@ -9,7 +9,7 @@ namespace FrigoTab {
     public class ScreenForms : IDisposable {
 
         private readonly Form _owner;
-        private readonly IList<ScreenForm> _screenForms = new List<ScreenForm>();
+        private readonly IList<FrigoForm> _forms = new List<FrigoForm>();
 
         public ScreenForms (Form owner) {
             _owner = owner;
@@ -21,23 +21,26 @@ namespace FrigoTab {
 
         public bool Visible {
             set {
-                foreach( ScreenForm screenForm in _screenForms ) {
-                    screenForm.Visible = value;
+                foreach( FrigoForm form in _forms ) {
+                    form.Visible = value;
                 }
             }
         }
 
         public void Populate () {
             foreach( Screen screen in Screen.AllScreens ) {
-                _screenForms.Add(new ScreenForm(_owner, screen));
+                _forms.Add(new FrigoForm {
+                    Owner = _owner,
+                    Bounds = screen.WorkingArea
+                });
             }
         }
 
         public void Dispose () {
-            foreach( ScreenForm screenForm in _screenForms ) {
-                screenForm.Dispose();
+            foreach( FrigoForm form in _forms ) {
+                form.Close();
             }
-            _screenForms.Clear();
+            _forms.Clear();
         }
 
         public void Refresh () {
@@ -46,7 +49,7 @@ namespace FrigoTab {
         }
 
         public bool IsOnAToolBar (Point point) {
-            return _screenForms.FirstOrDefault(form => form.Bounds.Contains(point)) == null;
+            return _forms.FirstOrDefault(form => form.Bounds.Contains(point)) == null;
         }
 
     }
