@@ -8,7 +8,7 @@ namespace FrigoTab {
     public class Backgrounds : IDisposable {
 
         private readonly Form _owner;
-        private readonly IList<Thumbnail> _backgrounds = new List<Thumbnail>();
+        private readonly IList<BackgroundWindow> _backgrounds = new List<BackgroundWindow>();
 
         public Backgrounds (Form owner) {
             _owner = owner;
@@ -21,13 +21,13 @@ namespace FrigoTab {
         public void Populate () {
             WindowFinder finder = new WindowFinder();
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
-                _backgrounds.Add(new Thumbnail(window, _owner.Handle, window.GetWindowRect()));
+                _backgrounds.Add(new BackgroundWindow(_owner, window));
             }
         }
 
         public void Dispose () {
-            foreach( Thumbnail thumbnail in _backgrounds ) {
-                thumbnail.Dispose();
+            foreach( BackgroundWindow window in _backgrounds ) {
+                window.Dispose();
             }
             _backgrounds.Clear();
         }
