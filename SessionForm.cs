@@ -33,12 +33,9 @@ namespace FrigoTab {
                 _applications.SelectByIndex((char) e.Key - '1');
                 ActivateEndSession();
             }
-            if( e.Key == Keys.Escape ) {
+            if( (e.Key == Keys.Escape) || (e.Key == (Keys.Alt | Keys.F4)) ) {
                 e.Handled = true;
                 EndSession();
-            }
-            if( e.Key == (Keys.Alt | Keys.F4) ) {
-                e.Handled = true;
             }
         }
 
