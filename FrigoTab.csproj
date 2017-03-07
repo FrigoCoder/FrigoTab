@@ -115,6 +115,7 @@
     <Compile Include="ScreenForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="ScreenForms.cs" />
     <Compile Include="SessionManager.cs">
       <SubType>Form</SubType>
     </Compile>
