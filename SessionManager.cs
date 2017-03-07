@@ -42,7 +42,7 @@ namespace FrigoTab {
             if( finder.Windows.Count == 0 ) {
                 return;
             }
-            _session = new Session(finder);
+            _session = new Session();
             _session.FormClosed += EndSession;
         }
 

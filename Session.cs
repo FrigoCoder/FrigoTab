@@ -10,9 +10,8 @@ namespace FrigoTab {
         private readonly Backgrounds _backgrounds;
         private readonly ScreenForms _screenForms;
         private readonly Applications _applications;
-        private ApplicationWindow _selectedWindow;
 
-        public Session (WindowFinder finder) {
+        public Session () {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
 
