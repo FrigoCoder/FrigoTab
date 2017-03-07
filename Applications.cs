@@ -8,12 +8,14 @@ namespace FrigoTab {
 
     public class Applications : IDisposable {
 
-        private readonly Form _owner;
         private readonly IList<ApplicationWindow> _windows = new List<ApplicationWindow>();
         private ApplicationWindow _selected;
 
-        public Applications (Form owner) {
-            _owner = owner;
+        public Applications (Form owner, WindowFinder finder) {
+            foreach( WindowHandle window in finder.Windows ) {
+                _windows.Add(new ApplicationWindow(owner, window, _windows.Count));
+            }
+            Layout.LayoutWindows(_windows);
         }
 
         ~Applications () {
@@ -42,14 +44,6 @@ namespace FrigoTab {
                     window.Visible = value;
                 }
             }
-        }
-
-        public void Populate () {
-            WindowFinder finder = new WindowFinder();
-            foreach( WindowHandle window in finder.Windows ) {
-                _windows.Add(new ApplicationWindow(_owner, window, _windows.Count));
-            }
-            Layout.LayoutWindows(_windows);
         }
 
         public void Dispose () {

@@ -9,19 +9,14 @@ namespace FrigoTab {
 
     public class SessionForm : FrigoForm {
 
-        private readonly Backgrounds _backgrounds;
-        private readonly ScreenForms _screenForms;
-        private readonly Applications _applications;
+        private Backgrounds _backgrounds;
+        private ScreenForms _screenForms;
+        private Applications _applications;
         private bool _active;
 
         public SessionForm () {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
-
-            _backgrounds = new Backgrounds(this);
-            _screenForms = new ScreenForms(this);
-            _applications = new Applications(this);
-
             SystemEvents.DisplaySettingsChanged += RefreshDisplay;
         }
 
@@ -80,9 +75,14 @@ namespace FrigoTab {
                 return;
             }
 
-            _backgrounds.Populate();
-            _screenForms.Populate();
-            _applications.Populate();
+            WindowFinder finder = new WindowFinder();
+            if( finder.Windows.Count == 0 ) {
+                return;
+            }
+
+            _backgrounds = new Backgrounds(this, finder);
+            _screenForms = new ScreenForms(this);
+            _applications = new Applications(this, finder);
 
             Visible = true;
             _screenForms.Visible = true;
@@ -93,6 +93,9 @@ namespace FrigoTab {
         }
 
         private void EndSession () {
+            if( !_active ) {
+                return;
+            }
             _active = false;
 
             _applications.Visible = false;

@@ -8,11 +8,12 @@ namespace FrigoTab {
 
     public class ScreenForms : IDisposable {
 
-        private readonly Form _owner;
         private readonly IList<ScreenForm> _forms = new List<ScreenForm>();
 
         public ScreenForms (Form owner) {
-            _owner = owner;
+            foreach( Screen screen in Screen.AllScreens ) {
+                _forms.Add(new ScreenForm(owner, screen));
+            }
         }
 
         ~ScreenForms () {
@@ -24,12 +25,6 @@ namespace FrigoTab {
                 foreach( ScreenForm form in _forms ) {
                     form.Visible = value;
                 }
-            }
-        }
-
-        public void Populate () {
-            foreach( Screen screen in Screen.AllScreens ) {
-                _forms.Add(new ScreenForm(_owner, screen));
             }
         }
 
