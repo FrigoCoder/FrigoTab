@@ -54,8 +54,10 @@ namespace FrigoTab {
         }
 
         public void RefreshSession (object sender, EventArgs e) {
-            EndSession();
-            BeginSession();
+            if( _active ) {
+                EndSession();
+                BeginSession();
+            }
         }
 
         public void HandleKeyEvents (KeyHookEventArgs e) {
