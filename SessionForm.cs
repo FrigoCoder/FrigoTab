@@ -9,53 +9,36 @@ namespace FrigoTab {
         private readonly Backgrounds _backgrounds;
         private readonly ScreenForms _screenForms;
         private readonly Applications _applications;
+        private bool _active;
 
         public SessionForm () {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
 
             _backgrounds = new Backgrounds(this);
-            _backgrounds.Populate();
-
             _screenForms = new ScreenForms(this);
-            _screenForms.Populate();
-
             _applications = new Applications(this);
+        }
+
+        public void BeginSession () {
+            if( _active ) {
+                return;
+            }
+            _backgrounds.Populate();
+            _screenForms.Populate();
             _applications.Populate();
 
             Visible = true;
             _screenForms.Visible = true;
             _applications.Visible = true;
             ((WindowHandle) Handle).SetForeground();
+
+            _active = true;
         }
 
-        public void HandleKeyEvents (KeyHookEventArgs e) {
-            if( ((Keys.D1 <= e.Key) && (e.Key <= Keys.D9)) || ((Keys.NumPad1 <= e.Key) && (e.Key <= Keys.NumPad9)) ) {
-                e.Handled = true;
-                _applications.SelectByIndex((char) e.Key - '1');
-                End();
-            }
-            if( e.Key == Keys.Escape ) {
-                e.Handled = true;
-                Close();
-            }
-            if( e.Key == (Keys.Alt | Keys.F4) ) {
-                e.Handled = true;
-            }
-        }
+        public void EndSession () {
+            _active = false;
 
-        public void HandleMouseEvents (MouseHookEventArgs e) {
-            _applications.SelectByPoint(e.Point);
-            if( e.Click ) {
-                if( _screenForms.IsOnAToolBar(e.Point) ) {
-                    Close();
-                } else {
-                    End();
-                }
-            }
-        }
-
-        protected override void Dispose (bool disposing) {
             _applications.Visible = false;
             _screenForms.Visible = false;
             Visible = false;
@@ -63,6 +46,45 @@ namespace FrigoTab {
             _applications.Dispose();
             _screenForms.Dispose();
             _backgrounds.Dispose();
+        }
+
+        public void RefreshSession () {
+            EndSession();
+            BeginSession();
+        }
+
+        public void HandleKeyEvents (KeyHookEventArgs e) {
+            if( _active ) {
+                if( ((Keys.D1 <= e.Key) && (e.Key <= Keys.D9)) || ((Keys.NumPad1 <= e.Key) && (e.Key <= Keys.NumPad9)) ) {
+                    e.Handled = true;
+                    _applications.SelectByIndex((char) e.Key - '1');
+                    End();
+                }
+                if( e.Key == Keys.Escape ) {
+                    e.Handled = true;
+                    EndSession();
+                }
+                if( e.Key == (Keys.Alt | Keys.F4) ) {
+                    e.Handled = true;
+                }
+            }
+        }
+
+        public void HandleMouseEvents (MouseHookEventArgs e) {
+            if( _active ) {
+                _applications.SelectByPoint(e.Point);
+                if( e.Click ) {
+                    if( _screenForms.IsOnAToolBar(e.Point) ) {
+                        EndSession();
+                    } else {
+                        End();
+                    }
+                }
+            }
+        }
+
+        protected override void Dispose (bool disposing) {
+            EndSession();
             base.Dispose(disposing);
         }
 
@@ -71,7 +93,7 @@ namespace FrigoTab {
                 return;
             }
             _applications.Selected.SetForeground();
-            Close();
+            EndSession();
         }
 
     }
