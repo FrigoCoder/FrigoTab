@@ -58,7 +58,7 @@ namespace FrigoTab {
 
         public void Dispose () {
             foreach( ApplicationWindow window in _windows ) {
-                window.Dispose();
+                window.Close();
             }
             _windows.Clear();
         }

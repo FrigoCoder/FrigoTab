@@ -52,11 +52,6 @@ namespace FrigoTab {
             }
         }
 
-        public new void Dispose () {
-            Close();
-            _thumbnail.Dispose();
-        }
-
         public Screen GetScreen () {
             return _application.GetScreen();
         }
@@ -67,6 +62,11 @@ namespace FrigoTab {
 
         public Size GetSourceSize () {
             return _thumbnail.GetSourceSize();
+        }
+
+        protected override void Dispose (bool disposing) {
+            _thumbnail.Dispose();
+            base.Dispose(disposing);
         }
 
         private void RenderOverlay () {
