@@ -29,7 +29,6 @@ namespace FrigoTab {
             if( _active ) {
                 return;
             }
-            Visible = false;
 
             _backgrounds.Populate();
             _screenForms.Populate();
@@ -100,6 +99,14 @@ namespace FrigoTab {
             EndSession();
             SystemEvents.DisplaySettingsChanged -= RefreshSession;
             base.Dispose(disposing);
+        }
+
+        protected override void SetVisibleCore (bool value) {
+            if( !IsHandleCreated ) {
+                CreateHandle();
+                value = false;
+            }
+            base.SetVisibleCore(value);
         }
 
         private void ActivateEndSession () {
