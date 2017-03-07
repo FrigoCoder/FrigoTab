@@ -31,6 +31,10 @@ namespace FrigoTab {
         }
 
         public new void Dispose () {
+            _applications.Visible = false;
+            _screenForms.Visible = false;
+            Visible = false;
+
             _applications.Dispose();
             _screenForms.Dispose();
             _backgrounds.Dispose();
