@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class ApplicationWindow : FrigoForm, IDisposable {
+    public class ApplicationWindow : FrigoForm {
 
         private readonly WindowHandle _application;
         private readonly int _index;

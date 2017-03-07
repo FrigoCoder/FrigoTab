@@ -5,7 +5,7 @@ using Microsoft.Win32;
 
 namespace FrigoTab {
 
-    public class SessionManager : FrigoForm, IDisposable {
+    public class SessionManager : FrigoForm {
 
         private Session _session;
 
