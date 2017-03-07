@@ -25,73 +25,38 @@ namespace FrigoTab {
             SystemEvents.DisplaySettingsChanged += RefreshDisplay;
         }
 
-        public void BeginSession () {
-            if( _active ) {
-                return;
-            }
-
-            _backgrounds.Populate();
-            _screenForms.Populate();
-            _applications.Populate();
-
-            Visible = true;
-            _screenForms.Visible = true;
-            _applications.Visible = true;
-            ((WindowHandle) Handle).SetForeground();
-
-            _active = true;
-        }
-
-        public void EndSession () {
-            _active = false;
-
-            _applications.Visible = false;
-            _screenForms.Visible = false;
-            Visible = false;
-
-            _applications.Dispose();
-            _screenForms.Dispose();
-            _backgrounds.Dispose();
-        }
-
-        public void RefreshDisplay (object sender, EventArgs e) {
-            Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
-            if( _active ) {
-                EndSession();
-                BeginSession();
-            }
-        }
-
         public void HandleKeyEvents (KeyHookEventArgs e) {
             if( e.Key == (Keys.Alt | Keys.Tab) ) {
                 e.Handled = true;
                 BeginSession();
             }
-            if( _active ) {
-                if( ((Keys.D1 <= e.Key) && (e.Key <= Keys.D9)) || ((Keys.NumPad1 <= e.Key) && (e.Key <= Keys.NumPad9)) ) {
-                    e.Handled = true;
-                    _applications.SelectByIndex((char) e.Key - '1');
-                    ActivateEndSession();
-                }
-                if( e.Key == Keys.Escape ) {
-                    e.Handled = true;
-                    EndSession();
-                }
-                if( e.Key == (Keys.Alt | Keys.F4) ) {
-                    e.Handled = true;
-                }
+            if( !_active ) {
+                return;
+            }
+            if( ((Keys.D1 <= e.Key) && (e.Key <= Keys.D9)) || ((Keys.NumPad1 <= e.Key) && (e.Key <= Keys.NumPad9)) ) {
+                e.Handled = true;
+                _applications.SelectByIndex((char) e.Key - '1');
+                ActivateEndSession();
+            }
+            if( e.Key == Keys.Escape ) {
+                e.Handled = true;
+                EndSession();
+            }
+            if( e.Key == (Keys.Alt | Keys.F4) ) {
+                e.Handled = true;
             }
         }
 
         public void HandleMouseEvents (MouseHookEventArgs e) {
-            if( _active ) {
-                _applications.SelectByPoint(e.Point);
-                if( e.Click ) {
-                    if( _screenForms.IsOnAToolBar(e.Point) ) {
-                        EndSession();
-                    } else {
-                        ActivateEndSession();
-                    }
+            if( !_active ) {
+                return;
+            }
+            _applications.SelectByPoint(e.Point);
+            if( e.Click ) {
+                if( _screenForms.IsOnAToolBar(e.Point) ) {
+                    EndSession();
+                } else {
+                    ActivateEndSession();
                 }
             }
         }
@@ -108,6 +73,44 @@ namespace FrigoTab {
                 value = false;
             }
             base.SetVisibleCore(value);
+        }
+
+        private void BeginSession () {
+            if( _active ) {
+                return;
+            }
+
+            _backgrounds.Populate();
+            _screenForms.Populate();
+            _applications.Populate();
+
+            Visible = true;
+            _screenForms.Visible = true;
+            _applications.Visible = true;
+            ((WindowHandle) Handle).SetForeground();
+
+            _active = true;
+        }
+
+        private void EndSession () {
+            _active = false;
+
+            _applications.Visible = false;
+            _screenForms.Visible = false;
+            Visible = false;
+
+            _applications.Dispose();
+            _screenForms.Dispose();
+            _backgrounds.Dispose();
+        }
+
+        private void RefreshDisplay (object sender, EventArgs e) {
+            Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
+            if( !_active ) {
+                return;
+            }
+            EndSession();
+            BeginSession();
         }
 
         private void ActivateEndSession () {
