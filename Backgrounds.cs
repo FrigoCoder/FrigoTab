@@ -32,11 +32,6 @@ namespace FrigoTab {
             _backgrounds.Clear();
         }
 
-        public void Refresh () {
-            Dispose();
-            Populate();
-        }
-
     }
 
 }
