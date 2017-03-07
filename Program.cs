@@ -17,13 +17,13 @@ namespace FrigoTab {
             using( KeyHook keyHook = new KeyHook() ) {
                 using( MouseHook mouseHook = new MouseHook() ) {
                     using( SysTrayIcon sysTrayIcon = new SysTrayIcon() ) {
-                        using( SessionManager sessionManager = new SessionManager() ) {
-                            keyHook.KeyEvent += sessionManager.KeyCallBack;
-                            mouseHook.MouseEvent += sessionManager.MouseCallBack;
-                            sysTrayIcon.Exit += sessionManager.Close;
+                        using( SessionForm sessionForm = new SessionForm() ) {
+                            keyHook.KeyEvent += sessionForm.HandleKeyEvents;
+                            mouseHook.MouseEvent += sessionForm.HandleMouseEvents;
+                            sysTrayIcon.Exit += sessionForm.Close;
 
                             StartQuitTimer();
-                            Application.Run(sessionManager);
+                            Application.Run(sessionForm);
                         }
                     }
                 }
