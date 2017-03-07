@@ -49,11 +49,7 @@ namespace FrigoTab {
             foreach( WindowHandle window in finder.Windows ) {
                 _windows.Add(new ApplicationWindow(_owner, window, _windows.Count));
             }
-            Layout();
-        }
-
-        public void Layout () {
-            FrigoTab.Layout.LayoutWindows(_windows);
+            Layout.LayoutWindows(_windows);
         }
 
         public void Dispose () {
@@ -61,11 +57,6 @@ namespace FrigoTab {
                 window.Close();
             }
             _windows.Clear();
-        }
-
-        public void Refresh () {
-            Dispose();
-            Populate();
         }
 
         public void SelectByIndex (int index) {

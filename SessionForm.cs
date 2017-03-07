@@ -22,7 +22,7 @@ namespace FrigoTab {
             _screenForms = new ScreenForms(this);
             _applications = new Applications(this);
 
-            SystemEvents.DisplaySettingsChanged += RefreshSession;
+            SystemEvents.DisplaySettingsChanged += RefreshDisplay;
         }
 
         public void BeginSession () {
@@ -54,7 +54,8 @@ namespace FrigoTab {
             _backgrounds.Dispose();
         }
 
-        public void RefreshSession (object sender, EventArgs e) {
+        public void RefreshDisplay (object sender, EventArgs e) {
+            Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
             if( _active ) {
                 EndSession();
                 BeginSession();
@@ -97,7 +98,7 @@ namespace FrigoTab {
 
         protected override void Dispose (bool disposing) {
             EndSession();
-            SystemEvents.DisplaySettingsChanged -= RefreshSession;
+            SystemEvents.DisplaySettingsChanged -= RefreshDisplay;
             base.Dispose(disposing);
         }
 

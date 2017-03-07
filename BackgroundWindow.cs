@@ -5,12 +5,10 @@ namespace FrigoTab {
 
     public class BackgroundWindow : IDisposable {
 
-        private readonly WindowHandle _window;
         private readonly Thumbnail _thumbnail;
         private bool _disposed;
 
         public BackgroundWindow (Form owner, WindowHandle window) {
-            _window = window;
             _thumbnail = new Thumbnail(window, owner.Handle, window.GetWindowRect());
         }
 
