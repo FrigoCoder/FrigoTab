@@ -4,13 +4,13 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class Session : FrigoForm {
+    public class SessionForm : FrigoForm {
 
         private readonly Backgrounds _backgrounds;
         private readonly ScreenForms _screenForms;
         private readonly Applications _applications;
 
-        public Session () {
+        public SessionForm () {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
 

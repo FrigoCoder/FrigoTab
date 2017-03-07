@@ -119,7 +119,7 @@
     </Compile>
     <Compile Include="KeyHook.cs" />
     <Compile Include="Program.cs" />
-    <Compile Include="Session.cs">
+    <Compile Include="SessionForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="SysTrayIcon.cs" />
