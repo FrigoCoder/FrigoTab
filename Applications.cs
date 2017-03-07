@@ -8,8 +8,8 @@ namespace FrigoTab {
 
     public class Applications : IDisposable {
 
-        public readonly IList<ApplicationWindow> Windows = new List<ApplicationWindow>();
         private readonly Form _owner;
+        private readonly IList<ApplicationWindow> _windows = new List<ApplicationWindow>();
         private ApplicationWindow _selected;
 
         public Applications (Form owner) {
@@ -22,7 +22,7 @@ namespace FrigoTab {
 
         public ApplicationWindow Selected {
             get { return _selected; }
-            set {
+            private set {
                 if( _selected == value ) {
                     return;
                 }
@@ -38,7 +38,7 @@ namespace FrigoTab {
 
         public bool Visible {
             set {
-                foreach( ApplicationWindow window in Windows ) {
+                foreach( ApplicationWindow window in _windows ) {
                     window.Visible = value;
                 }
             }
@@ -47,20 +47,20 @@ namespace FrigoTab {
         public void Populate () {
             WindowFinder finder = new WindowFinder();
             foreach( WindowHandle window in finder.Windows ) {
-                Windows.Add(new ApplicationWindow(_owner, window, Windows.Count));
+                _windows.Add(new ApplicationWindow(_owner, window, _windows.Count));
             }
             Layout();
         }
 
         public void Layout () {
-            FrigoTab.Layout.LayoutWindows(Windows);
+            FrigoTab.Layout.LayoutWindows(_windows);
         }
 
         public void Dispose () {
-            foreach( ApplicationWindow window in Windows ) {
+            foreach( ApplicationWindow window in _windows ) {
                 window.Dispose();
             }
-            Windows.Clear();
+            _windows.Clear();
         }
 
         public void Refresh () {
@@ -69,11 +69,11 @@ namespace FrigoTab {
         }
 
         public void SelectByIndex (int index) {
-            Selected = (index >= 0) && (index < Windows.Count) ? Windows[index] : null;
+            Selected = (index >= 0) && (index < _windows.Count) ? _windows[index] : null;
         }
 
         public void SelectByPoint (Point point) {
-            Selected = Windows.FirstOrDefault(window => window.Bounds.Contains(point));
+            Selected = _windows.FirstOrDefault(window => window.Bounds.Contains(point));
         }
 
     }
