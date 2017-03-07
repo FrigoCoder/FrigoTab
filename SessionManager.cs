@@ -14,10 +14,6 @@ namespace FrigoTab {
             SystemEvents.DisplaySettingsChanged += RefreshSession;
         }
 
-        ~SessionManager () {
-            SystemEvents.DisplaySettingsChanged -= RefreshSession;
-        }
-
         public void KeyCallBack (KeyHookEventArgs e) {
             if( e.Key == (Keys.Alt | Keys.Tab) ) {
                 e.Handled = true;
@@ -32,9 +28,10 @@ namespace FrigoTab {
             _session?.HandleMouseEvents(e);
         }
 
-        public new void Dispose () {
-            _session?.Dispose();
-            base.Dispose();
+        protected override void Dispose (bool disposing) {
+            SystemEvents.DisplaySettingsChanged -= RefreshSession;
+            _session?.Close();
+            base.Dispose(disposing);
         }
 
         private void BeginSession () {
@@ -55,7 +52,7 @@ namespace FrigoTab {
             if( _session == null ) {
                 return;
             }
-            _session.Dispose();
+            _session.Close();
             BeginSession();
         }
 
