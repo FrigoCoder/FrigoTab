@@ -13,6 +13,7 @@ namespace FrigoTab {
 
         private readonly WindowHandle _destination;
         private readonly IntPtr _thumbnail;
+        private bool _disposed;
 
         public Thumbnail (WindowHandle source, WindowHandle destination) {
             _destination = destination;
@@ -23,8 +24,17 @@ namespace FrigoTab {
             Update(bounds);
         }
 
+        ~Thumbnail () {
+            Dispose();
+        }
+
         public void Dispose () {
+            if( _disposed ) {
+                return;
+            }
             DwmUnregisterThumbnail(_thumbnail);
+            _disposed = true;
+            GC.SuppressFinalize(this);
         }
 
         public Size GetSourceSize () {
