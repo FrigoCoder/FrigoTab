@@ -8,7 +8,7 @@ namespace FrigoTab {
 
     public class Session : FrigoForm, IDisposable {
 
-        private readonly IList<Thumbnail> _backgrounds = new List<Thumbnail>();
+        private readonly Backgrounds _backgrounds;
         private readonly IList<ScreenForm> _screenForms = new List<ScreenForm>();
         private readonly IList<ApplicationWindow> _applications = new List<ApplicationWindow>();
         private ApplicationWindow _selectedWindow;
@@ -17,9 +17,8 @@ namespace FrigoTab {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
 
-            foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
-                _backgrounds.Add(new Thumbnail(window, Handle, window.GetWindowRect()));
-            }
+            _backgrounds = new Backgrounds(this);
+            _backgrounds.Populate();
 
             foreach( Screen screen in Screen.AllScreens ) {
                 _screenForms.Add(new ScreenForm(this, screen));
@@ -64,9 +63,7 @@ namespace FrigoTab {
             foreach( ScreenForm screenForm in _screenForms ) {
                 screenForm.Dispose();
             }
-            foreach( Thumbnail thumbnail in _backgrounds ) {
-                thumbnail.Dispose();
-            }
+            _backgrounds.Dispose();
             Close();
         }
 
