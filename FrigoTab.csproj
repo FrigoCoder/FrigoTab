@@ -104,7 +104,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Applications.cs" />
+    <Compile Include="ApplicationWindows.cs" />
     <Compile Include="Backgrounds.cs" />
     <Compile Include="BackgroundWindow.cs" />
     <Compile Include="FrigoForm.cs">
