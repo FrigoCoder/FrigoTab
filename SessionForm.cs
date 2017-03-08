@@ -9,7 +9,7 @@ namespace FrigoTab {
 
     public class SessionForm : FrigoForm {
 
-        private Backgrounds _backgrounds;
+        private BackgroundWindows _backgrounds;
         private ScreenForms _screenForms;
         private ApplicationWindows _applications;
         private bool _active;
@@ -77,7 +77,7 @@ namespace FrigoTab {
                 return;
             }
 
-            _backgrounds = new Backgrounds(this, finder);
+            _backgrounds = new BackgroundWindows(this, finder);
             _screenForms = new ScreenForms(this);
             _applications = new ApplicationWindows(this, finder);
 

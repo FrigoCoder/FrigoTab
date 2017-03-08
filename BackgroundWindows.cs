@@ -5,17 +5,17 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class Backgrounds : IDisposable {
+    public class BackgroundWindows : IDisposable {
 
         private readonly IList<BackgroundWindow> _backgrounds = new List<BackgroundWindow>();
 
-        public Backgrounds (Form owner, WindowFinder finder) {
+        public BackgroundWindows (Form owner, WindowFinder finder) {
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
                 _backgrounds.Add(new BackgroundWindow(owner, window));
             }
         }
 
-        ~Backgrounds () {
+        ~BackgroundWindows () {
             Dispose();
         }
 
