@@ -6,19 +6,19 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class Applications : IDisposable {
+    public class ApplicationWindows : IDisposable {
 
         private readonly IList<ApplicationWindow> _windows = new List<ApplicationWindow>();
         private ApplicationWindow _selected;
 
-        public Applications (Form owner, WindowFinder finder) {
+        public ApplicationWindows (Form owner, WindowFinder finder) {
             foreach( WindowHandle window in finder.Windows ) {
                 _windows.Add(new ApplicationWindow(owner, window, _windows.Count));
             }
             Layout.LayoutWindows(_windows);
         }
 
-        ~Applications () {
+        ~ApplicationWindows () {
             Dispose();
         }
 

@@ -11,7 +11,7 @@ namespace FrigoTab {
 
         private Backgrounds _backgrounds;
         private ScreenForms _screenForms;
-        private Applications _applications;
+        private ApplicationWindows _applications;
         private bool _active;
 
         public SessionForm () {
@@ -79,7 +79,7 @@ namespace FrigoTab {
 
             _backgrounds = new Backgrounds(this, finder);
             _screenForms = new ScreenForms(this);
-            _applications = new Applications(this, finder);
+            _applications = new ApplicationWindows(this, finder);
 
             Visible = true;
             _screenForms.Visible = true;
