@@ -105,7 +105,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ApplicationWindows.cs" />
-    <Compile Include="Backgrounds.cs" />
+    <Compile Include="BackgroundWindows.cs" />
     <Compile Include="BackgroundWindow.cs" />
     <Compile Include="FrigoForm.cs">
       <SubType>Form</SubType>
