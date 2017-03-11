@@ -81,6 +81,8 @@ namespace FrigoTab {
             _screenForms = new ScreenForms(this);
             _applications = new ApplicationWindows(this, finder);
 
+            _applications.SelectByIndex(0);
+
             Visible = true;
             _screenForms.Visible = true;
             _applications.Visible = true;
