@@ -4,7 +4,7 @@ namespace FrigoTab {
 
     public class FrigoForm : Form {
 
-        protected WindowExStyles ExStyle = WindowExStyles.ToolWindow | WindowExStyles.NoActivate;
+        protected WindowExStyles ExStyle = WindowExStyles.ToolWindow;
 
         protected FrigoForm () {
             FormBorderStyle = FormBorderStyle.None;
