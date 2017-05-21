@@ -57,15 +57,14 @@ namespace FrigoTab {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 ShowWindow(_handle, ShowWindowCommand.Restore);
             }
-            SetForegroundWindow(_handle);
-            int expected = GetWindowThreadProcessId(_handle, IntPtr.Zero);
-            int foreground = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
-            if( expected != foreground ) {
-                File.AppendAllText("log.txt", DateTime.Now + ": Had to AttachThreadInput\n");
-                AttachThreadInput(expected, foreground, true);
-                SetForegroundWindow(_handle);
-                AttachThreadInput(expected, foreground, false);
+            if( SetForegroundWindow(_handle) ) {
+                return;
             }
+            int process = GetWindowThreadProcessId(_handle, IntPtr.Zero);
+            int foreground = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
+            AttachThreadInput(process, foreground, true);
+            SetForegroundWindow(_handle);
+            AttachThreadInput(process, foreground, false);
         }
 
         public string GetWindowText () {
