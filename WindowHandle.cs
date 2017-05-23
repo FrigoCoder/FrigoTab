@@ -57,14 +57,11 @@ namespace FrigoTab {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 ShowWindow(_handle, ShowWindowCommand.Restore);
             }
-            if( SetForegroundWindow(_handle) ) {
-                return;
-            }
-            int process = GetWindowThreadProcessId(_handle, IntPtr.Zero);
+            int current = GetCurrentThreadId();
             int foreground = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
-            AttachThreadInput(process, foreground, true);
+            AttachThreadInput(current, foreground, true);
             SetForegroundWindow(_handle);
-            AttachThreadInput(process, foreground, false);
+            AttachThreadInput(current, foreground, false);
         }
 
         public string GetWindowText () {
@@ -173,6 +170,9 @@ namespace FrigoTab {
 
         [DllImport ("user32.dll")]
         private static extern bool AttachThreadInput (int idAttach, int idAttachTo, bool fAttach);
+
+        [DllImport("kernel32.dll")]
+        private static extern int GetCurrentThreadId ();
 
     }
 
