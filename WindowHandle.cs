@@ -57,11 +57,20 @@ namespace FrigoTab {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 ShowWindow(_handle, ShowWindowCommand.Restore);
             }
-            int current = GetCurrentThreadId();
-            int foreground = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
-            AttachThreadInput(current, foreground, true);
+
+            byte[] keyState = new byte[256];
+            GetKeyboardState(keyState);
+            bool altPressed = (keyState[(int) Keys.Menu] & 0x80) != 0;
+
+            if( !altPressed ) {
+                keybd_event((int)Keys.Menu, 0, (int) KeyEventF.ExtendedKey, 0);
+            }
+
             SetForegroundWindow(_handle);
-            AttachThreadInput(current, foreground, false);
+
+            if( !altPressed ) {
+                keybd_event((int) Keys.Menu, 0, (int) (KeyEventF.ExtendedKey | KeyEventF.KeyUp), 0);
+            }
         }
 
         public string GetWindowText () {
@@ -119,6 +128,14 @@ namespace FrigoTab {
 
         }
 
+        [Flags]
+        private enum KeyEventF {
+
+            ExtendedKey = 1,
+            KeyUp = 2
+
+        }
+
         private delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
 
         private static readonly SendMessageDelegate _callback = Callback;
@@ -162,17 +179,11 @@ namespace FrigoTab {
             SendMessageDelegate lpCallBack,
             IntPtr dwData);
 
-        [DllImport ("user32.dll")]
-        private static extern int GetWindowThreadProcessId (IntPtr hWnd, IntPtr dwProcessId);
+        [DllImport("user32.dll")]
+        private static extern bool GetKeyboardState(byte[] lpKeyState);
 
-        [DllImport ("user32.dll")]
-        private static extern IntPtr GetForegroundWindow ();
-
-        [DllImport ("user32.dll")]
-        private static extern bool AttachThreadInput (int idAttach, int idAttachTo, bool fAttach);
-
-        [DllImport("kernel32.dll")]
-        private static extern int GetCurrentThreadId ();
+        [DllImport("user32.dll")]
+        private static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
 
     }
 
