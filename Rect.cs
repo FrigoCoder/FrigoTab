@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace FrigoTab {
 
-    [SuppressMessage ("ReSharper", "NotAccessedField.Local")]
+    [SuppressMessage("ReSharper", "NotAccessedField.Local")]
     public struct ClientRect {
 
         private readonly int _left;
@@ -45,7 +45,7 @@ namespace FrigoTab {
             return new ClientRect(location, Size);
         }
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern bool ScreenToClient (IntPtr hWnd, ref Point lpPoint);
 
     }

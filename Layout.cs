@@ -32,12 +32,14 @@ namespace FrigoTab {
             }
         }
 
-        private static List<ApplicationWindow> GetWindowsOnScreen (IEnumerable<ApplicationWindow> windows, Screen screen) {
+        private static List<ApplicationWindow> GetWindowsOnScreen (IEnumerable<ApplicationWindow> windows,
+            Screen screen) {
             return windows.Where(window => window.GetScreen().Equals(screen)).ToList();
         }
 
         private static RectangleF GetCellBounds (Screen screen, int columns, int rows, int column, int row) {
-            SizeF size = new SizeF((float) screen.WorkingArea.Width / columns, (float) screen.WorkingArea.Height / rows);
+            SizeF size = new SizeF((float) screen.WorkingArea.Width / columns,
+                (float) screen.WorkingArea.Height / rows);
             PointF location = new PointF(column * size.Width, row * size.Height);
             return new RectangleF(location, size);
         }

@@ -28,12 +28,12 @@ namespace FrigoTab {
             if( !_active ) {
                 return;
             }
-            if( ((Keys.D1 <= e.Key) && (e.Key <= Keys.D9)) || ((Keys.NumPad1 <= e.Key) && (e.Key <= Keys.NumPad9)) ) {
+            if( Keys.D1 <= e.Key && e.Key <= Keys.D9 || Keys.NumPad1 <= e.Key && e.Key <= Keys.NumPad9 ) {
                 e.Handled = true;
                 _applications.SelectByIndex((char) e.Key - '1');
                 ActivateEndSession();
             }
-            if( (e.Key == Keys.Escape) || (e.Key == (Keys.Alt | Keys.F4)) ) {
+            if( e.Key == Keys.Escape || e.Key == (Keys.Alt | Keys.F4) ) {
                 e.Handled = true;
                 EndSession();
             }

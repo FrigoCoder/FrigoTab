@@ -69,28 +69,28 @@ namespace FrigoTab {
             UpdateLayeredWindow(form.Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, ref pblend, flag);
         }
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern IntPtr GetDC (IntPtr hwnd);
 
-        [DllImport ("gdi32.dll")]
+        [DllImport("gdi32.dll")]
         private static extern IntPtr CreateCompatibleDC (IntPtr hdc);
 
-        [DllImport ("gdi32.dll")]
+        [DllImport("gdi32.dll")]
         private static extern IntPtr CreateCompatibleBitmap (IntPtr hdc, int cx, int cy);
 
-        [DllImport ("gdi32.dll")]
+        [DllImport("gdi32.dll")]
         private static extern IntPtr SelectObject (IntPtr hdc, IntPtr hobj);
 
-        [DllImport ("gdi32.dll")]
+        [DllImport("gdi32.dll")]
         private static extern bool DeleteDC (IntPtr hdc);
 
-        [DllImport ("gdi32.dll")]
+        [DllImport("gdi32.dll")]
         private static extern bool DeleteObject (IntPtr hobj);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern int ReleaseDC (IntPtr hwnd, IntPtr hdc);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern bool UpdateLayeredWindow (IntPtr hwnd,
             IntPtr hdcDst,
             ref Point pptDst,
