@@ -21,7 +21,7 @@ namespace FrigoTab {
 
     public class MouseHook : IDisposable {
 
-        [SuppressMessage ("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
+        [SuppressMessage("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
         private readonly LowLevelMouseProc _hookProc;
 
         private readonly IntPtr _hookId;
@@ -56,7 +56,7 @@ namespace FrigoTab {
                 Wm w = (Wm) wParam;
                 if( Enum.IsDefined(typeof(Wm), w) ) {
                     Point point = lParam.Point;
-                    bool click = (w == Wm.LeftDown) || (w == Wm.LeftUp) || (w == Wm.RightDown) || (w == Wm.RightUp);
+                    bool click = w == Wm.LeftDown || w == Wm.LeftUp || w == Wm.RightDown || w == Wm.RightUp;
 
                     MouseHookEventArgs e = new MouseHookEventArgs(point, click);
                     MouseEvent?.Invoke(e);
@@ -78,7 +78,7 @@ namespace FrigoTab {
 
         }
 
-        [SuppressMessage ("ReSharper", "UnusedMember.Local")]
+        [SuppressMessage("ReSharper", "UnusedMember.Local")]
         private enum Wm {
 
             MouseMove = 0x200,
@@ -93,16 +93,16 @@ namespace FrigoTab {
 
         private delegate IntPtr LowLevelMouseProc (int nCode, IntPtr wParam, ref LowLevelMouseStruct lParam);
 
-        [DllImport ("kernel32.dll")]
+        [DllImport("kernel32.dll")]
         private static extern IntPtr GetModuleHandle (string lpModuleName);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern IntPtr SetWindowsHookEx (int idHook, LowLevelMouseProc lpfn, IntPtr hMod, int dwThreadId);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern bool UnhookWindowsHookEx (IntPtr hhk);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern IntPtr CallNextHookEx (IntPtr hhk,
             int nCode,
             IntPtr wParam,

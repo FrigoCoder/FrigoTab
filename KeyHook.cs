@@ -19,7 +19,7 @@ namespace FrigoTab {
 
     public class KeyHook : IDisposable {
 
-        [SuppressMessage ("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
+        [SuppressMessage("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
         private readonly LowLevelKeyProc _hookProc;
 
         private readonly IntPtr _hookId;
@@ -92,7 +92,7 @@ namespace FrigoTab {
 
         }
 
-        [SuppressMessage ("ReSharper", "UnusedMember.Local")]
+        [SuppressMessage("ReSharper", "UnusedMember.Local")]
         private enum Wm {
 
             KeyDown = 0x0100,
@@ -104,17 +104,20 @@ namespace FrigoTab {
 
         private delegate IntPtr LowLevelKeyProc (int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam);
 
-        [DllImport ("kernel32.dll")]
+        [DllImport("kernel32.dll")]
         private static extern IntPtr GetModuleHandle (string lpModuleName);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern IntPtr SetWindowsHookEx (int idHook, LowLevelKeyProc lpfn, IntPtr hMod, int dwThreadId);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern bool UnhookWindowsHookEx (IntPtr hhk);
 
-        [DllImport ("user32.dll")]
-        private static extern IntPtr CallNextHookEx (IntPtr hhk, int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam);
+        [DllImport("user32.dll")]
+        private static extern IntPtr CallNextHookEx (IntPtr hhk,
+            int nCode,
+            IntPtr wParam,
+            ref LowLevelKeyStruct lParam);
 
     }
 

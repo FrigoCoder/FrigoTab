@@ -61,7 +61,7 @@ namespace FrigoTab {
             return WindowType.AppWindow;
         }
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern bool EnumWindows (EnumWindowsProc enumFunc, IntPtr lParam);
 
     }

@@ -54,7 +54,7 @@ namespace FrigoTab {
         }
 
         public void SelectByIndex (int index) {
-            Selected = (index >= 0) && (index < _windows.Count) ? _windows[index] : null;
+            Selected = index >= 0 && index < _windows.Count ? _windows[index] : null;
         }
 
         public void SelectByPoint (Point point) {

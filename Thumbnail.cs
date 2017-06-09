@@ -20,7 +20,8 @@ namespace FrigoTab {
             DwmRegisterThumbnail(destination, source, out _thumbnail);
         }
 
-        public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect bounds) : this(source, destination) {
+        public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect bounds) :
+            this(source, destination) {
             Update(bounds);
         }
 
@@ -63,7 +64,7 @@ namespace FrigoTab {
 
         }
 
-        [Flags, SuppressMessage ("ReSharper", "UnusedMember.Local")]
+        [Flags, SuppressMessage("ReSharper", "UnusedMember.Local")]
         private enum DwmThumbnailFlags {
 
             RectDestination = 1,
@@ -80,19 +81,19 @@ namespace FrigoTab {
 
         }
 
-        [DllImport ("dwmapi.dll")]
+        [DllImport("dwmapi.dll")]
         private static extern int DwmEnableComposition (DwmEnableCompositionConstants uCompositionAction);
 
-        [DllImport ("dwmapi.dll")]
+        [DllImport("dwmapi.dll")]
         private static extern int DwmRegisterThumbnail (IntPtr dest, IntPtr src, out IntPtr thumb);
 
-        [DllImport ("dwmapi.dll")]
+        [DllImport("dwmapi.dll")]
         private static extern int DwmUnregisterThumbnail (IntPtr thumb);
 
-        [DllImport ("dwmapi.dll")]
+        [DllImport("dwmapi.dll")]
         private static extern int DwmUpdateThumbnailProperties (IntPtr thumb, ref DwmThumbnailProperties props);
 
-        [DllImport ("dwmapi.dll")]
+        [DllImport("dwmapi.dll")]
         private static extern int DwmQueryThumbnailSourceSize (IntPtr thumb, out Size pSize);
 
     }

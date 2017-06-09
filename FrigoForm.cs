@@ -26,7 +26,7 @@ namespace FrigoTab {
             }
         }
 
-        protected override void OnPaint(PaintEventArgs e) {
+        protected override void OnPaint (PaintEventArgs e) {
         }
 
         protected override void OnPaintBackground (PaintEventArgs e) {

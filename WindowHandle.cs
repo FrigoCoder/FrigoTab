@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Drawing;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
@@ -63,7 +62,7 @@ namespace FrigoTab {
             bool altPressed = (keyState[(int) Keys.Menu] & 0x80) != 0;
 
             if( !altPressed ) {
-                keybd_event((int)Keys.Menu, 0, (int) KeyEventF.ExtendedKey, 0);
+                keybd_event((int) Keys.Menu, 0, (int) KeyEventF.ExtendedKey, 0);
             }
 
             SetForegroundWindow(_handle);
@@ -150,28 +149,28 @@ namespace FrigoTab {
             }
         }
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern bool GetWindowRect (IntPtr hWnd, out ScreenRect lpRect);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern int GetWindowTextLength (IntPtr hWnd);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern int GetWindowText (IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern IntPtr GetWindowLongPtr (IntPtr hWnd, WindowLong nIndex);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern bool ShowWindow (IntPtr hWnd, ShowWindowCommand nCmdShow);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow (IntPtr hwnd);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern IntPtr GetClassLongPtr (IntPtr hWnd, ClassLong nIndex);
 
-        [DllImport ("user32.dll")]
+        [DllImport("user32.dll")]
         private static extern bool SendMessageCallback (IntPtr hWnd,
             WindowMessages message,
             GetIconSize wParam,
@@ -180,10 +179,10 @@ namespace FrigoTab {
             IntPtr dwData);
 
         [DllImport("user32.dll")]
-        private static extern bool GetKeyboardState(byte[] lpKeyState);
+        private static extern bool GetKeyboardState (byte[] lpKeyState);
 
         [DllImport("user32.dll")]
-        private static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
+        private static extern void keybd_event (byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
 
     }
 

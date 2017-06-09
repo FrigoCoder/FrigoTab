@@ -30,7 +30,7 @@ namespace FrigoTab {
             }
         }
 
-        [Conditional ("DEBUG")]
+        [Conditional("DEBUG")]
         private static void StartQuitTimer () {
             Timer timer = new Timer {
                 Interval = 10 * 1000
