@@ -25,7 +25,7 @@ namespace FrigoTab {
         }
 
         public new Rectangle Bounds {
-            get { return base.Bounds; }
+            get => base.Bounds;
             set {
                 base.Bounds = value;
                 _thumbnail.Update(new ScreenRect(value));
@@ -45,7 +45,7 @@ namespace FrigoTab {
         }
 
         private Icon AppIcon {
-            get { return _appIcon; }
+            get => _appIcon;
             set {
                 _appIcon = value;
                 RenderOverlay();
