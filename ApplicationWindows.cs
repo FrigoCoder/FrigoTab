@@ -23,7 +23,7 @@ namespace FrigoTab {
         }
 
         public ApplicationWindow Selected {
-            get { return _selected; }
+            get => _selected;
             private set {
                 if( _selected == value ) {
                     return;
