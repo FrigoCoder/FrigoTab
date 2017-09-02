@@ -8,7 +8,8 @@ namespace FrigoTab {
 
     public class ApplicationWindow : FrigoForm {
 
-        private readonly WindowHandle _application;
+        public readonly WindowHandle Application;
+
         private readonly int _index;
         private readonly Thumbnail _thumbnail;
         private Icon _appIcon;
@@ -17,11 +18,11 @@ namespace FrigoTab {
         public ApplicationWindow (Form owner, WindowHandle application, int index) {
             Owner = owner;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
-            _application = application;
+            Application = application;
             _index = index;
             _thumbnail = new Thumbnail(application, owner.Handle);
-            _appIcon = _application.IconFromGetClassLongPtr() ?? Program.Icon;
-            _application.RegisterIconCallback(icon => AppIcon = icon);
+            _appIcon = Application.IconFromGetClassLongPtr() ?? Program.Icon;
+            Application.RegisterIconCallback(icon => AppIcon = icon);
         }
 
         public new Rectangle Bounds {
@@ -53,11 +54,11 @@ namespace FrigoTab {
         }
 
         public Screen GetScreen () {
-            return _application.GetScreen();
+            return Application.GetScreen();
         }
 
         public void SetForeground () {
-            _application.SetForeground();
+            Application.SetForeground();
         }
 
         public Size GetSourceSize () {
@@ -91,7 +92,7 @@ namespace FrigoTab {
             const int pad = 8;
 
             Icon icon = AppIcon;
-            string text = _application.GetWindowText();
+            string text = Application.GetWindowText();
 
             Font font = new Font("Segoe UI", 11f);
             SizeF textSize = graphics.MeasureString(text, font);

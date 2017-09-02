@@ -15,7 +15,7 @@ namespace FrigoTab {
         private bool _active;
 
         public SessionForm () {
-            Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
+            Bounds = GetScreenBounds();
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             SystemEvents.DisplaySettingsChanged += RefreshDisplay;
         }
@@ -107,20 +107,27 @@ namespace FrigoTab {
         }
 
         private void RefreshDisplay (object sender, EventArgs e) {
-            Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
             if( !_active ) {
                 return;
             }
-            EndSession();
-            BeginSession();
+            if( Bounds != GetScreenBounds() ) {
+                EndSession();
+                Bounds = GetScreenBounds();
+                BeginSession();
+            }
         }
 
         private void ActivateEndSession () {
             if( _applications.Selected == null ) {
                 return;
             }
-            _applications.Selected.SetForeground();
+            WindowHandle selected = _applications.Selected.Application;
             EndSession();
+            selected.SetForeground();
+        }
+
+        private static Rectangle GetScreenBounds () {
+            return Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
         }
 
     }
