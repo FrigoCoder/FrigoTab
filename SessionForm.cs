@@ -59,14 +59,6 @@ namespace FrigoTab {
             base.Dispose(disposing);
         }
 
-        protected override void SetVisibleCore (bool value) {
-            if( !IsHandleCreated ) {
-                CreateHandle();
-                value = false;
-            }
-            base.SetVisibleCore(value);
-        }
-
         private void BeginSession () {
             if( _active ) {
                 return;
