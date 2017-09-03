@@ -57,10 +57,6 @@ namespace FrigoTab {
             return Application.GetScreen();
         }
 
-        public void SetForeground () {
-            Application.SetForeground();
-        }
-
         public Size GetSourceSize () {
             return _thumbnail.GetSourceSize();
         }
