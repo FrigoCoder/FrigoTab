@@ -1,4 +1,7 @@
-﻿using System.Windows.Forms;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Windows.Forms;
 
 namespace FrigoTab {
 
@@ -30,6 +33,28 @@ namespace FrigoTab {
         }
 
         protected override void OnPaintBackground (PaintEventArgs e) {
+        }
+
+        protected override void SetVisibleCore (bool value) {
+            if( IsHandleCreated ) {
+                base.SetVisibleCore(value);
+                return;
+            }
+            CreateHandle();
+            if( !IsCalledFromRunMessageLoop(new StackTrace()) ) {
+                base.SetVisibleCore(value);
+            }
+        }
+
+        private static bool IsCalledFromRunMessageLoop (StackTrace trace) {
+            IEnumerable<string> expected = new[] {
+                "SetVisibleCore",
+                "RunMessageLoopInner",
+                "RunMessageLoop",
+                "Main"
+            };
+            IEnumerable<string> actual = trace.GetFrames()?.Select(frame => frame.GetMethod().Name) ?? new string[0];
+            return expected.SequenceEqual(actual);
         }
 
     }
