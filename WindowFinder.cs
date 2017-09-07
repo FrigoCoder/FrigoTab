@@ -58,6 +58,11 @@ namespace FrigoTab {
             if( ex.HasFlag(WindowExStyles.ToolWindow) ) {
                 return WindowType.ToolWindow;
             }
+
+            if( handle.GetWindowRect().Size.IsEmpty ) {
+                return WindowType.Hidden;
+            }
+
             return WindowType.AppWindow;
         }
 
