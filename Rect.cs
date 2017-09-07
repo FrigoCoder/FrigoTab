@@ -29,8 +29,8 @@ namespace FrigoTab {
         private readonly int _right;
         private readonly int _bottom;
 
+        public Size Size => new Size(_right - _left, _bottom - _top);
         private Point Location => new Point(_left, _top);
-        private Size Size => new Size(_right - _left, _bottom - _top);
 
         public ScreenRect (Rectangle bounds) {
             _left = bounds.Left;
