@@ -76,7 +76,7 @@ namespace FrigoTab {
         }
 
         private void PostMessage (WindowMessages windowMessages, int wParam, int lParam) {
-            ((WindowHandle) Handle).PostMessage((int) windowMessages, wParam, lParam);
+            ((WindowHandle) Handle).PostMessage(windowMessages, wParam, lParam);
         }
 
         private void BeginSession () {
@@ -158,7 +158,7 @@ namespace FrigoTab {
 
         private static void ForceResolutionChange () {
             WindowHandle foreground = WindowHandle.GetForegroundWindowHandle();
-            foreground.SendMessage((int) WindowMessages.ActivateApp, 0, Thread.CurrentThread.ManagedThreadId);
+            foreground.SendMessage(WindowMessages.ActivateApp, 0, Thread.CurrentThread.ManagedThreadId);
         }
 
         private static Rectangle GetScreenBounds () {

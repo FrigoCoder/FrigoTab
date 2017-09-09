@@ -100,11 +100,11 @@ namespace FrigoTab {
             SendMessageCallback(_handle, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, _callback, actionHandle);
         }
 
-        public void SendMessage (int msg, int wParam, int lParam) {
+        public void SendMessage (WindowMessages msg, int wParam, int lParam) {
             SendMessage(_handle, msg, (IntPtr) wParam, (IntPtr) lParam);
         }
 
-        public void PostMessage (int msg, int wParam, int lParam) {
+        public void PostMessage (WindowMessages msg, int wParam, int lParam) {
             PostMessage(_handle, msg, (IntPtr) wParam, (IntPtr) lParam);
         }
 
@@ -191,10 +191,10 @@ namespace FrigoTab {
         private static extern void keybd_event (byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
 
         [DllImport("user32.dll")]
-        private static extern bool SendMessage (IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+        private static extern bool SendMessage (IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
 
         [DllImport("user32.dll")]
-        private static extern bool PostMessage (IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+        private static extern bool PostMessage (IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow ();
