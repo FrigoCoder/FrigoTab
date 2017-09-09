@@ -38,13 +38,9 @@ namespace FrigoTab {
             if( !_active ) {
                 return;
             }
-            _applications.SelectByPoint(e.Point);
+            PostMessage(WindowMessages.MouseMoved, e.Point.X, e.Point.Y);
             if( e.Click ) {
-                if( _screenForms.IsOnAToolBar(e.Point) ) {
-                    EndSession();
-                } else {
-                    ActivateEndSession();
-                }
+                PostMessage(WindowMessages.MouseClicked, e.Point.X, e.Point.Y);
             }
         }
 
@@ -64,6 +60,12 @@ namespace FrigoTab {
                     break;
                 case WindowMessages.KeyPressed:
                     KeyPressed((Keys) m.WParam);
+                    break;
+                case WindowMessages.MouseMoved:
+                    MouseMoved(new Point((int) m.WParam, (int) m.LParam));
+                    break;
+                case WindowMessages.MouseClicked:
+                    MouseClicked(new Point((int) m.WParam, (int) m.LParam));
                     break;
                 case WindowMessages.DisplayChange:
                     DisplayChange();
@@ -120,6 +122,19 @@ namespace FrigoTab {
             ActivateEndSession();
         }
 
+        private void MouseMoved (Point point) {
+            _applications.SelectByPoint(point);
+        }
+
+        private void MouseClicked (Point point) {
+            _applications.SelectByPoint(point);
+            if( _screenForms.IsOnAToolBar(point) ) {
+                EndSession();
+            } else {
+                ActivateEndSession();
+            }
+        }
+
         private void ActivateEndSession () {
             if( _applications.Selected == null ) {
                 return;
@@ -144,7 +159,9 @@ namespace FrigoTab {
             User = 0x4000,
             BeginSession = User + 1,
             EndSession = User + 2,
-            KeyPressed = User + 3
+            KeyPressed = User + 3,
+            MouseMoved = User + 4,
+            MouseClicked = User + 5
 
         }
 
