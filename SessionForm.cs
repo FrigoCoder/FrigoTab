@@ -67,12 +67,9 @@ namespace FrigoTab {
                     break;
                 case WindowMessages.DisplayChange:
                     RefreshDisplay();
-                    base.WndProc(ref m);
-                    break;
-                default:
-                    base.WndProc(ref m);
                     break;
             }
+                    base.WndProc(ref m);
         }
 
         private void PostMessage (WindowMessages windowMessages, int wParam, int lParam) {
