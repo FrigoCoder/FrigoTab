@@ -28,13 +28,13 @@ namespace FrigoTab {
             if( !_active ) {
                 return;
             }
-            if( Keys.D1 <= e.Key && e.Key <= Keys.D9 || Keys.NumPad1 <= e.Key && e.Key <= Keys.NumPad9 ) {
-                e.Handled = true;
-                PostMessage(Wm.KeyPressed, (int) e.Key, 0);
-            }
             if( e.Key == Keys.Escape || e.Key == (Keys.Alt | Keys.F4) ) {
                 e.Handled = true;
                 PostMessage(Wm.EndSession, 0, 0);
+            }
+            if( Keys.D1 <= e.Key && e.Key <= Keys.D9 || Keys.NumPad1 <= e.Key && e.Key <= Keys.NumPad9 ) {
+                e.Handled = true;
+                PostMessage(Wm.KeyPressed, (int) e.Key, 0);
             }
         }
 
@@ -120,6 +120,15 @@ namespace FrigoTab {
             _backgrounds.Dispose();
         }
 
+        private void ActivateEndSession () {
+            if( _applications.Selected == null ) {
+                return;
+            }
+            WindowHandle selected = _applications.Selected.Application;
+            EndSession();
+            selected.SetForeground();
+        }
+
         private void RefreshDisplay (object sender, EventArgs e) {
             if( !_active ) {
                 return;
@@ -129,15 +138,6 @@ namespace FrigoTab {
                 Bounds = GetScreenBounds();
                 BeginSession();
             }
-        }
-
-        private void ActivateEndSession () {
-            if( _applications.Selected == null ) {
-                return;
-            }
-            WindowHandle selected = _applications.Selected.Application;
-            EndSession();
-            selected.SetForeground();
         }
 
         private enum Wm {
