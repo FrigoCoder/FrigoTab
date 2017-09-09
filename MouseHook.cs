@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace FrigoTab {
@@ -51,19 +52,22 @@ namespace FrigoTab {
         }
 
         private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelMouseStruct lParam) {
-            HookProcInner(nCode, (Wm) wParam, ref lParam);
+            HookProcInner(nCode, (WindowMessages) wParam, ref lParam);
             return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
         }
 
-        private void HookProcInner (int nCode, Wm wParam, ref LowLevelMouseStruct lParam) {
+        private void HookProcInner (int nCode, WindowMessages wParam, ref LowLevelMouseStruct lParam) {
             if( nCode < 0 ) {
                 return;
             }
-            if( !Enum.IsDefined(typeof(Wm), wParam) ) {
-                return;
-            }
             Point point = lParam.Point;
-            bool click = wParam == Wm.LeftDown || wParam == Wm.LeftUp || wParam == Wm.RightDown || wParam == Wm.RightUp;
+            WindowMessages[] clickMessages = {
+                WindowMessages.LeftDown,
+                WindowMessages.LeftUp,
+                WindowMessages.RightDown,
+                WindowMessages.RightUp
+            };
+            bool click = clickMessages.Contains(wParam);
             MouseHookEventArgs e = new MouseHookEventArgs(point, click);
             MouseEvent?.Invoke(e);
         }
@@ -75,19 +79,6 @@ namespace FrigoTab {
             public int Flags;
             public int Time;
             public IntPtr DwExtraInfo;
-
-        }
-
-        [SuppressMessage("ReSharper", "UnusedMember.Local")]
-        private enum Wm {
-
-            MouseMove = 0x200,
-            LeftDown = 0x201,
-            LeftUp = 0x202,
-            RightDown = 0x204,
-            RightUp = 0x205,
-            MouseWheel = 0x20a,
-            MouseHWheel = 0x20e
 
         }
 

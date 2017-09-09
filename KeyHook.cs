@@ -50,17 +50,14 @@ namespace FrigoTab {
         }
 
         private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam) {
-            if( HookProcInner(nCode, (Wm) wParam, ref lParam) ) {
+            if( HookProcInner(nCode, (WindowMessages) wParam, ref lParam) ) {
                 return (IntPtr) 1;
             }
             return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
         }
 
-        private bool HookProcInner (int nCode, Wm wParam, ref LowLevelKeyStruct lParam) {
+        private bool HookProcInner (int nCode, WindowMessages wParam, ref LowLevelKeyStruct lParam) {
             if( nCode < 0 ) {
-                return false;
-            }
-            if( !Enum.IsDefined(typeof(Wm), wParam) ) {
                 return false;
             }
             if( lParam.Flags.HasFlag(LowLevelKeyFlags.Injected) ) {
@@ -89,16 +86,6 @@ namespace FrigoTab {
 
             Injected = 16,
             AltDown = 32
-
-        }
-
-        [SuppressMessage("ReSharper", "UnusedMember.Local")]
-        private enum Wm {
-
-            KeyDown = 0x0100,
-            KeyUp = 0x0101,
-            SysKeyDown = 0x0104,
-            SysKeyUp = 0x0105
 
         }
 
