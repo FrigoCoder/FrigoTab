@@ -10,7 +10,6 @@ namespace FrigoTab {
 
         public readonly Point Point;
         public readonly bool Click;
-        public bool Handled;
 
         public MouseHookEventArgs (Point point, bool click) {
             Point = point;
@@ -60,9 +59,6 @@ namespace FrigoTab {
 
                     MouseHookEventArgs e = new MouseHookEventArgs(point, click);
                     MouseEvent?.Invoke(e);
-                    if( e.Handled ) {
-                        return (IntPtr) 1;
-                    }
                 }
             }
             return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
