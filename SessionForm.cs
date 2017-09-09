@@ -156,19 +156,6 @@ namespace FrigoTab {
             BeginSession();
         }
 
-        private enum WindowMessages {
-
-            ActivateApp = 0x001c,
-            DisplayChange = 0x007e,
-            User = 0x4000,
-            BeginSession = User + 1,
-            EndSession = User + 2,
-            KeyPressed = User + 3,
-            MouseMoved = User + 4,
-            MouseClicked = User + 5
-
-        }
-
         private static void ForceResolutionChange () {
             WindowHandle foreground = WindowHandle.GetForegroundWindowHandle();
             foreground.SendMessage((int) WindowMessages.ActivateApp, 0, Thread.CurrentThread.ManagedThreadId);

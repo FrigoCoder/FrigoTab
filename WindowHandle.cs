@@ -31,10 +31,10 @@ namespace FrigoTab {
         public static WindowHandle GetForegroundWindowHandle () {
             return GetForegroundWindow();
         }
+
         public static implicit operator WindowHandle (IntPtr handle) {
             return new WindowHandle(handle);
         }
-
 
         public static implicit operator IntPtr (WindowHandle handle) {
             return handle._handle;
@@ -124,12 +124,6 @@ namespace FrigoTab {
 
             ExStyle = -20,
             Style = -16
-
-        }
-
-        private enum WindowMessages {
-
-            GetIcon = 127
 
         }
 
