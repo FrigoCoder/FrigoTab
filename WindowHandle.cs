@@ -96,6 +96,10 @@ namespace FrigoTab {
             SendMessageCallback(_handle, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, _callback, actionHandle);
         }
 
+        public void PostMessage (int msg, int wParam, int lParam) {
+            PostMessage(_handle, msg, (IntPtr) wParam, (IntPtr) lParam);
+        }
+
         private enum ClassLong {
 
             Icon = -14
@@ -183,6 +187,9 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern void keybd_event (byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
+
+        [DllImport("user32.dll")]
+        private static extern bool PostMessage (IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
     }
 
