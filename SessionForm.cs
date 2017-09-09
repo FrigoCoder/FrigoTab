@@ -1,9 +1,6 @@
-using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-
-using Microsoft.Win32;
 
 namespace FrigoTab {
 
@@ -17,24 +14,23 @@ namespace FrigoTab {
         public SessionForm () {
             Bounds = GetScreenBounds();
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
-            SystemEvents.DisplaySettingsChanged += RefreshDisplay;
         }
 
         public void HandleKeyEvents (KeyHookEventArgs e) {
             if( e.Key == (Keys.Alt | Keys.Tab) ) {
                 e.Handled = true;
-                PostMessage(Wm.BeginSession, 0, 0);
+                PostMessage(WindowMessages.BeginSession, 0, 0);
             }
             if( !_active ) {
                 return;
             }
             if( e.Key == Keys.Escape || e.Key == (Keys.Alt | Keys.F4) ) {
                 e.Handled = true;
-                PostMessage(Wm.EndSession, 0, 0);
+                PostMessage(WindowMessages.EndSession, 0, 0);
             }
             if( Keys.D1 <= e.Key && e.Key <= Keys.D9 || Keys.NumPad1 <= e.Key && e.Key <= Keys.NumPad9 ) {
                 e.Handled = true;
-                PostMessage(Wm.KeyPressed, (int) e.Key, 0);
+                PostMessage(WindowMessages.KeyPressed, (int) e.Key, 0);
             }
         }
 
@@ -54,22 +50,24 @@ namespace FrigoTab {
 
         protected override void Dispose (bool disposing) {
             EndSession();
-            SystemEvents.DisplaySettingsChanged -= RefreshDisplay;
             base.Dispose(disposing);
         }
 
         protected override void WndProc (ref Message m) {
-            switch( m.Msg ) {
-                case (int) Wm.BeginSession:
+            WindowMessages wm = (WindowMessages) m.Msg;
+            switch( wm ) {
+                case WindowMessages.BeginSession:
                     BeginSession();
                     break;
-                case (int) Wm.EndSession:
+                case WindowMessages.EndSession:
                     EndSession();
                     break;
-                case (int) Wm.KeyPressed:
-                    Keys key = (Keys) m.WParam;
-                    _applications.SelectByIndex((char) key - '1');
-                    ActivateEndSession();
+                case WindowMessages.KeyPressed:
+                    ActivateEndSession((char) (Keys) m.WParam - '1');
+                    break;
+                case WindowMessages.DisplayChange:
+                    RefreshDisplay();
+                    base.WndProc(ref m);
                     break;
                 default:
                     base.WndProc(ref m);
@@ -77,8 +75,8 @@ namespace FrigoTab {
             }
         }
 
-        private void PostMessage (Wm wm, int wParam, int lParam) {
-            ((WindowHandle) Handle).PostMessage((int) wm, wParam, lParam);
+        private void PostMessage (WindowMessages windowMessages, int wParam, int lParam) {
+            ((WindowHandle) Handle).PostMessage((int) windowMessages, wParam, lParam);
         }
 
         private void BeginSession () {
@@ -120,6 +118,11 @@ namespace FrigoTab {
             _backgrounds.Dispose();
         }
 
+        private void ActivateEndSession (int index) {
+            _applications.SelectByIndex(index);
+            ActivateEndSession();
+        }
+
         private void ActivateEndSession () {
             if( _applications.Selected == null ) {
                 return;
@@ -129,19 +132,18 @@ namespace FrigoTab {
             selected.SetForeground();
         }
 
-        private void RefreshDisplay (object sender, EventArgs e) {
-            if( !_active ) {
+        private void RefreshDisplay () {
+            if( !_active || Bounds == GetScreenBounds() ) {
                 return;
             }
-            if( Bounds != GetScreenBounds() ) {
-                EndSession();
-                Bounds = GetScreenBounds();
-                BeginSession();
-            }
+            EndSession();
+            Bounds = GetScreenBounds();
+            BeginSession();
         }
 
-        private enum Wm {
+        private enum WindowMessages {
 
+            DisplayChange = 0x007e,
             User = 0x4000,
             BeginSession = User + 1,
             EndSession = User + 2,
