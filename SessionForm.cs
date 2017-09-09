@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Linq;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace FrigoTab {
@@ -88,6 +89,8 @@ namespace FrigoTab {
                 return;
             }
 
+            ForceResolutionChange();
+
             _backgrounds = new BackgroundWindows(this, finder);
             _screenForms = new ScreenForms(this);
             _applications = new ApplicationWindows(this, finder);
@@ -155,6 +158,7 @@ namespace FrigoTab {
 
         private enum WindowMessages {
 
+            ActivateApp = 0x001c,
             DisplayChange = 0x007e,
             User = 0x4000,
             BeginSession = User + 1,
@@ -163,6 +167,11 @@ namespace FrigoTab {
             MouseMoved = User + 4,
             MouseClicked = User + 5
 
+        }
+
+        private static void ForceResolutionChange () {
+            WindowHandle foreground = WindowHandle.GetForegroundWindowHandle();
+            foreground.SendMessage((int) WindowMessages.ActivateApp, 0, Thread.CurrentThread.ManagedThreadId);
         }
 
         private static Rectangle GetScreenBounds () {
