@@ -28,9 +28,13 @@ namespace FrigoTab {
 
     public class WindowHandle {
 
+        public static WindowHandle GetForegroundWindowHandle () {
+            return GetForegroundWindow();
+        }
         public static implicit operator WindowHandle (IntPtr handle) {
             return new WindowHandle(handle);
         }
+
 
         public static implicit operator IntPtr (WindowHandle handle) {
             return handle._handle;
@@ -94,6 +98,10 @@ namespace FrigoTab {
         public void RegisterIconCallback (Action<Icon> action) {
             IntPtr actionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(action));
             SendMessageCallback(_handle, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, _callback, actionHandle);
+        }
+
+        public void SendMessage (int msg, int wParam, int lParam) {
+            SendMessage(_handle, msg, (IntPtr) wParam, (IntPtr) lParam);
         }
 
         public void PostMessage (int msg, int wParam, int lParam) {
@@ -189,7 +197,13 @@ namespace FrigoTab {
         private static extern void keybd_event (byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
 
         [DllImport("user32.dll")]
+        private static extern bool SendMessage (IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
         private static extern bool PostMessage (IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow ();
 
     }
 
