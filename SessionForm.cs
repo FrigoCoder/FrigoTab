@@ -23,19 +23,18 @@ namespace FrigoTab {
         public void HandleKeyEvents (KeyHookEventArgs e) {
             if( e.Key == (Keys.Alt | Keys.Tab) ) {
                 e.Handled = true;
-                BeginSession();
+                PostMessage(Wm.BeginSession, 0, 0);
             }
             if( !_active ) {
                 return;
             }
             if( Keys.D1 <= e.Key && e.Key <= Keys.D9 || Keys.NumPad1 <= e.Key && e.Key <= Keys.NumPad9 ) {
                 e.Handled = true;
-                _applications.SelectByIndex((char) e.Key - '1');
-                ActivateEndSession();
+                PostMessage(Wm.KeyPressed, (int) e.Key, 0);
             }
             if( e.Key == Keys.Escape || e.Key == (Keys.Alt | Keys.F4) ) {
                 e.Handled = true;
-                EndSession();
+                PostMessage(Wm.EndSession, 0, 0);
             }
         }
 
@@ -57,6 +56,29 @@ namespace FrigoTab {
             EndSession();
             SystemEvents.DisplaySettingsChanged -= RefreshDisplay;
             base.Dispose(disposing);
+        }
+
+        protected override void WndProc (ref Message m) {
+            switch( m.Msg ) {
+                case (int) Wm.BeginSession:
+                    BeginSession();
+                    break;
+                case (int) Wm.EndSession:
+                    EndSession();
+                    break;
+                case (int) Wm.KeyPressed:
+                    Keys key = (Keys) m.WParam;
+                    _applications.SelectByIndex((char) key - '1');
+                    ActivateEndSession();
+                    break;
+                default:
+                    base.WndProc(ref m);
+                    break;
+            }
+        }
+
+        private void PostMessage (Wm wm, int wParam, int lParam) {
+            ((WindowHandle) Handle).PostMessage((int) wm, wParam, lParam);
         }
 
         private void BeginSession () {
@@ -116,6 +138,15 @@ namespace FrigoTab {
             WindowHandle selected = _applications.Selected.Application;
             EndSession();
             selected.SetForeground();
+        }
+
+        private enum Wm {
+
+            User = 0x4000,
+            BeginSession = User + 1,
+            EndSession = User + 2,
+            KeyPressed = User + 3
+
         }
 
         private static Rectangle GetScreenBounds () {
