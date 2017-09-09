@@ -35,7 +35,7 @@ namespace FrigoTab {
         }
 
         public bool Selected {
-            private get { return _selected; }
+            private get => _selected;
             set {
                 if( _selected == value ) {
                     return;
