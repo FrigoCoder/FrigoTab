@@ -63,13 +63,13 @@ namespace FrigoTab {
                     EndSession();
                     break;
                 case WindowMessages.KeyPressed:
-                    ActivateEndSession((char) (Keys) m.WParam - '1');
+                    KeyPressed((Keys) m.WParam);
                     break;
                 case WindowMessages.DisplayChange:
-                    RefreshDisplay();
+                    DisplayChange();
                     break;
             }
-                    base.WndProc(ref m);
+            base.WndProc(ref m);
         }
 
         private void PostMessage (WindowMessages windowMessages, int wParam, int lParam) {
@@ -115,8 +115,8 @@ namespace FrigoTab {
             _backgrounds.Dispose();
         }
 
-        private void ActivateEndSession (int index) {
-            _applications.SelectByIndex(index);
+        private void KeyPressed (Keys key) {
+            _applications.SelectByIndex((char) key - '1');
             ActivateEndSession();
         }
 
@@ -129,7 +129,7 @@ namespace FrigoTab {
             selected.SetForeground();
         }
 
-        private void RefreshDisplay () {
+        private void DisplayChange () {
             if( !_active || Bounds == GetScreenBounds() ) {
                 return;
             }
