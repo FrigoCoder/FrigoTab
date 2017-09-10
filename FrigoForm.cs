@@ -17,6 +17,8 @@ namespace FrigoTab {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint, true);
         }
 
+        protected new WindowHandle Handle => base.Handle;
+
         protected override CreateParams CreateParams {
             get {
                 CreateParams createParams = base.CreateParams;
