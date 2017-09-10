@@ -20,18 +20,18 @@ namespace FrigoTab {
         public void HandleKeyEvents (KeyHookEventArgs e) {
             if( e.Key == (Keys.Alt | Keys.Tab) ) {
                 e.Handled = true;
-                PostMessage(WindowMessages.BeginSession, 0, 0);
+                Handle.PostMessage(WindowMessages.BeginSession, 0, 0);
             }
             if( !_active ) {
                 return;
             }
             if( e.Key == Keys.Escape || e.Key == (Keys.Alt | Keys.F4) ) {
                 e.Handled = true;
-                PostMessage(WindowMessages.EndSession, 0, 0);
+                Handle.PostMessage(WindowMessages.EndSession, 0, 0);
             }
             if( Keys.D1 <= e.Key && e.Key <= Keys.D9 || Keys.NumPad1 <= e.Key && e.Key <= Keys.NumPad9 ) {
                 e.Handled = true;
-                PostMessage(WindowMessages.KeyPressed, (int) e.Key, 0);
+                Handle.PostMessage(WindowMessages.KeyPressed, (int) e.Key, 0);
             }
         }
 
@@ -39,9 +39,9 @@ namespace FrigoTab {
             if( !_active ) {
                 return;
             }
-            PostMessage(WindowMessages.MouseMoved, e.Point.X, e.Point.Y);
+            Handle.PostMessage(WindowMessages.MouseMoved, e.Point.X, e.Point.Y);
             if( e.Click ) {
-                PostMessage(WindowMessages.MouseClicked, e.Point.X, e.Point.Y);
+                Handle.PostMessage(WindowMessages.MouseClicked, e.Point.X, e.Point.Y);
             }
         }
 
@@ -75,10 +75,6 @@ namespace FrigoTab {
             base.WndProc(ref m);
         }
 
-        private void PostMessage (WindowMessages windowMessages, int wParam, int lParam) {
-            ((WindowHandle) Handle).PostMessage(windowMessages, wParam, lParam);
-        }
-
         private void BeginSession () {
             if( _active ) {
                 return;
@@ -100,7 +96,7 @@ namespace FrigoTab {
             Visible = true;
             _screenForms.Visible = true;
             _applications.Visible = true;
-            ((WindowHandle) Handle).SetForeground();
+            Handle.SetForeground();
 
             _active = true;
         }
