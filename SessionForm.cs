@@ -142,9 +142,8 @@ namespace FrigoTab {
             if( _applications.Selected == null ) {
                 return;
             }
-            WindowHandle selected = _applications.Selected.Application;
+            _applications.Selected.Application.SetForeground();
             EndSession();
-            selected.SetForeground();
         }
 
         private void DisplayChange () {
