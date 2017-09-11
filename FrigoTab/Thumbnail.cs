@@ -11,17 +11,18 @@ namespace FrigoTab {
             DwmEnableComposition(DwmEnableCompositionConstants.EnableComposition);
         }
 
+        private readonly WindowHandle _destination;
         private readonly IntPtr _thumbnail;
         private bool _disposed;
 
-        public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect destinationRect) {
+        public Thumbnail (WindowHandle source, WindowHandle destination) {
+            _destination = destination;
             DwmRegisterThumbnail(destination, source, out _thumbnail);
-            DwmThumbnailProperties properties = new DwmThumbnailProperties {
-                Flags = DwmThumbnailFlags.RectSource | DwmThumbnailFlags.RectDestination,
-                Source = new ClientRect(Point.Empty, source.GetWindowRect().Size),
-                Destination = destinationRect.ScreenToClient(destination)
-            };
-            DwmUpdateThumbnailProperties(_thumbnail, ref properties);
+        }
+
+        public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect bounds) :
+            this(source, destination) {
+            Update(bounds);
         }
 
         ~Thumbnail () {
@@ -35,6 +36,21 @@ namespace FrigoTab {
             DwmUnregisterThumbnail(_thumbnail);
             _disposed = true;
             GC.SuppressFinalize(this);
+        }
+
+        public Size GetSourceSize () {
+            Size size;
+            DwmQueryThumbnailSourceSize(_thumbnail, out size);
+            return size;
+        }
+
+        public void Update (ScreenRect destinationRect) {
+            DwmThumbnailProperties properties = new DwmThumbnailProperties {
+                Flags = DwmThumbnailFlags.RectSource | DwmThumbnailFlags.RectDestination,
+                Source = new ClientRect(Point.Empty, GetSourceSize()),
+                Destination = destinationRect.ScreenToClient(_destination)
+            };
+            DwmUpdateThumbnailProperties(_thumbnail, ref properties);
         }
 
         private struct DwmThumbnailProperties {
@@ -76,6 +92,9 @@ namespace FrigoTab {
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmUpdateThumbnailProperties (IntPtr thumb, ref DwmThumbnailProperties props);
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmQueryThumbnailSourceSize (IntPtr thumb, out Size pSize);
 
     }
 

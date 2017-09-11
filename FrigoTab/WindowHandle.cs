@@ -51,9 +51,9 @@ namespace FrigoTab {
         }
 
         public ScreenRect GetWindowRect () {
-            ScreenRect rect;
-            GetWindowRect(_handle, out rect);
-            return rect;
+            ScreenRect lpRect;
+            GetWindowRect(_handle, out lpRect);
+            return lpRect;
         }
 
         public void SetForeground () {
@@ -168,6 +168,9 @@ namespace FrigoTab {
         }
 
         [DllImport("user32.dll")]
+        private static extern bool GetWindowRect (IntPtr hWnd, out ScreenRect lpRect);
+
+        [DllImport("user32.dll")]
         private static extern int GetWindowTextLength (IntPtr hWnd);
 
         [DllImport("user32.dll")]
@@ -213,9 +216,6 @@ namespace FrigoTab {
             DwmWindowAttribute dwAttribute,
             out bool pvAttribute,
             int cbAttribute);
-
-        [DllImport("user32.dll")]
-        private static extern bool GetWindowRect (IntPtr hWnd, out ScreenRect lpRect);
 
     }
 
