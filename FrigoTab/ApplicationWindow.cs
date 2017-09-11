@@ -9,6 +9,7 @@ namespace FrigoTab {
     public class ApplicationWindow : FrigoForm {
 
         public readonly WindowHandle Application;
+
         private readonly int _index;
         private readonly Thumbnail _thumbnail;
         private Icon _appIcon;
@@ -16,16 +17,13 @@ namespace FrigoTab {
 
         public ApplicationWindow (Form owner, WindowHandle application, int index, Rectangle bounds) {
             Owner = owner;
+            Bounds = bounds;
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             Application = application;
             _index = index;
-
-            Bounds = bounds;
             _thumbnail = new Thumbnail(application, owner.Handle, new ScreenRect(bounds));
-
             _appIcon = Application.IconFromGetClassLongPtr() ?? Program.Icon;
             Application.RegisterIconCallback(icon => AppIcon = icon);
-
-            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
         }
 
         public bool Selected {
