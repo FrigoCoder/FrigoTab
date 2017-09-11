@@ -108,6 +108,12 @@ namespace FrigoTab {
             PostMessage(_handle, msg, (IntPtr) wParam, (IntPtr) lParam);
         }
 
+        public bool IsCloaked () {
+            bool isCloaked;
+            DwmGetWindowAttribute(_handle, DwmWindowAttribute.Cloaked, out isCloaked, Marshal.SizeOf(typeof(bool)));
+            return isCloaked;
+        }
+
         private enum ClassLong {
 
             Icon = -14
@@ -138,6 +144,12 @@ namespace FrigoTab {
 
             ExtendedKey = 1,
             KeyUp = 2
+
+        }
+
+        private enum DwmWindowAttribute {
+
+            Cloaked = 0xe
 
         }
 
@@ -198,6 +210,12 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow ();
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmGetWindowAttribute (IntPtr hWnd,
+            DwmWindowAttribute dwAttribute,
+            out bool pvAttribute,
+            int cbAttribute);
 
     }
 
