@@ -16,14 +16,10 @@ namespace FrigoTab {
         private readonly IntPtr _thumbnail;
         private bool _disposed;
 
-        public Thumbnail (WindowHandle source, WindowHandle destination) {
+        public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect bounds) {
             _source = source;
             _destination = destination;
             DwmRegisterThumbnail(destination, source, out _thumbnail);
-        }
-
-        public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect bounds) :
-            this(source, destination) {
             Update(bounds);
         }
 
@@ -92,9 +88,6 @@ namespace FrigoTab {
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmUpdateThumbnailProperties (IntPtr thumb, ref DwmThumbnailProperties props);
-
-        [DllImport("dwmapi.dll")]
-        private static extern int DwmQueryThumbnailSourceSize (IntPtr thumb, out Size pSize);
 
     }
 
