@@ -11,16 +11,17 @@ namespace FrigoTab {
             DwmEnableComposition(DwmEnableCompositionConstants.EnableComposition);
         }
 
-        private readonly WindowHandle _source;
-        private readonly WindowHandle _destination;
         private readonly IntPtr _thumbnail;
         private bool _disposed;
 
-        public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect bounds) {
-            _source = source;
-            _destination = destination;
+        public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect destinationRect) {
             DwmRegisterThumbnail(destination, source, out _thumbnail);
-            Update(bounds);
+            DwmThumbnailProperties properties = new DwmThumbnailProperties {
+                Flags = DwmThumbnailFlags.RectSource | DwmThumbnailFlags.RectDestination,
+                Source = new ClientRect(Point.Empty, source.GetWindowRect().Size),
+                Destination = destinationRect.ScreenToClient(destination)
+            };
+            DwmUpdateThumbnailProperties(_thumbnail, ref properties);
         }
 
         ~Thumbnail () {
@@ -34,19 +35,6 @@ namespace FrigoTab {
             DwmUnregisterThumbnail(_thumbnail);
             _disposed = true;
             GC.SuppressFinalize(this);
-        }
-
-        public Size GetSourceSize () {
-            return _source.GetWindowRect().Size;
-        }
-
-        public void Update (ScreenRect destinationRect) {
-            DwmThumbnailProperties properties = new DwmThumbnailProperties {
-                Flags = DwmThumbnailFlags.RectSource | DwmThumbnailFlags.RectDestination,
-                Source = new ClientRect(Point.Empty, GetSourceSize()),
-                Destination = destinationRect.ScreenToClient(_destination)
-            };
-            DwmUpdateThumbnailProperties(_thumbnail, ref properties);
         }
 
         private struct DwmThumbnailProperties {
