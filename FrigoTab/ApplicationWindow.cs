@@ -15,8 +15,6 @@ namespace FrigoTab {
         private bool _selected;
 
         public ApplicationWindow (Form owner, WindowHandle application, int index, Rectangle bounds) {
-            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
-
             Owner = owner;
             Application = application;
             _index = index;
@@ -25,8 +23,9 @@ namespace FrigoTab {
             _thumbnail = new Thumbnail(application, owner.Handle, new ScreenRect(bounds));
 
             _appIcon = Application.IconFromGetClassLongPtr() ?? Program.Icon;
-            RenderOverlay();
             Application.RegisterIconCallback(icon => AppIcon = icon);
+
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
         }
 
         public bool Selected {
