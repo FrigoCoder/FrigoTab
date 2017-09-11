@@ -9,29 +9,24 @@ namespace FrigoTab {
     public class ApplicationWindow : FrigoForm {
 
         public readonly WindowHandle Application;
-
         private readonly int _index;
         private readonly Thumbnail _thumbnail;
         private Icon _appIcon;
         private bool _selected;
 
-        public ApplicationWindow (Form owner, WindowHandle application, int index) {
-            Owner = owner;
+        public ApplicationWindow (Form owner, WindowHandle application, int index, Rectangle bounds) {
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
+
+            Owner = owner;
             Application = application;
             _index = index;
-            _thumbnail = new Thumbnail(application, owner.Handle);
-            _appIcon = Application.IconFromGetClassLongPtr() ?? Program.Icon;
-            Application.RegisterIconCallback(icon => AppIcon = icon);
-        }
 
-        public new Rectangle Bounds {
-            get => base.Bounds;
-            set {
-                base.Bounds = value;
-                _thumbnail.Update(new ScreenRect(value));
-                RenderOverlay();
-            }
+            Bounds = bounds;
+            _thumbnail = new Thumbnail(application, owner.Handle, new ScreenRect(bounds));
+
+            _appIcon = Application.IconFromGetClassLongPtr() ?? Program.Icon;
+            RenderOverlay();
+            Application.RegisterIconCallback(icon => AppIcon = icon);
         }
 
         public bool Selected {
@@ -51,10 +46,6 @@ namespace FrigoTab {
                 _appIcon = value;
                 RenderOverlay();
             }
-        }
-
-        public Size GetSourceSize () {
-            return _thumbnail.GetSourceSize();
         }
 
         protected override void Dispose (bool disposing) {
