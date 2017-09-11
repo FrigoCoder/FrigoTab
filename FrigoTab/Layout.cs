@@ -6,15 +6,18 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public static class Layout {
+    public class Layout {
 
-        public static void LayoutWindows (IList<ApplicationWindow> windows) {
+        private readonly IDictionary<WindowHandle, Rectangle> _dictionary;
+
+        public Layout (IList<WindowHandle> windows) {
+            _dictionary = new Dictionary<WindowHandle, Rectangle>();
             foreach( Screen screen in Screen.AllScreens ) {
                 LayoutScreen(screen, GetWindowsOnScreen(windows, screen));
             }
         }
 
-        private static void LayoutScreen (Screen screen, IList<ApplicationWindow> windows) {
+        private void LayoutScreen (Screen screen, IList<WindowHandle> windows) {
             int n = windows.Count;
             if( n == 0 ) {
                 return;
@@ -26,15 +29,16 @@ namespace FrigoTab {
 
             for( int i = 0; i < windows.Count; i++ ) {
                 RectangleF cell = GetCellBounds(screen, columns, rows, i % columns, i / columns);
-                RectangleF bounds = CenterWithin(windows[i].GetSourceSize(), cell);
+                RectangleF bounds = CenterWithin(windows[i].GetWindowRect().Size, cell);
                 bounds.Offset(screen.WorkingArea.Location);
-                windows[i].Bounds = Rectangle.Round(bounds);
+                _dictionary[windows[i]] = Rectangle.Round(bounds);
             }
         }
 
-        private static List<ApplicationWindow> GetWindowsOnScreen (IEnumerable<ApplicationWindow> windows,
-            Screen screen) {
-            return windows.Where(window => window.Application.GetScreen().Equals(screen)).ToList();
+        public Rectangle this [WindowHandle window] => _dictionary[window];
+
+        private static IList<WindowHandle> GetWindowsOnScreen (IEnumerable<WindowHandle> windows, Screen screen) {
+            return windows.Where(window => window.GetScreen().Equals(screen)).ToList();
         }
 
         private static RectangleF GetCellBounds (Screen screen, int columns, int rows, int column, int row) {
