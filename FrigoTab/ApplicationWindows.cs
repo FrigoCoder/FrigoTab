@@ -12,10 +12,10 @@ namespace FrigoTab {
         private ApplicationWindow _selected;
 
         public ApplicationWindows (Form owner, WindowFinder finder) {
-            Layout layout = new Layout(finder.Windows);
             foreach( WindowHandle window in finder.Windows ) {
-                _windows.Add(new ApplicationWindow(owner, window, _windows.Count, layout[window]));
+                _windows.Add(new ApplicationWindow(owner, window, _windows.Count));
             }
+            Layout.LayoutWindows(_windows);
         }
 
         ~ApplicationWindows () {
