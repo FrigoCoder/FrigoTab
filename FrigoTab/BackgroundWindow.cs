@@ -9,7 +9,7 @@ namespace FrigoTab {
         private bool _disposed;
 
         public BackgroundWindow (Form owner, WindowHandle window) {
-            _thumbnail = new Thumbnail(window, owner.Handle, window.GetExtendedFrameBounds());
+            _thumbnail = new Thumbnail(window, owner.Handle, window.GetWindowRect());
         }
 
         ~BackgroundWindow () {
