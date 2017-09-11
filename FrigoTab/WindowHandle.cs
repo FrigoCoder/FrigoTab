@@ -50,12 +50,9 @@ namespace FrigoTab {
             return Screen.FromHandle(_handle);
         }
 
-        public ScreenRect GetExtendedFrameBounds () {
+        public ScreenRect GetWindowRect () {
             ScreenRect rect;
-            DwmGetWindowAttribute(_handle,
-                DwmWindowAttribute.ExtendedFrameBounds,
-                out rect,
-                Marshal.SizeOf(typeof(ScreenRect)));
+            GetWindowRect(_handle, out rect);
             return rect;
         }
 
@@ -152,7 +149,6 @@ namespace FrigoTab {
 
         private enum DwmWindowAttribute {
 
-            ExtendedFrameBounds = 0x9,
             Cloaked = 0xe
 
         }
@@ -218,11 +214,8 @@ namespace FrigoTab {
             out bool pvAttribute,
             int cbAttribute);
 
-        [DllImport("dwmapi.dll")]
-        private static extern int DwmGetWindowAttribute (IntPtr hWnd,
-            DwmWindowAttribute dwAttribute,
-            out ScreenRect pvAttribute,
-            int cbAttribute);
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect (IntPtr hWnd, out ScreenRect lpRect);
 
     }
 
