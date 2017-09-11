@@ -44,6 +44,10 @@ namespace FrigoTab {
                 return WindowType.Hidden;
             }
 
+            if( handle.IsCloaked() ) {
+                return WindowType.Hidden;
+            }
+
             WindowStyles style = handle.GetWindowStyles();
             if( style.HasFlag(WindowStyles.Disabled) ) {
                 return WindowType.Hidden;
