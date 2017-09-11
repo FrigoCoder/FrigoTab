@@ -2,14 +2,14 @@
 
     public enum WindowMessages {
 
+        ActivateApp = 0x001c,
+        DisplayChange = 0x007e,
+        GetIcon = 0x007f,
+
         KeyDown = 0x0100,
         KeyUp = 0x0101,
         SysKeyDown = 0x0104,
         SysKeyUp = 0x0105,
-
-        ActivateApp = 0x001c,
-        DisplayChange = 0x007e,
-        GetIcon = 0x007f,
 
         MouseMove = 0x200,
         LeftDown = 0x201,
