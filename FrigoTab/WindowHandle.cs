@@ -50,8 +50,8 @@ namespace FrigoTab {
             return Screen.FromHandle(_handle);
         }
 
-        public ScreenRect GetWindowRect () {
-            ScreenRect lpRect;
+        public Rect GetWindowRect () {
+            Rect lpRect;
             GetWindowRect(_handle, out lpRect);
             return lpRect;
         }
@@ -168,7 +168,7 @@ namespace FrigoTab {
         }
 
         [DllImport("user32.dll")]
-        private static extern bool GetWindowRect (IntPtr hWnd, out ScreenRect lpRect);
+        private static extern bool GetWindowRect (IntPtr hWnd, out Rect lpRect);
 
         [DllImport("user32.dll")]
         private static extern int GetWindowTextLength (IntPtr hWnd);
