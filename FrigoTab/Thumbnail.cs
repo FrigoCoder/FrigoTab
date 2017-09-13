@@ -7,10 +7,6 @@ namespace FrigoTab {
 
     public class Thumbnail : IDisposable {
 
-        static Thumbnail () {
-            DwmEnableComposition(DwmEnableCompositionConstants.EnableComposition);
-        }
-
         private readonly WindowHandle _source;
         private readonly WindowHandle _destination;
         private readonly IntPtr _thumbnail;
@@ -82,15 +78,6 @@ namespace FrigoTab {
             SourceClientAreaOnly = 16
 
         }
-
-        private enum DwmEnableCompositionConstants {
-
-            EnableComposition = 1
-
-        }
-
-        [DllImport("dwmapi.dll")]
-        private static extern int DwmEnableComposition (DwmEnableCompositionConstants uCompositionAction);
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmRegisterThumbnail (IntPtr dest, IntPtr src, out IntPtr thumb);
