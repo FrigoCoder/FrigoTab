@@ -10,18 +10,15 @@ namespace FrigoTab {
         private readonly WindowHandle _source;
         private readonly WindowHandle _destination;
         private IntPtr _thumbnail;
-        private readonly bool _appWindow;
 
         public Thumbnail (WindowHandle source, WindowHandle destination) {
             _source = source;
             _destination = destination;
-            _appWindow = true;
             DwmRegisterThumbnail(destination, source, out _thumbnail);
         }
 
         public Thumbnail (WindowHandle source, WindowHandle destination, ScreenRect bounds) :
             this(source, destination) {
-            _appWindow = false;
             Update(bounds);
         }
 
@@ -39,12 +36,9 @@ namespace FrigoTab {
         }
 
         public Size GetSourceSize () {
-            if( _appWindow ) {
-                Size size;
-                DwmQueryThumbnailSourceSize(_thumbnail, out size);
-                return size;
-            }
-            return _source.GetWindowRect().Size;
+            Size size;
+            DwmQueryThumbnailSourceSize(_thumbnail, out size);
+            return size;
         }
 
         public void Update (ScreenRect destinationRect) {
