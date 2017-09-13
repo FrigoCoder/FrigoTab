@@ -9,9 +9,8 @@ namespace FrigoTab {
 
         private readonly WindowHandle _source;
         private readonly WindowHandle _destination;
-        private readonly IntPtr _thumbnail;
+        private IntPtr _thumbnail;
         private readonly bool _appWindow;
-        private bool _disposed;
 
         public Thumbnail (WindowHandle source, WindowHandle destination) {
             _source = source;
@@ -31,11 +30,11 @@ namespace FrigoTab {
         }
 
         public void Dispose () {
-            if( _disposed ) {
+            if( _thumbnail == IntPtr.Zero ) {
                 return;
             }
             DwmUnregisterThumbnail(_thumbnail);
-            _disposed = true;
+            _thumbnail = IntPtr.Zero;
             GC.SuppressFinalize(this);
         }
 
