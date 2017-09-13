@@ -6,43 +6,34 @@ using System.Runtime.InteropServices;
 namespace FrigoTab {
 
     [SuppressMessage("ReSharper", "NotAccessedField.Local")]
-    public struct ClientRect {
+    public struct Rect {
 
-        private readonly int _left;
-        private readonly int _top;
-        private readonly int _right;
-        private readonly int _bottom;
+        private readonly Point TopLeft;
+        private readonly Point BottomRight;
 
-        public ClientRect (Point location, Size size) {
-            _left = location.X;
-            _top = location.Y;
-            _right = location.X + size.Width;
-            _bottom = location.Y + size.Height;
+        public Rect (Point topLeft, Point bottomRight) {
+            TopLeft = topLeft;
+            BottomRight = bottomRight;
         }
 
-    }
-
-    public struct ScreenRect {
-
-        private readonly int _left;
-        private readonly int _top;
-        private readonly int _right;
-        private readonly int _bottom;
-
-        public Size Size => new Size(_right - _left, _bottom - _top);
-        private Point Location => new Point(_left, _top);
-
-        public ScreenRect (Rectangle bounds) {
-            _left = bounds.Left;
-            _top = bounds.Top;
-            _right = bounds.Right;
-            _bottom = bounds.Bottom;
+        public Rect (Point location, Size size) {
+            TopLeft = location;
+            BottomRight = new Point(location.X + size.Width, location.Y + size.Height);
         }
 
-        public ClientRect ScreenToClient (WindowHandle window) {
-            Point location = Location;
-            ScreenToClient(window, ref location);
-            return new ClientRect(location, Size);
+        public Rect (Rectangle bounds) {
+            TopLeft = bounds.Location;
+            BottomRight = new Point(bounds.X + bounds.Width, bounds.Y + bounds.Height);
+        }
+
+        public Size Size => new Size(BottomRight.X - TopLeft.X, BottomRight.Y - TopLeft.Y);
+
+        public Rect ScreenToClient (WindowHandle window) {
+            Point topLeft = TopLeft;
+            Point bottomRight = BottomRight;
+            ScreenToClient(window, ref topLeft);
+            ScreenToClient(window, ref bottomRight);
+            return new Rect(topLeft, bottomRight);
         }
 
         [DllImport("user32.dll")]

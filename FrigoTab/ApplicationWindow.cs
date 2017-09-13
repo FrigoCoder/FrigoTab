@@ -29,7 +29,7 @@ namespace FrigoTab {
             get => base.Bounds;
             set {
                 base.Bounds = value;
-                _thumbnail.Update(new ScreenRect(value));
+                _thumbnail.Update(new Rect(value));
                 RenderOverlay();
             }
         }
