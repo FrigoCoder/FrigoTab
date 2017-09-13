@@ -7,18 +7,10 @@ namespace FrigoTab {
 
     public class Thumbnail : IDisposable {
 
-        private readonly WindowHandle _source;
-        private readonly WindowHandle _destination;
         private IntPtr _thumbnail;
 
         public Thumbnail (WindowHandle source, WindowHandle destination) {
-            _source = source;
-            _destination = destination;
             DwmRegisterThumbnail(destination, source, out _thumbnail);
-        }
-
-        public Thumbnail (WindowHandle source, WindowHandle destination, Rect bounds) : this(source, destination) {
-            Update(bounds);
         }
 
         ~Thumbnail () {
@@ -40,11 +32,15 @@ namespace FrigoTab {
             return size;
         }
 
+        public Rect GetSourceRect () {
+            return new Rect(Point.Empty, GetSourceSize());
+        }
+
         public void Update (Rect destinationRect) {
             DwmThumbnailProperties properties = new DwmThumbnailProperties {
                 Flags = DwmThumbnailFlags.RectSource | DwmThumbnailFlags.RectDestination,
-                Source = new Rect(Point.Empty, GetSourceSize()),
-                Destination = destinationRect.ScreenToClient(_destination)
+                Source = GetSourceRect(),
+                Destination = destinationRect
             };
             DwmUpdateThumbnailProperties(_thumbnail, ref properties);
         }
