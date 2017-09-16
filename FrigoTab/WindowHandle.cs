@@ -102,12 +102,6 @@ namespace FrigoTab {
             PostMessage(_handle, msg, (IntPtr) wParam, (IntPtr) lParam);
         }
 
-        public bool IsCloaked () {
-            bool cloaked;
-            Dwm.DwmGetWindowAttribute(_handle, Dwm.WindowAttribute.Cloaked, out cloaked, Marshal.SizeOf(typeof(bool)));
-            return cloaked;
-        }
-
         private enum ClassLong {
 
             Icon = -14
