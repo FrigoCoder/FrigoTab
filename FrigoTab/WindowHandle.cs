@@ -50,12 +50,6 @@ namespace FrigoTab {
             return Screen.FromHandle(_handle);
         }
 
-        public Rect GetWindowRect () {
-            Rect lpRect;
-            GetWindowRect(_handle, out lpRect);
-            return lpRect;
-        }
-
         public void SetForeground () {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 ShowWindow(_handle, ShowWindowCommand.Restore);
@@ -109,9 +103,9 @@ namespace FrigoTab {
         }
 
         public bool IsCloaked () {
-            bool isCloaked;
-            Dwm.DwmGetWindowAttribute(_handle, Dwm.WindowAttribute.Cloaked, out isCloaked, Marshal.SizeOf(typeof(bool)));
-            return isCloaked;
+            bool cloaked;
+            Dwm.DwmGetWindowAttribute(_handle, Dwm.WindowAttribute.Cloaked, out cloaked, Marshal.SizeOf(typeof(bool)));
+            return cloaked;
         }
 
         private enum ClassLong {
@@ -160,9 +154,6 @@ namespace FrigoTab {
                 action(Icon.FromHandle(lResult));
             }
         }
-
-        [DllImport("user32.dll")]
-        private static extern bool GetWindowRect (IntPtr hWnd, out Rect lpRect);
 
         [DllImport("user32.dll")]
         private static extern int GetWindowTextLength (IntPtr hWnd);
