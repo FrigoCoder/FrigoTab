@@ -10,6 +10,7 @@ namespace FrigoTab {
 
         public BackgroundWindow (Form owner, WindowHandle window) {
             _thumbnail = new Thumbnail(window, owner.Handle);
+            _thumbnail.SetSourceRect(Dwm.GetExtendedFrameBounds(window).ScreenToClient(window));
             _thumbnail.SetDestinationRect(Dwm.GetExtendedFrameBounds(window).ScreenToClient(owner.Handle));
         }
 

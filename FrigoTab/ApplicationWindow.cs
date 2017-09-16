@@ -21,6 +21,7 @@ namespace FrigoTab {
             Application = application;
             _index = index;
             _thumbnail = new Thumbnail(application, owner.Handle);
+            _thumbnail.SetSourceRect(new Rect(Point.Empty, _thumbnail.GetSourceSize()));
             _appIcon = Application.IconFromGetClassLongPtr() ?? Program.Icon;
             Application.RegisterIconCallback(icon => AppIcon = icon);
         }
