@@ -101,6 +101,7 @@
     <Compile Include="ApplicationWindows.cs" />
     <Compile Include="BackgroundWindows.cs" />
     <Compile Include="BackgroundWindow.cs" />
+    <Compile Include="Dwm.cs" />
     <Compile Include="FrigoForm.cs">
       <SubType>Form</SubType>
     </Compile>
