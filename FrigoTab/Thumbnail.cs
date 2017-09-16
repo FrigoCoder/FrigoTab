@@ -30,10 +30,17 @@ namespace FrigoTab {
             return size;
         }
 
+        public void SetSourceRect (Rect sourceRect) {
+            Dwm.ThumbnailProperties properties = new Dwm.ThumbnailProperties {
+                Flags = Dwm.ThumbnailFlags.RectSource,
+                Source = sourceRect
+            };
+            Dwm.DwmUpdateThumbnailProperties(_thumbnail, ref properties);
+        }
+
         public void SetDestinationRect (Rect destinationRect) {
             Dwm.ThumbnailProperties properties = new Dwm.ThumbnailProperties {
-                Flags = Dwm.ThumbnailFlags.RectSource | Dwm.ThumbnailFlags.RectDestination,
-                Source = new Rect(Point.Empty, GetSourceSize()),
+                Flags = Dwm.ThumbnailFlags.RectDestination,
                 Destination = destinationRect
             };
             Dwm.DwmUpdateThumbnailProperties(_thumbnail, ref properties);
