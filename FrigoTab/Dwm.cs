@@ -36,6 +36,12 @@ namespace FrigoTab {
 
         }
 
+        public static Rect GetExtendedFrameBounds (WindowHandle window) {
+            Rect rect;
+            DwmGetWindowAttribute(window, WindowAttribute.ExtendedFrameBounds, out rect, Marshal.SizeOf(typeof(Rect)));
+            return rect;
+        }
+
         [DllImport("dwmapi.dll")]
         public static extern int DwmRegisterThumbnail (IntPtr dest, IntPtr src, out IntPtr thumb);
 
