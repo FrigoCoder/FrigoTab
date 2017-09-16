@@ -44,7 +44,7 @@ namespace FrigoTab {
                 return WindowType.Hidden;
             }
 
-            if( handle.IsCloaked() ) {
+            if( Dwm.IsCloaked(handle)) {
                 return WindowType.Hidden;
             }
 
