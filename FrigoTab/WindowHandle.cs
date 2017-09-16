@@ -110,7 +110,7 @@ namespace FrigoTab {
 
         public bool IsCloaked () {
             bool isCloaked;
-            DwmGetWindowAttribute(_handle, DwmWindowAttribute.Cloaked, out isCloaked, Marshal.SizeOf(typeof(bool)));
+            Dwm.DwmGetWindowAttribute(_handle, Dwm.WindowAttribute.Cloaked, out isCloaked, Marshal.SizeOf(typeof(bool)));
             return isCloaked;
         }
 
@@ -144,12 +144,6 @@ namespace FrigoTab {
 
             ExtendedKey = 1,
             KeyUp = 2
-
-        }
-
-        private enum DwmWindowAttribute {
-
-            Cloaked = 0xe
 
         }
 
@@ -210,12 +204,6 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow ();
-
-        [DllImport("dwmapi.dll")]
-        private static extern int DwmGetWindowAttribute (IntPtr hWnd,
-            DwmWindowAttribute dwAttribute,
-            out bool pvAttribute,
-            int cbAttribute);
 
     }
 

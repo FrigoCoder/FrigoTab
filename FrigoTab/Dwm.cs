@@ -1,0 +1,58 @@
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Drawing;
+using System.Runtime.InteropServices;
+
+namespace FrigoTab {
+
+    public static class Dwm {
+
+        public struct ThumbnailProperties {
+
+            public ThumbnailFlags Flags;
+            public Rect Destination;
+            public Rect Source;
+            public byte Opacity;
+            public bool Visible;
+            public bool SourceClientAreaOnly;
+
+        }
+
+        [Flags, SuppressMessage("ReSharper", "UnusedMember.Local")]
+        public enum ThumbnailFlags {
+
+            RectDestination = 1,
+            RectSource = 2,
+            Opacity = 4,
+            Visible = 8,
+            SourceClientAreaOnly = 16
+
+        }
+
+        public enum WindowAttribute {
+
+            Cloaked = 0xe
+
+        }
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmRegisterThumbnail (IntPtr dest, IntPtr src, out IntPtr thumb);
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmUnregisterThumbnail (IntPtr thumb);
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmUpdateThumbnailProperties (IntPtr thumb, ref ThumbnailProperties props);
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmQueryThumbnailSourceSize (IntPtr thumb, out Size pSize);
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmGetWindowAttribute (IntPtr hWnd,
+            WindowAttribute dwAttribute,
+            out bool pvAttribute,
+            int cbAttribute);
+
+    }
+
+}
