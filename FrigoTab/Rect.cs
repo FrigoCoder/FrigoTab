@@ -8,25 +8,25 @@ namespace FrigoTab {
     [SuppressMessage("ReSharper", "NotAccessedField.Local")]
     public struct Rect {
 
-        private readonly Point TopLeft;
-        private readonly Point BottomRight;
+        private readonly Point _topLeft;
+        private readonly Point _bottomRight;
 
-        public Rect (Point topLeft, Point bottomRight) {
-            TopLeft = topLeft;
-            BottomRight = bottomRight;
+        private Rect (Point topLeft, Point bottomRight) {
+            _topLeft = topLeft;
+            _bottomRight = bottomRight;
         }
 
         public Rect (Point location, Size size) {
-            TopLeft = location;
-            BottomRight = new Point(location.X + size.Width, location.Y + size.Height);
+            _topLeft = location;
+            _bottomRight = new Point(location.X + size.Width, location.Y + size.Height);
         }
 
         public Rect (Rectangle bounds) {
-            TopLeft = bounds.Location;
-            BottomRight = new Point(bounds.X + bounds.Width, bounds.Y + bounds.Height);
+            _topLeft = bounds.Location;
+            _bottomRight = new Point(bounds.X + bounds.Width, bounds.Y + bounds.Height);
         }
 
-        public Size Size => new Size(BottomRight.X - TopLeft.X, BottomRight.Y - TopLeft.Y);
+        public Size Size => new Size(_bottomRight.X - _topLeft.X, _bottomRight.Y - _topLeft.Y);
 
         public Rect MapWindowPoints (WindowHandle from, WindowHandle to) {
             Rect rect = this;
@@ -35,8 +35,8 @@ namespace FrigoTab {
         }
 
         public Rect ScreenToClient (WindowHandle window) {
-            Point topLeft = TopLeft;
-            Point bottomRight = BottomRight;
+            Point topLeft = _topLeft;
+            Point bottomRight = _bottomRight;
             ScreenToClient(window, ref topLeft);
             ScreenToClient(window, ref bottomRight);
             return new Rect(topLeft, bottomRight);
