@@ -31,6 +31,7 @@ namespace FrigoTab {
 
         public enum WindowAttribute {
 
+            ExtendedFrameBounds = 0x9,
             Cloaked = 0xe
 
         }
@@ -51,6 +52,12 @@ namespace FrigoTab {
         public static extern int DwmGetWindowAttribute (IntPtr hWnd,
             WindowAttribute dwAttribute,
             out bool pvAttribute,
+            int cbAttribute);
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmGetWindowAttribute (IntPtr hWnd,
+            WindowAttribute dwAttribute,
+            out Rect pvAttribute,
             int cbAttribute);
 
     }
