@@ -70,6 +70,12 @@ namespace FrigoTab {
             }
         }
 
+        public Rect GetWindowRect () {
+            Rect rect;
+            GetWindowRect(_handle, out rect);
+            return rect;
+        }
+
         public string GetWindowText () {
             StringBuilder text = new StringBuilder(GetWindowTextLength(_handle) + 1);
             GetWindowText(_handle, text, text.Capacity);
@@ -189,6 +195,9 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow ();
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect (IntPtr hWnd, out Rect lpRect);
 
     }
 

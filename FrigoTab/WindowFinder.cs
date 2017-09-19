@@ -40,11 +40,11 @@ namespace FrigoTab {
         private delegate bool EnumWindowsProc (IntPtr handle, IntPtr lParam);
 
         private static WindowType GetWindowType (WindowHandle handle) {
-            if( Dwm.GetExtendedFrameBounds(handle).Size.IsEmpty ) {
+            if( handle.GetWindowRect().Size.IsEmpty ) {
                 return WindowType.Hidden;
             }
 
-            if( Dwm.IsCloaked(handle)) {
+            if( Dwm.IsCloaked(handle) ) {
                 return WindowType.Hidden;
             }
 
