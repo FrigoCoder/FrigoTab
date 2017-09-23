@@ -143,7 +143,7 @@ namespace FrigoTab {
         }
 
         private void DisplayChange () {
-            if( !_active || Bounds == GetScreenBounds() ) {
+            if( !_active ) {
                 return;
             }
             EndSession();
