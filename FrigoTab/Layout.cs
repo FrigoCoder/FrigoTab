@@ -33,18 +33,20 @@ namespace FrigoTab {
 
         private void LayoutScreen () {
             for( int i = 0; i < _windows.Count; i++ ) {
-                RectangleF cell = GetCellBounds(i % _columns, i / _columns);
+                float xMargin = _screen.Bounds.Width * 0.005f;
+                float yMargin = _screen.Bounds.Height * 0.005f;
+                RectangleF cell = GetCellBounds(i % _columns, i / _columns, xMargin, yMargin);
                 RectangleF bounds = CenterWithin(_windows[i].GetSourceSize(), cell);
                 bounds.Offset(_screen.WorkingArea.Location);
                 _windows[i].Bounds = Rectangle.Round(bounds);
             }
         }
 
-        private RectangleF GetCellBounds (int column, int row) {
+        private RectangleF GetCellBounds (int column, int row, float xMargin, float yMargin) {
             SizeF size = new SizeF((float) _screen.WorkingArea.Width / _columns,
                 (float) _screen.WorkingArea.Height / _rows);
-            PointF location = new PointF(column * size.Width, row * size.Height);
-            return new RectangleF(location, size);
+            PointF location = new PointF(column * size.Width + xMargin, row * size.Height + yMargin);
+            return new RectangleF(location, new SizeF(size.Width - 2 * xMargin, size.Height - 2 * yMargin));
         }
 
         private static List<ApplicationWindow> GetWindowsOnScreen (IEnumerable<ApplicationWindow> windows,
