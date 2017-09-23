@@ -16,23 +16,12 @@ namespace FrigoTab {
             _bottomRight = bottomRight;
         }
 
-        public Rect (Point location, Size size) {
-            _topLeft = location;
-            _bottomRight = new Point(location.X + size.Width, location.Y + size.Height);
-        }
-
         public Rect (Rectangle bounds) {
             _topLeft = bounds.Location;
             _bottomRight = new Point(bounds.X + bounds.Width, bounds.Y + bounds.Height);
         }
 
-        public Size Size => new Size(_bottomRight.X - _topLeft.X, _bottomRight.Y - _topLeft.Y);
-
-        public Rect MapWindowPoints (WindowHandle from, WindowHandle to) {
-            Rect rect = this;
-            MapWindowPoints(from, to, ref rect, 2);
-            return rect;
-        }
+        public bool IsEmpty => _topLeft.X >= _bottomRight.X || _topLeft.Y >= _bottomRight.Y;
 
         public Rect ScreenToClient (WindowHandle window) {
             Point topLeft = _topLeft;
@@ -41,9 +30,6 @@ namespace FrigoTab {
             ScreenToClient(window, ref bottomRight);
             return new Rect(topLeft, bottomRight);
         }
-
-        [DllImport("user32.dll")]
-        private static extern int MapWindowPoints (IntPtr hWndFrom, IntPtr hWndTo, ref Rect lpRect, int cPoints);
 
         [DllImport("user32.dll")]
         private static extern bool ScreenToClient (IntPtr hWnd, ref Point lpPoint);
