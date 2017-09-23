@@ -18,20 +18,17 @@ namespace FrigoTab {
         private readonly Screen _screen;
         private readonly IList<ApplicationWindow> _windows;
 
-        private readonly int _n;
         private readonly int _columns;
         private readonly int _rows;
 
         private Layout (Screen screen, IList<ApplicationWindow> windows) {
             _screen = screen;
             _windows = windows;
-            _n = windows.Count;
-            if( _n == 0 ) {
+            if( windows.Count == 0 ) {
                 return;
             }
-            double sqrtn = Math.Sqrt(_n);
-            _columns = (int) Math.Ceiling(sqrtn);
-            _rows = (int) Math.Ceiling((double) _n / _columns);
+            _columns = (int) Math.Ceiling(Math.Sqrt(windows.Count));
+            _rows = (int) Math.Ceiling((double) windows.Count / _columns);
         }
 
         private void LayoutScreen () {
