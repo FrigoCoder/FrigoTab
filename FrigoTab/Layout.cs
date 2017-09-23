@@ -6,42 +6,53 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public static class Layout {
+    public class Layout {
 
         public static void LayoutWindows (IList<ApplicationWindow> windows) {
             foreach( Screen screen in Screen.AllScreens ) {
-                LayoutScreen(screen, GetWindowsOnScreen(windows, screen));
+                Layout layout = new Layout(screen, GetWindowsOnScreen(windows, screen));
+                layout.LayoutScreen();
             }
         }
 
-        private static void LayoutScreen (Screen screen, IList<ApplicationWindow> windows) {
-            int n = windows.Count;
-            if( n == 0 ) {
+        private readonly Screen _screen;
+        private readonly IList<ApplicationWindow> _windows;
+
+        private readonly int _n;
+        private readonly int _columns;
+        private readonly int _rows;
+
+        private Layout (Screen screen, IList<ApplicationWindow> windows) {
+            _screen = screen;
+            _windows = windows;
+            _n = windows.Count;
+            if( _n == 0 ) {
                 return;
             }
+            double sqrtn = Math.Sqrt(_n);
+            _columns = (int) Math.Ceiling(sqrtn);
+            _rows = (int) Math.Ceiling((double) _n / _columns);
+        }
 
-            double sqrtn = Math.Sqrt(n);
-            int columns = (int) Math.Ceiling(sqrtn);
-            int rows = (int) Math.Ceiling((double) n / columns);
-
-            for( int i = 0; i < windows.Count; i++ ) {
-                RectangleF cell = GetCellBounds(screen, columns, rows, i % columns, i / columns);
-                RectangleF bounds = CenterWithin(windows[i].GetSourceSize(), cell);
-                bounds.Offset(screen.WorkingArea.Location);
-                windows[i].Bounds = Rectangle.Round(bounds);
+        private void LayoutScreen () {
+            for( int i = 0; i < _windows.Count; i++ ) {
+                RectangleF cell = GetCellBounds(i % _columns, i / _columns);
+                RectangleF bounds = CenterWithin(_windows[i].GetSourceSize(), cell);
+                bounds.Offset(_screen.WorkingArea.Location);
+                _windows[i].Bounds = Rectangle.Round(bounds);
             }
+        }
+
+        private RectangleF GetCellBounds (int column, int row) {
+            SizeF size = new SizeF((float) _screen.WorkingArea.Width / _columns,
+                (float) _screen.WorkingArea.Height / _rows);
+            PointF location = new PointF(column * size.Width, row * size.Height);
+            return new RectangleF(location, size);
         }
 
         private static List<ApplicationWindow> GetWindowsOnScreen (IEnumerable<ApplicationWindow> windows,
             Screen screen) {
             return windows.Where(window => window.Application.GetScreen().Equals(screen)).ToList();
-        }
-
-        private static RectangleF GetCellBounds (Screen screen, int columns, int rows, int column, int row) {
-            SizeF size = new SizeF((float) screen.WorkingArea.Width / columns,
-                (float) screen.WorkingArea.Height / rows);
-            PointF location = new PointF(column * size.Width, row * size.Height);
-            return new RectangleF(location, size);
         }
 
         private static RectangleF CenterWithin (Size rectSize, RectangleF bounds) {
