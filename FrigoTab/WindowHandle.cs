@@ -46,6 +46,8 @@ namespace FrigoTab {
             _handle = handle;
         }
 
+        private bool AltPressed => (KeyboardState[(int) Keys.Menu] & 0x80) != 0;
+
         public Screen GetScreen () {
             return Screen.FromHandle(_handle);
         }
@@ -54,18 +56,11 @@ namespace FrigoTab {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 ShowWindow(_handle, ShowWindowCommand.Restore);
             }
-
-            byte[] keyState = new byte[256];
-            GetKeyboardState(keyState);
-            bool altPressed = (keyState[(int) Keys.Menu] & 0x80) != 0;
-
-            if( !altPressed ) {
+            if( !AltPressed ) {
                 keybd_event((int) Keys.Menu, 0, (int) KeyEventF.ExtendedKey, 0);
             }
-
             SetForegroundWindow(_handle);
-
-            if( !altPressed ) {
+            if( !AltPressed ) {
                 keybd_event((int) Keys.Menu, 0, (int) (KeyEventF.ExtendedKey | KeyEventF.KeyUp), 0);
             }
         }
@@ -144,6 +139,14 @@ namespace FrigoTab {
         private delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
 
         private static readonly SendMessageDelegate _callback = Callback;
+
+        private static byte[] KeyboardState {
+            get {
+                byte[] keyState = new byte[256];
+                GetKeyboardState(keyState);
+                return keyState;
+            }
+        }
 
         private static void Callback (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult) {
             GCHandle handle = GCHandle.FromIntPtr(dwData);
