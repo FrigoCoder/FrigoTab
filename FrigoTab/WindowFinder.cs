@@ -40,10 +40,12 @@ namespace FrigoTab {
         private delegate bool EnumWindowsProc (IntPtr handle, IntPtr lParam);
 
         private static WindowType GetWindowType (WindowHandle handle) {
+            if( handle.GetClassName() == "SWT_Window0" && handle.GetWindowText() == "" ) {
+                return WindowType.Hidden;
+            }
             if( handle.GetWindowRect().IsEmpty ) {
                 return WindowType.Hidden;
             }
-
             if( Dwm.IsCloaked(handle) ) {
                 return WindowType.Hidden;
             }
