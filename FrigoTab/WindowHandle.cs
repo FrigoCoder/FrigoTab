@@ -103,6 +103,12 @@ namespace FrigoTab {
             PostMessage(_handle, msg, (IntPtr) wParam, (IntPtr) lParam);
         }
 
+        public string GetClassName () {
+            StringBuilder builder = new StringBuilder(256);
+            GetClassName(_handle, builder, builder.Capacity);
+            return builder.ToString();
+        }
+
         private enum ClassLong {
 
             Icon = -14
@@ -201,6 +207,9 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern bool GetWindowRect (IntPtr hWnd, out Rect lpRect);
+
+        [DllImport("user32.dll")]
+        private static extern int GetClassName (IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
     }
 
