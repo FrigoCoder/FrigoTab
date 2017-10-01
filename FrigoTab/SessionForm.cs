@@ -138,7 +138,9 @@ namespace FrigoTab {
             if( _applications.Selected == null ) {
                 return;
             }
+            _active = false;
             _applications.Selected.Application.SetForeground();
+            _active = true;
             EndSession();
         }
 
@@ -146,6 +148,7 @@ namespace FrigoTab {
             if( !_active ) {
                 return;
             }
+            MessageBox.Show("Resolution change!");
             EndSession();
             Bounds = GetScreenBounds();
             BeginSession();
