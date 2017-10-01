@@ -155,7 +155,7 @@ namespace FrigoTab {
 
         private static void ForceResolutionChange () {
             WindowHandle foreground = WindowHandle.GetForegroundWindowHandle();
-            foreground.SendMessage(WindowMessages.ActivateApp, 0, Thread.CurrentThread.ManagedThreadId);
+            foreground.PostMessage(WindowMessages.ActivateApp, 0, Thread.CurrentThread.ManagedThreadId);
         }
 
         private static Rectangle GetScreenBounds () {
