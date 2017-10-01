@@ -109,13 +109,6 @@ namespace FrigoTab {
             return builder.ToString();
         }
 
-        public void InsertAfter (WindowHandle window) {
-            SetWindowPosFlags flags = SetWindowPosFlags.NoSize | SetWindowPosFlags.NoMove | SetWindowPosFlags.NoRedraw |
-                SetWindowPosFlags.NoActivate | SetWindowPosFlags.NoCopyBits | SetWindowPosFlags.NoReposition |
-                SetWindowPosFlags.NoSendChanging | SetWindowPosFlags.DeferErase;
-            SetWindowPos(_handle, window, 0, 0, 0, 0, flags);
-        }
-
         private enum ClassLong {
 
             Icon = -14
@@ -146,27 +139,6 @@ namespace FrigoTab {
 
             ExtendedKey = 1,
             KeyUp = 2
-
-        }
-
-        [Flags]
-        private enum SetWindowPosFlags {
-
-            NoSize = 0x0001,
-            NoMove = 0x0002,
-            NoZOrder = 0x0004,
-            NoRedraw = 0x0008,
-            NoActivate = 0x0010,
-            DrawFrame = 0x0020,
-            FrameChanged = 0x0020,
-            ShowWindow = 0x0040,
-            HideWIndow = 0x0080,
-            NoCopyBits = 0x0100,
-            NoOwnerZOrder = 0x0200,
-            NoReposition = 0x0200,
-            NoSendChanging = 0x0400,
-            DeferErase = 0x2000,
-            AsyncWindowPos = 0x4000
 
         }
 
@@ -238,15 +210,6 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern int GetClassName (IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-
-        [DllImport("user32.dll")]
-        private static extern bool SetWindowPos (IntPtr hWnd,
-            IntPtr hWndInsertAfter,
-            int x,
-            int y,
-            int cx,
-            int cy,
-            SetWindowPosFlags uFlags);
 
     }
 
