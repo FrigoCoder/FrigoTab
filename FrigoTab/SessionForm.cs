@@ -148,7 +148,6 @@ namespace FrigoTab {
             if( !_active ) {
                 return;
             }
-            MessageBox.Show("Resolution change!");
             EndSession();
             Bounds = GetScreenBounds();
             BeginSession();
