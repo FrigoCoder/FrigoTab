@@ -138,7 +138,7 @@ namespace FrigoTab {
             if( _applications.Selected == null ) {
                 return;
             }
-            _applications.Selected.Application.InsertAfter(Handle);
+            _applications.Selected.Application.SetForeground();
             EndSession();
         }
 
