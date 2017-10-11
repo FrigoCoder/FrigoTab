@@ -46,8 +46,6 @@ namespace FrigoTab {
             _handle = handle;
         }
 
-        private bool AltPressed => (KeyboardState[(int) Keys.Menu] & 0x80) != 0;
-
         public Screen GetScreen () {
             return Screen.FromHandle(_handle);
         }
@@ -56,13 +54,9 @@ namespace FrigoTab {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 ShowWindow(_handle, ShowWindowCommand.Restore);
             }
-            if( !AltPressed ) {
-                keybd_event((int) Keys.Menu, 0, (int) KeyEventF.ExtendedKey, 0);
-            }
+            keybd_event((int) Keys.Menu, 0, (int) KeyEventF.ExtendedKey, 0);
+            keybd_event((int) Keys.Menu, 0, (int) (KeyEventF.ExtendedKey | KeyEventF.KeyUp), 0);
             SetForegroundWindow(_handle);
-            if( !AltPressed ) {
-                keybd_event((int) Keys.Menu, 0, (int) (KeyEventF.ExtendedKey | KeyEventF.KeyUp), 0);
-            }
         }
 
         public Rect GetWindowRect () {
