@@ -8,6 +8,14 @@ namespace FrigoTab {
 
     public class ScreenForms : IDisposable {
 
+        public bool Visible {
+            set {
+                foreach( ScreenForm form in _forms ) {
+                    form.Visible = value;
+                }
+            }
+        }
+
         private readonly IList<ScreenForm> _forms = new List<ScreenForm>();
 
         public ScreenForms (Form owner) {
@@ -18,14 +26,6 @@ namespace FrigoTab {
 
         ~ScreenForms () {
             Dispose();
-        }
-
-        public bool Visible {
-            set {
-                foreach( ScreenForm form in _forms ) {
-                    form.Visible = value;
-                }
-            }
         }
 
         public void Dispose () {

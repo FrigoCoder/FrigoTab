@@ -91,15 +91,8 @@ namespace FrigoTab {
         private static extern int ReleaseDC (IntPtr hwnd, IntPtr hdc);
 
         [DllImport("user32.dll")]
-        private static extern bool UpdateLayeredWindow (IntPtr hwnd,
-            IntPtr hdcDst,
-            ref Point pptDst,
-            ref Size psize,
-            IntPtr hdcSrc,
-            ref Point pptSrc,
-            int crKey,
-            ref BlendFunction pblend,
-            UpdateLayeredWindowFlags dwFlags);
+        private static extern bool UpdateLayeredWindow (IntPtr hwnd, IntPtr hdcDst, ref Point pptDst, ref Size psize, IntPtr hdcSrc, ref Point pptSrc,
+            int crKey, ref BlendFunction pblend, UpdateLayeredWindowFlags dwFlags);
 
     }
 

@@ -19,13 +19,13 @@ namespace FrigoTab {
 
     public class KeyHook : IDisposable {
 
+        public event Action<KeyHookEventArgs> KeyEvent;
+
         [SuppressMessage("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
         private readonly LowLevelKeyProc _hookProc;
 
         private readonly IntPtr _hookId;
         private bool _disposed;
-
-        public event Action<KeyHookEventArgs> KeyEvent;
 
         public KeyHook () {
             _hookProc = HookProc;
@@ -101,10 +101,7 @@ namespace FrigoTab {
         private static extern bool UnhookWindowsHookEx (IntPtr hhk);
 
         [DllImport("user32.dll")]
-        private static extern IntPtr CallNextHookEx (IntPtr hhk,
-            int nCode,
-            IntPtr wParam,
-            ref LowLevelKeyStruct lParam);
+        private static extern IntPtr CallNextHookEx (IntPtr hhk, int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam);
 
     }
 
