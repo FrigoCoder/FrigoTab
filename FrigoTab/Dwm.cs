@@ -18,7 +18,8 @@ namespace FrigoTab {
 
         }
 
-        [Flags, SuppressMessage("ReSharper", "UnusedMember.Local")]
+        [Flags]
+        [SuppressMessage("ReSharper", "UnusedMember.Local")]
         public enum ThumbnailFlags {
 
             RectDestination = 1,
@@ -61,16 +62,10 @@ namespace FrigoTab {
         public static extern int DwmQueryThumbnailSourceSize (IntPtr thumb, out Size pSize);
 
         [DllImport("dwmapi.dll")]
-        public static extern int DwmGetWindowAttribute (IntPtr hWnd,
-            WindowAttribute dwAttribute,
-            out bool pvAttribute,
-            int cbAttribute);
+        public static extern int DwmGetWindowAttribute (IntPtr hWnd, WindowAttribute dwAttribute, out bool pvAttribute, int cbAttribute);
 
         [DllImport("dwmapi.dll")]
-        public static extern int DwmGetWindowAttribute (IntPtr hWnd,
-            WindowAttribute dwAttribute,
-            out Rect pvAttribute,
-            int cbAttribute);
+        public static extern int DwmGetWindowAttribute (IntPtr hWnd, WindowAttribute dwAttribute, out Rect pvAttribute, int cbAttribute);
 
     }
 

@@ -21,13 +21,13 @@ namespace FrigoTab {
 
     public class MouseHook : IDisposable {
 
+        public event Action<MouseHookEventArgs> MouseEvent;
+
         [SuppressMessage("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
         private readonly LowLevelMouseProc _hookProc;
 
         private readonly IntPtr _hookId;
         private bool _disposed;
-
-        public event Action<MouseHookEventArgs> MouseEvent;
 
         public MouseHook () {
             _hookProc = HookProc;
@@ -61,12 +61,7 @@ namespace FrigoTab {
                 return;
             }
             Point point = lParam.Point;
-            WindowMessages[] clickMessages = {
-                WindowMessages.LeftDown,
-                WindowMessages.LeftUp,
-                WindowMessages.RightDown,
-                WindowMessages.RightUp
-            };
+            WindowMessages[] clickMessages = {WindowMessages.LeftDown, WindowMessages.LeftUp, WindowMessages.RightDown, WindowMessages.RightUp};
             bool click = clickMessages.Contains(wParam);
             MouseHookEventArgs e = new MouseHookEventArgs(point, click);
             MouseEvent?.Invoke(e);
@@ -94,10 +89,7 @@ namespace FrigoTab {
         private static extern bool UnhookWindowsHookEx (IntPtr hhk);
 
         [DllImport("user32.dll")]
-        private static extern IntPtr CallNextHookEx (IntPtr hhk,
-            int nCode,
-            IntPtr wParam,
-            ref LowLevelMouseStruct lParam);
+        private static extern IntPtr CallNextHookEx (IntPtr hhk, int nCode, IntPtr wParam, ref LowLevelMouseStruct lParam);
 
     }
 
