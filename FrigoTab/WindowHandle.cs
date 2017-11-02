@@ -54,8 +54,7 @@ namespace FrigoTab {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 ShowWindow(_handle, ShowWindowCommand.Restore);
             }
-            keybd_event((int) Keys.Menu, 0, (int) KeyEventF.ExtendedKey, 0);
-            keybd_event((int) Keys.Menu, 0, (int) (KeyEventF.ExtendedKey | KeyEventF.KeyUp), 0);
+            keybd_event(0, 0, 0, 0);
             SetForegroundWindow(_handle);
         }
 
@@ -128,25 +127,9 @@ namespace FrigoTab {
 
         }
 
-        [Flags]
-        private enum KeyEventF {
-
-            ExtendedKey = 1,
-            KeyUp = 2
-
-        }
-
         private delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
 
         private static readonly SendMessageDelegate _callback = Callback;
-
-        private static byte[] KeyboardState {
-            get {
-                byte[] keyState = new byte[256];
-                GetKeyboardState(keyState);
-                return keyState;
-            }
-        }
 
         private static void Callback (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult) {
             GCHandle handle = GCHandle.FromIntPtr(dwData);
@@ -177,15 +160,8 @@ namespace FrigoTab {
         private static extern IntPtr GetClassLongPtr (IntPtr hWnd, ClassLong nIndex);
 
         [DllImport("user32.dll")]
-        private static extern bool SendMessageCallback (IntPtr hWnd,
-            WindowMessages message,
-            GetIconSize wParam,
-            IntPtr lParam,
-            SendMessageDelegate lpCallBack,
-            IntPtr dwData);
-
-        [DllImport("user32.dll")]
-        private static extern bool GetKeyboardState (byte[] lpKeyState);
+        private static extern bool SendMessageCallback (IntPtr hWnd, WindowMessages message, GetIconSize wParam, IntPtr lParam,
+            SendMessageDelegate lpCallBack, IntPtr dwData);
 
         [DllImport("user32.dll")]
         private static extern void keybd_event (byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
