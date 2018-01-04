@@ -22,17 +22,6 @@ namespace FrigoTab {
                 e.Handled = true;
                 Handle.PostMessage(WindowMessages.BeginSession, 0, 0);
             }
-            if( !active ) {
-                return;
-            }
-            if( e.Key == Keys.Escape || e.Key == (Keys.Alt | Keys.F4) ) {
-                e.Handled = true;
-                Handle.PostMessage(WindowMessages.EndSession, 0, 0);
-            }
-            if( Keys.D1 <= e.Key && e.Key <= Keys.D9 || Keys.NumPad1 <= e.Key && e.Key <= Keys.NumPad9 ) {
-                e.Handled = true;
-                Handle.PostMessage(WindowMessages.KeyPressed, (int) e.Key, 0);
-            }
         }
 
         public void HandleMouseEvents (MouseHookEventArgs e) {
@@ -59,7 +48,10 @@ namespace FrigoTab {
                 case WindowMessages.EndSession:
                     EndSession();
                     break;
-                case WindowMessages.KeyPressed:
+                case WindowMessages.KeyDown:
+                case WindowMessages.KeyUp:
+                case WindowMessages.SysKeyDown:
+                case WindowMessages.SysKeyUp:
                     KeyPressed((Keys) m.WParam);
                     break;
                 case WindowMessages.MouseMoved:
@@ -117,8 +109,10 @@ namespace FrigoTab {
         }
 
         private void KeyPressed (Keys key) {
-            applications.SelectByIndex((char) key - '1');
-            ActivateEndSession();
+            if( Keys.D1 <= key && key <= Keys.D9 || Keys.NumPad1 <= key && key <= Keys.NumPad9 ) {
+                applications.SelectByIndex((char) key - '1');
+                ActivateEndSession();
+            }
         }
 
         private void MouseMoved (Point point) {
