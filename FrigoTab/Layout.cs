@@ -15,35 +15,35 @@ namespace FrigoTab {
             }
         }
 
-        private readonly Screen _screen;
-        private readonly IList<ApplicationWindow> _windows;
+        private readonly Screen screen;
+        private readonly IList<ApplicationWindow> windows;
 
-        private readonly int _columns;
-        private readonly int _rows;
+        private readonly int columns;
+        private readonly int rows;
 
         private Layout (Screen screen, IList<ApplicationWindow> windows) {
-            _screen = screen;
-            _windows = windows;
+            this.screen = screen;
+            this.windows = windows;
             if( windows.Count == 0 ) {
                 return;
             }
-            _columns = (int) Math.Ceiling(Math.Sqrt(windows.Count));
-            _rows = (int) Math.Ceiling((double) windows.Count / _columns);
+            columns = (int) Math.Ceiling(Math.Sqrt(windows.Count));
+            rows = (int) Math.Ceiling((double) windows.Count / columns);
         }
 
         private void LayoutScreen () {
-            for( int i = 0; i < _windows.Count; i++ ) {
-                float xMargin = _screen.Bounds.Width * 0.005f;
-                float yMargin = _screen.Bounds.Height * 0.005f;
-                RectangleF cell = GetCellBounds(i % _columns, i / _columns, xMargin, yMargin);
-                RectangleF bounds = CenterWithin(_windows[i].GetSourceSize(), cell);
-                bounds.Offset(_screen.WorkingArea.Location);
-                _windows[i].Bounds = Rectangle.Round(bounds);
+            for( int i = 0; i < windows.Count; i++ ) {
+                float xMargin = screen.Bounds.Width * 0.005f;
+                float yMargin = screen.Bounds.Height * 0.005f;
+                RectangleF cell = GetCellBounds(i % columns, i / columns, xMargin, yMargin);
+                RectangleF bounds = CenterWithin(windows[i].GetSourceSize(), cell);
+                bounds.Offset(screen.WorkingArea.Location);
+                windows[i].Bounds = Rectangle.Round(bounds);
             }
         }
 
         private RectangleF GetCellBounds (int column, int row, float xMargin, float yMargin) {
-            SizeF size = new SizeF((float) _screen.WorkingArea.Width / _columns, (float) _screen.WorkingArea.Height / _rows);
+            SizeF size = new SizeF((float) screen.WorkingArea.Width / columns, (float) screen.WorkingArea.Height / rows);
             PointF location = new PointF(column * size.Width + xMargin, row * size.Height + yMargin);
             return new RectangleF(location, new SizeF(size.Width - 2 * xMargin, size.Height - 2 * yMargin));
         }

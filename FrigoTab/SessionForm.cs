@@ -7,10 +7,10 @@ namespace FrigoTab {
 
     public class SessionForm : FrigoForm {
 
-        private BackgroundWindows _backgrounds;
-        private ScreenForms _screenForms;
-        private ApplicationWindows _applications;
-        private bool _active;
+        private BackgroundWindows backgrounds;
+        private ScreenForms screenForms;
+        private ApplicationWindows applications;
+        private bool active;
 
         public SessionForm () {
             Bounds = GetScreenBounds();
@@ -22,7 +22,7 @@ namespace FrigoTab {
                 e.Handled = true;
                 Handle.PostMessage(WindowMessages.BeginSession, 0, 0);
             }
-            if( !_active ) {
+            if( !active ) {
                 return;
             }
             if( e.Key == Keys.Escape || e.Key == (Keys.Alt | Keys.F4) ) {
@@ -36,7 +36,7 @@ namespace FrigoTab {
         }
 
         public void HandleMouseEvents (MouseHookEventArgs e) {
-            if( !_active ) {
+            if( !active ) {
                 return;
             }
             Handle.PostMessage(WindowMessages.MouseMoved, e.Point.X, e.Point.Y);
@@ -76,7 +76,7 @@ namespace FrigoTab {
         }
 
         private void BeginSession () {
-            if( _active ) {
+            if( active ) {
                 return;
             }
 
@@ -87,47 +87,47 @@ namespace FrigoTab {
 
             ForceResolutionChange();
 
-            _backgrounds = new BackgroundWindows(this, finder);
-            _screenForms = new ScreenForms(this);
-            _applications = new ApplicationWindows(this, finder);
+            backgrounds = new BackgroundWindows(this, finder);
+            screenForms = new ScreenForms(this);
+            applications = new ApplicationWindows(this, finder);
 
-            _applications.SelectByIndex(0);
+            applications.SelectByIndex(0);
 
             Visible = true;
-            _screenForms.Visible = true;
-            _applications.Visible = true;
+            screenForms.Visible = true;
+            applications.Visible = true;
             Handle.SetForeground();
 
-            _active = true;
+            active = true;
         }
 
         private void EndSession () {
-            if( !_active ) {
+            if( !active ) {
                 return;
             }
-            _active = false;
+            active = false;
 
-            _applications.Visible = false;
-            _screenForms.Visible = false;
+            applications.Visible = false;
+            screenForms.Visible = false;
             Visible = false;
 
-            _applications.Dispose();
-            _screenForms.Dispose();
-            _backgrounds.Dispose();
+            applications.Dispose();
+            screenForms.Dispose();
+            backgrounds.Dispose();
         }
 
         private void KeyPressed (Keys key) {
-            _applications.SelectByIndex((char) key - '1');
+            applications.SelectByIndex((char) key - '1');
             ActivateEndSession();
         }
 
         private void MouseMoved (Point point) {
-            _applications.SelectByPoint(point);
+            applications.SelectByPoint(point);
         }
 
         private void MouseClicked (Point point) {
-            _applications.SelectByPoint(point);
-            if( _screenForms.IsOnAToolBar(point) ) {
+            applications.SelectByPoint(point);
+            if( screenForms.IsOnAToolBar(point) ) {
                 EndSession();
             } else {
                 ActivateEndSession();
@@ -135,17 +135,17 @@ namespace FrigoTab {
         }
 
         private void ActivateEndSession () {
-            if( _applications.Selected == null ) {
+            if( applications.Selected == null ) {
                 return;
             }
-            _active = false;
-            _applications.Selected.Application.SetForeground();
-            _active = true;
+            active = false;
+            applications.Selected.Application.SetForeground();
+            active = true;
             EndSession();
         }
 
         private void DisplayChange () {
-            if( !_active ) {
+            if( !active ) {
                 return;
             }
             EndSession();

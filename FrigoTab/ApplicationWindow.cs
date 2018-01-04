@@ -14,31 +14,31 @@ namespace FrigoTab {
             get => base.Bounds;
             set {
                 base.Bounds = value;
-                _thumbnail.SetDestinationRect(new Rect(value).ScreenToClient(Owner.Handle));
+                thumbnail.SetDestinationRect(new Rect(value).ScreenToClient(Owner.Handle));
                 RenderOverlay();
             }
         }
 
         public bool Selected {
-            private get => _selected;
+            private get => selected;
             set {
-                if( _selected == value ) {
+                if( selected == value ) {
                     return;
                 }
-                _selected = value;
+                selected = value;
                 RenderOverlay();
             }
         }
 
-        private readonly int _index;
-        private readonly Thumbnail _thumbnail;
-        private Icon _appIcon;
-        private bool _selected;
+        private readonly int index;
+        private readonly Thumbnail thumbnail;
+        private Icon appIcon;
+        private bool selected;
 
         private Icon AppIcon {
-            get => _appIcon;
+            get => appIcon;
             set {
-                _appIcon = value;
+                appIcon = value;
                 RenderOverlay();
             }
         }
@@ -47,16 +47,16 @@ namespace FrigoTab {
             Owner = owner;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             Application = application;
-            _index = index;
-            _thumbnail = new Thumbnail(application, owner.Handle);
-            _appIcon = Application.IconFromGetClassLongPtr() ?? Program.Icon;
+            this.index = index;
+            thumbnail = new Thumbnail(application, owner.Handle);
+            appIcon = Application.IconFromGetClassLongPtr() ?? Program.Icon;
             Application.RegisterIconCallback(icon => AppIcon = icon);
         }
 
-        public Size GetSourceSize () => _thumbnail.GetSourceSize();
+        public Size GetSourceSize () => thumbnail.GetSourceSize();
 
         protected override void Dispose (bool disposing) {
-            _thumbnail.Dispose();
+            thumbnail.Dispose();
             base.Dispose(disposing);
         }
 
@@ -79,7 +79,7 @@ namespace FrigoTab {
         }
 
         private void RenderTitle (Graphics graphics) {
-            const int pad = 8;
+            const int Pad = 8;
 
             Icon icon = AppIcon;
             string text = Application.GetWindowText();
@@ -87,27 +87,27 @@ namespace FrigoTab {
             Font font = new Font("Segoe UI", 11f);
             SizeF textSize = graphics.MeasureString(text, font);
 
-            float width = pad + icon.Width + pad + textSize.Width + pad;
-            float height = pad + Math.Max(icon.Height, textSize.Height) + pad;
+            float width = Pad + icon.Width + Pad + textSize.Width + Pad;
+            float height = Pad + Math.Max(icon.Height, textSize.Height) + Pad;
 
             RectangleF background = new RectangleF(graphics.VisibleClipBounds.Location, new SizeF(width, height));
             FillRectangle(graphics, background, Color.Black);
 
             {
-                float x = background.X + pad;
+                float x = background.X + Pad;
                 float y = Center(icon.Size, background).Y;
                 graphics.DrawIcon(icon, (int) x, (int) y);
             }
 
             using( Brush brush = new SolidBrush(Color.White) ) {
-                float x = background.X + pad + icon.Width + pad;
+                float x = background.X + Pad + icon.Width + Pad;
                 float y = Center(textSize, background).Y;
                 graphics.DrawString(text, font, brush, x, y);
             }
         }
 
         private void RenderNumber (Graphics graphics) {
-            string text = (_index + 1).ToString();
+            string text = (index + 1).ToString();
 
             Font font = new Font("Segoe UI", 72f, FontStyle.Bold);
             SizeF textSize = graphics.MeasureString(text, font);

@@ -7,11 +7,11 @@ namespace FrigoTab {
 
     public class BackgroundWindows : IDisposable {
 
-        private readonly IList<BackgroundWindow> _backgrounds = new List<BackgroundWindow>();
+        private readonly IList<BackgroundWindow> backgrounds = new List<BackgroundWindow>();
 
         public BackgroundWindows (Form owner, WindowFinder finder) {
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
-                _backgrounds.Add(new BackgroundWindow(owner, window));
+                backgrounds.Add(new BackgroundWindow(owner, window));
             }
         }
 
@@ -20,10 +20,10 @@ namespace FrigoTab {
         }
 
         public void Dispose () {
-            foreach( BackgroundWindow window in _backgrounds ) {
+            foreach( BackgroundWindow window in backgrounds ) {
                 window.Dispose();
             }
-            _backgrounds.Clear();
+            backgrounds.Clear();
         }
 
     }
