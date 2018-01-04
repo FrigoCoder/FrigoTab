@@ -28,17 +28,11 @@ namespace FrigoTab {
 
     public class WindowHandle {
 
-        public static WindowHandle GetForegroundWindowHandle () {
-            return GetForegroundWindow();
-        }
+        public static WindowHandle GetForegroundWindowHandle () => GetForegroundWindow();
 
-        public static implicit operator WindowHandle (IntPtr handle) {
-            return new WindowHandle(handle);
-        }
+        public static implicit operator WindowHandle (IntPtr handle) => new WindowHandle(handle);
 
-        public static implicit operator IntPtr (WindowHandle handle) {
-            return handle._handle;
-        }
+        public static implicit operator IntPtr (WindowHandle handle) => handle._handle;
 
         private readonly IntPtr _handle;
 
@@ -46,9 +40,7 @@ namespace FrigoTab {
             _handle = handle;
         }
 
-        public Screen GetScreen () {
-            return Screen.FromHandle(_handle);
-        }
+        public Screen GetScreen () => Screen.FromHandle(_handle);
 
         public void SetForeground () {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
@@ -70,13 +62,9 @@ namespace FrigoTab {
             return text.ToString();
         }
 
-        public WindowStyles GetWindowStyles () {
-            return (WindowStyles) GetWindowLongPtr(_handle, WindowLong.Style);
-        }
+        public WindowStyles GetWindowStyles () => (WindowStyles) GetWindowLongPtr(_handle, WindowLong.Style);
 
-        public WindowExStyles GetWindowExStyles () {
-            return (WindowExStyles) GetWindowLongPtr(_handle, WindowLong.ExStyle);
-        }
+        public WindowExStyles GetWindowExStyles () => (WindowExStyles) GetWindowLongPtr(_handle, WindowLong.ExStyle);
 
         public Icon IconFromGetClassLongPtr () {
             IntPtr icon = GetClassLongPtr(_handle, ClassLong.Icon);

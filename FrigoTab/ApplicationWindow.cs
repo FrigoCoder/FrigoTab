@@ -53,9 +53,7 @@ namespace FrigoTab {
             Application.RegisterIconCallback(icon => AppIcon = icon);
         }
 
-        public Size GetSourceSize () {
-            return _thumbnail.GetSourceSize();
-        }
+        public Size GetSourceSize () => _thumbnail.GetSourceSize();
 
         protected override void Dispose (bool disposing) {
             _thumbnail.Dispose();
