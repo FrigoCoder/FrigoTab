@@ -1,6 +1,4 @@
-syntax:glob
 .*
 bin
 obj
 packages
-*.user

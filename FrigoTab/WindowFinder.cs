@@ -40,13 +40,13 @@ namespace FrigoTab {
         private delegate bool EnumWindowsProc (IntPtr handle, IntPtr lParam);
 
         private static WindowType GetWindowType (WindowHandle handle) {
-            if( handle.GetClassName() == "SWT_Window0" && handle.GetWindowText() == "" ) {
-                return WindowType.Hidden;
-            }
             if( handle.GetWindowRect().IsEmpty ) {
                 return WindowType.Hidden;
             }
             if( Dwm.IsCloaked(handle) ) {
+                return WindowType.Hidden;
+            }
+            if( !IsAltTabWindow(handle) ) {
                 return WindowType.Hidden;
             }
 
@@ -72,8 +72,30 @@ namespace FrigoTab {
             return WindowType.AppWindow;
         }
 
+        private static bool IsAltTabWindow (IntPtr hwnd) {
+            IntPtr hwndWalk = IntPtr.Zero;
+            IntPtr hwndTry = GetAncestor(hwnd, 3);
+            while( hwndTry != hwndWalk ) {
+                hwndWalk = hwndTry;
+                hwndTry = GetLastActivePopup(hwndWalk);
+                if( IsWindowVisible(hwndTry) ) {
+                    break;
+                }
+            }
+            return hwndWalk == hwnd;
+        }
+
         [DllImport("user32.dll")]
         private static extern bool EnumWindows (EnumWindowsProc enumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetAncestor (IntPtr hWnd, int gaFlags);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetLastActivePopup (IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible (IntPtr hWnd);
 
     }
 
