@@ -38,14 +38,12 @@ namespace FrigoTab {
         }
 
         public static bool IsCloaked (WindowHandle window) {
-            bool cloaked;
-            DwmGetWindowAttribute(window, WindowAttribute.Cloaked, out cloaked, Marshal.SizeOf(typeof(bool)));
+            DwmGetWindowAttribute(window, WindowAttribute.Cloaked, out bool cloaked, Marshal.SizeOf(typeof(bool)));
             return cloaked;
         }
 
         public static Rect GetExtendedFrameBounds (WindowHandle window) {
-            Rect rect;
-            DwmGetWindowAttribute(window, WindowAttribute.ExtendedFrameBounds, out rect, Marshal.SizeOf(typeof(Rect)));
+            DwmGetWindowAttribute(window, WindowAttribute.ExtendedFrameBounds, out Rect rect, Marshal.SizeOf(typeof(Rect)));
             return rect;
         }
 

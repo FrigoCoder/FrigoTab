@@ -25,8 +25,7 @@ namespace FrigoTab {
         }
 
         public Size GetSourceSize () {
-            Size size;
-            Dwm.DwmQueryThumbnailSourceSize(thumbnail, out size);
+            Dwm.DwmQueryThumbnailSourceSize(thumbnail, out Size size);
             return size;
         }
 

@@ -51,8 +51,7 @@ namespace FrigoTab {
         }
 
         public Rect GetWindowRect () {
-            Rect rect;
-            GetWindowRect(handle, out rect);
+            GetWindowRect(handle, out Rect rect);
             return rect;
         }
 
