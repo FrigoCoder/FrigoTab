@@ -145,12 +145,14 @@ namespace FrigoTab {
         }
 
         private void DisplayChange () {
-            if( !active ) {
-                return;
+            bool preserve = active;
+            if( preserve ) {
+                EndSession();
             }
-            EndSession();
             Bounds = GetScreenBounds();
-            BeginSession();
+            if( preserve ) {
+                BeginSession();
+            }
         }
 
         private static void ForceResolutionChange () {
