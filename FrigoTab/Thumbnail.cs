@@ -5,10 +5,10 @@ namespace FrigoTab {
 
     public class Thumbnail : IDisposable {
 
-        private IntPtr _thumbnail;
+        private IntPtr thumbnail;
 
         public Thumbnail (WindowHandle source, WindowHandle destination) {
-            Dwm.DwmRegisterThumbnail(destination, source, out _thumbnail);
+            Dwm.DwmRegisterThumbnail(destination, source, out thumbnail);
         }
 
         ~Thumbnail () {
@@ -16,17 +16,17 @@ namespace FrigoTab {
         }
 
         public void Dispose () {
-            if( _thumbnail == IntPtr.Zero ) {
+            if( thumbnail == IntPtr.Zero ) {
                 return;
             }
-            Dwm.DwmUnregisterThumbnail(_thumbnail);
-            _thumbnail = IntPtr.Zero;
+            Dwm.DwmUnregisterThumbnail(thumbnail);
+            thumbnail = IntPtr.Zero;
             GC.SuppressFinalize(this);
         }
 
         public Size GetSourceSize () {
             Size size;
-            Dwm.DwmQueryThumbnailSourceSize(_thumbnail, out size);
+            Dwm.DwmQueryThumbnailSourceSize(thumbnail, out size);
             return size;
         }
 
@@ -35,7 +35,7 @@ namespace FrigoTab {
                 Flags = Dwm.ThumbnailFlags.RectSource,
                 Source = sourceRect
             };
-            Dwm.DwmUpdateThumbnailProperties(_thumbnail, ref properties);
+            Dwm.DwmUpdateThumbnailProperties(thumbnail, ref properties);
         }
 
         public void SetDestinationRect (Rect destinationRect) {
@@ -43,7 +43,7 @@ namespace FrigoTab {
                 Flags = Dwm.ThumbnailFlags.RectDestination,
                 Destination = destinationRect
             };
-            Dwm.DwmUpdateThumbnailProperties(_thumbnail, ref properties);
+            Dwm.DwmUpdateThumbnailProperties(thumbnail, ref properties);
         }
 
     }

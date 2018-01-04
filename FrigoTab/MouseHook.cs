@@ -24,16 +24,16 @@ namespace FrigoTab {
         public event Action<MouseHookEventArgs> MouseEvent;
 
         [SuppressMessage("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
-        private readonly LowLevelMouseProc _hookProc;
+        private readonly LowLevelMouseProc hookProc;
 
-        private readonly IntPtr _hookId;
-        private bool _disposed;
+        private readonly IntPtr hookId;
+        private bool disposed;
 
         public MouseHook () {
-            _hookProc = HookProc;
+            hookProc = HookProc;
             using( Process curProcess = Process.GetCurrentProcess() ) {
                 using( ProcessModule curModule = curProcess.MainModule ) {
-                    _hookId = SetWindowsHookEx(14, _hookProc, GetModuleHandle(curModule.ModuleName), 0);
+                    hookId = SetWindowsHookEx(14, hookProc, GetModuleHandle(curModule.ModuleName), 0);
                 }
             }
         }
@@ -43,17 +43,17 @@ namespace FrigoTab {
         }
 
         public void Dispose () {
-            if( _disposed ) {
+            if( disposed ) {
                 return;
             }
-            UnhookWindowsHookEx(_hookId);
-            _disposed = true;
+            UnhookWindowsHookEx(hookId);
+            disposed = true;
             GC.SuppressFinalize(this);
         }
 
         private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelMouseStruct lParam) {
             HookProcInner(nCode, (WindowMessages) wParam, ref lParam);
-            return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
+            return CallNextHookEx(hookId, nCode, wParam, ref lParam);
         }
 
         private void HookProcInner (int nCode, WindowMessages wParam, ref LowLevelMouseStruct lParam) {

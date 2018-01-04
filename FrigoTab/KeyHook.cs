@@ -22,16 +22,16 @@ namespace FrigoTab {
         public event Action<KeyHookEventArgs> KeyEvent;
 
         [SuppressMessage("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
-        private readonly LowLevelKeyProc _hookProc;
+        private readonly LowLevelKeyProc hookProc;
 
-        private readonly IntPtr _hookId;
-        private bool _disposed;
+        private readonly IntPtr hookId;
+        private bool disposed;
 
         public KeyHook () {
-            _hookProc = HookProc;
+            hookProc = HookProc;
             using( Process curProcess = Process.GetCurrentProcess() ) {
                 using( ProcessModule curModule = curProcess.MainModule ) {
-                    _hookId = SetWindowsHookEx(13, _hookProc, GetModuleHandle(curModule.ModuleName), 0);
+                    hookId = SetWindowsHookEx(13, hookProc, GetModuleHandle(curModule.ModuleName), 0);
                 }
             }
         }
@@ -41,11 +41,11 @@ namespace FrigoTab {
         }
 
         public void Dispose () {
-            if( _disposed ) {
+            if( disposed ) {
                 return;
             }
-            UnhookWindowsHookEx(_hookId);
-            _disposed = true;
+            UnhookWindowsHookEx(hookId);
+            disposed = true;
             GC.SuppressFinalize(this);
         }
 
@@ -53,9 +53,10 @@ namespace FrigoTab {
             if( HookProcInner(nCode, (WindowMessages) wParam, ref lParam) ) {
                 return (IntPtr) 1;
             }
-            return CallNextHookEx(_hookId, nCode, wParam, ref lParam);
+            return CallNextHookEx(hookId, nCode, wParam, ref lParam);
         }
 
+        [SuppressMessage("ReSharper", "UnusedParameter.Local")]
         private bool HookProcInner (int nCode, WindowMessages wParam, ref LowLevelKeyStruct lParam) {
             if( nCode < 0 ) {
                 return false;

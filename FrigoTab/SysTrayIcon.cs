@@ -7,10 +7,10 @@ namespace FrigoTab {
 
         public event Action Exit;
 
-        private readonly NotifyIcon _notifyIcon;
+        private readonly NotifyIcon notifyIcon;
 
         public SysTrayIcon () {
-            _notifyIcon = new NotifyIcon {
+            notifyIcon = new NotifyIcon {
                 Icon = Program.Icon,
                 ContextMenu = new ContextMenu(new[] {new MenuItem("Exit", (sender, args) => { Exit?.Invoke(); })}),
                 Visible = true
@@ -18,7 +18,7 @@ namespace FrigoTab {
         }
 
         public void Dispose () {
-            _notifyIcon.Dispose();
+            notifyIcon.Dispose();
         }
 
     }

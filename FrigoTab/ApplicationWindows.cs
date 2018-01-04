@@ -9,37 +9,37 @@ namespace FrigoTab {
     public class ApplicationWindows : IDisposable {
 
         public ApplicationWindow Selected {
-            get => _selected;
+            get => selected;
             private set {
-                if( _selected == value ) {
+                if( selected == value ) {
                     return;
                 }
-                if( _selected != null ) {
-                    _selected.Selected = false;
+                if( selected != null ) {
+                    selected.Selected = false;
                 }
-                _selected = value;
-                if( _selected != null ) {
-                    _selected.Selected = true;
+                selected = value;
+                if( selected != null ) {
+                    selected.Selected = true;
                 }
             }
         }
 
         public bool Visible {
             set {
-                foreach( ApplicationWindow window in _windows ) {
+                foreach( ApplicationWindow window in windows ) {
                     window.Visible = value;
                 }
             }
         }
 
-        private readonly IList<ApplicationWindow> _windows = new List<ApplicationWindow>();
-        private ApplicationWindow _selected;
+        private readonly IList<ApplicationWindow> windows = new List<ApplicationWindow>();
+        private ApplicationWindow selected;
 
         public ApplicationWindows (Form owner, WindowFinder finder) {
             foreach( WindowHandle window in finder.Windows ) {
-                _windows.Add(new ApplicationWindow(owner, window, _windows.Count));
+                windows.Add(new ApplicationWindow(owner, window, windows.Count));
             }
-            Layout.LayoutWindows(_windows);
+            Layout.LayoutWindows(windows);
         }
 
         ~ApplicationWindows () {
@@ -47,18 +47,18 @@ namespace FrigoTab {
         }
 
         public void Dispose () {
-            foreach( ApplicationWindow window in _windows ) {
+            foreach( ApplicationWindow window in windows ) {
                 window.Close();
             }
-            _windows.Clear();
+            windows.Clear();
         }
 
         public void SelectByIndex (int index) {
-            Selected = index >= 0 && index < _windows.Count ? _windows[index] : null;
+            Selected = index >= 0 && index < windows.Count ? windows[index] : null;
         }
 
         public void SelectByPoint (Point point) {
-            Selected = _windows.FirstOrDefault(window => window.Bounds.Contains(point));
+            Selected = windows.FirstOrDefault(window => window.Bounds.Contains(point));
         }
 
     }

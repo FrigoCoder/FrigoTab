@@ -5,13 +5,13 @@ namespace FrigoTab {
 
     public class BackgroundWindow : IDisposable {
 
-        private readonly Thumbnail _thumbnail;
-        private bool _disposed;
+        private readonly Thumbnail thumbnail;
+        private bool disposed;
 
         public BackgroundWindow (Form owner, WindowHandle window) {
-            _thumbnail = new Thumbnail(window, owner.Handle);
-            _thumbnail.SetSourceRect(Dwm.GetExtendedFrameBounds(window).ScreenToClient(window));
-            _thumbnail.SetDestinationRect(Dwm.GetExtendedFrameBounds(window).ScreenToClient(owner.Handle));
+            thumbnail = new Thumbnail(window, owner.Handle);
+            thumbnail.SetSourceRect(Dwm.GetExtendedFrameBounds(window).ScreenToClient(window));
+            thumbnail.SetDestinationRect(Dwm.GetExtendedFrameBounds(window).ScreenToClient(owner.Handle));
         }
 
         ~BackgroundWindow () {
@@ -19,11 +19,11 @@ namespace FrigoTab {
         }
 
         public void Dispose () {
-            if( _disposed ) {
+            if( disposed ) {
                 return;
             }
-            _thumbnail.Dispose();
-            _disposed = true;
+            thumbnail.Dispose();
+            disposed = true;
             GC.SuppressFinalize(this);
         }
 

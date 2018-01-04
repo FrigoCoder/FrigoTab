@@ -8,24 +8,24 @@ namespace FrigoTab {
     [SuppressMessage("ReSharper", "NotAccessedField.Local")]
     public struct Rect {
 
-        public bool IsEmpty => _topLeft.X >= _bottomRight.X || _topLeft.Y >= _bottomRight.Y;
+        public bool IsEmpty => topLeft.X >= bottomRight.X || topLeft.Y >= bottomRight.Y;
 
-        private readonly Point _topLeft;
-        private readonly Point _bottomRight;
+        private readonly Point topLeft;
+        private readonly Point bottomRight;
 
         public Rect (Rectangle bounds) {
-            _topLeft = bounds.Location;
-            _bottomRight = new Point(bounds.X + bounds.Width, bounds.Y + bounds.Height);
+            topLeft = bounds.Location;
+            bottomRight = new Point(bounds.X + bounds.Width, bounds.Y + bounds.Height);
         }
 
         private Rect (Point topLeft, Point bottomRight) {
-            _topLeft = topLeft;
-            _bottomRight = bottomRight;
+            this.topLeft = topLeft;
+            this.bottomRight = bottomRight;
         }
 
         public Rect ScreenToClient (WindowHandle window) {
-            Point topLeft = _topLeft;
-            Point bottomRight = _bottomRight;
+            Point topLeft = this.topLeft;
+            Point bottomRight = this.bottomRight;
             ScreenToClient(window, ref topLeft);
             ScreenToClient(window, ref bottomRight);
             return new Rect(topLeft, bottomRight);
