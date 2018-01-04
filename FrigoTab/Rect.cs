@@ -1,7 +1,5 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
-using System.Runtime.InteropServices;
 
 namespace FrigoTab {
 
@@ -23,16 +21,7 @@ namespace FrigoTab {
             this.bottomRight = bottomRight;
         }
 
-        public Rect ScreenToClient (WindowHandle window) {
-            Point topleft = topLeft;
-            Point bottomright = bottomRight;
-            ScreenToClient(window, ref topleft);
-            ScreenToClient(window, ref bottomright);
-            return new Rect(topleft, bottomright);
-        }
-
-        [DllImport("user32.dll")]
-        private static extern bool ScreenToClient (IntPtr hWnd, ref Point lpPoint);
+        public Rect ScreenToClient (WindowHandle window) => new Rect(topLeft.ScreenToClient(window), bottomRight.ScreenToClient(window));
 
     }
 
