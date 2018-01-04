@@ -24,11 +24,11 @@ namespace FrigoTab {
         }
 
         public Rect ScreenToClient (WindowHandle window) {
-            Point topLeft = this.topLeft;
-            Point bottomRight = this.bottomRight;
-            ScreenToClient(window, ref topLeft);
-            ScreenToClient(window, ref bottomRight);
-            return new Rect(topLeft, bottomRight);
+            Point topleft = topLeft;
+            Point bottomright = bottomRight;
+            ScreenToClient(window, ref topleft);
+            ScreenToClient(window, ref bottomright);
+            return new Rect(topleft, bottomright);
         }
 
         [DllImport("user32.dll")]
