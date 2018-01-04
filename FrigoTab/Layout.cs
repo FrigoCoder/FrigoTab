@@ -65,9 +65,7 @@ namespace FrigoTab {
             return size;
         }
 
-        private static SizeF Scale (SizeF size, float scale) {
-            return new SizeF(size.Width * scale, size.Height * scale);
-        }
+        private static SizeF Scale (SizeF size, float scale) => new SizeF(size.Width * scale, size.Height * scale);
 
     }
 
