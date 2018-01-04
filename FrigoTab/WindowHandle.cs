@@ -73,7 +73,7 @@ namespace FrigoTab {
 
         public void RegisterIconCallback (Action<Icon> action) {
             IntPtr actionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(action));
-            SendMessageCallback(handle, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, callback, actionHandle);
+            SendMessageCallback(handle, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, CallbackDelegate, actionHandle);
         }
 
         public void SendMessage (WindowMessages msg, int wParam, int lParam) {
@@ -117,7 +117,7 @@ namespace FrigoTab {
 
         private delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
 
-        private static readonly SendMessageDelegate callback = Callback;
+        private static readonly SendMessageDelegate CallbackDelegate = Callback;
 
         private static void Callback (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult) {
             GCHandle handle = GCHandle.FromIntPtr(dwData);
