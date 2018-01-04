@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>FrigoTab</RootNamespace>
     <AssemblyName>FrigoTab</AssemblyName>
-    <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <IsWebBootstrapper>false</IsWebBootstrapper>
@@ -32,6 +32,7 @@
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <LangVersion>7.2</LangVersion>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationIcon>Program.ico</ApplicationIcon>
@@ -81,34 +82,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ApplicationWindows.cs" />
-    <Compile Include="BackgroundWindows.cs" />
-    <Compile Include="BackgroundWindow.cs" />
-    <Compile Include="Dwm.cs" />
-    <Compile Include="FrigoForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="LayerUpdater.cs" />
-    <Compile Include="Layout.cs" />
-    <Compile Include="MouseHook.cs" />
-    <Compile Include="Rect.cs" />
-    <Compile Include="ScreenForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="ScreenForms.cs" />
-    <Compile Include="KeyHook.cs" />
-    <Compile Include="Program.cs" />
-    <Compile Include="SessionForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="SysTrayIcon.cs" />
-    <Compile Include="Thumbnail.cs" />
-    <Compile Include="ApplicationWindow.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="WindowFinder.cs" />
-    <Compile Include="WindowHandle.cs" />
-    <Compile Include="WindowMessages.cs" />
+    <Compile Include="**\*.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.5.2">
@@ -132,11 +106,4 @@
     <None Include="app.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>
