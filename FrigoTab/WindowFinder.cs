@@ -46,9 +46,6 @@ namespace FrigoTab {
             if( Dwm.IsCloaked(handle) ) {
                 return WindowType.Hidden;
             }
-            if( !IsAltTabWindow(handle) ) {
-                return WindowType.Hidden;
-            }
 
             WindowStyles style = handle.GetWindowStyles();
             if( style.HasFlag(WindowStyles.Disabled) ) {
@@ -69,7 +66,7 @@ namespace FrigoTab {
                 return WindowType.ToolWindow;
             }
 
-            return WindowType.AppWindow;
+            return IsAltTabWindow(handle) ? WindowType.AppWindow : WindowType.Hidden;
         }
 
         private static bool IsAltTabWindow (IntPtr hwnd) {
@@ -82,7 +79,7 @@ namespace FrigoTab {
                     break;
                 }
             }
-            return hwndWalk == hwnd;
+            return hwndTry == hwnd;
         }
 
         [DllImport("user32.dll")]
