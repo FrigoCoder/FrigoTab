@@ -13,7 +13,7 @@ namespace FrigoTab {
             EnumWindows(EnumWindowCallback, IntPtr.Zero);
         }
 
-        private bool EnumWindowCallback (IntPtr handle, IntPtr lParam) {
+        private bool EnumWindowCallback (WindowHandle handle, IntPtr lParam) {
             switch( GetWindowType(handle) ) {
                 case WindowType.AppWindow:
                     Windows.Add(handle);
@@ -37,7 +37,7 @@ namespace FrigoTab {
 
         }
 
-        private delegate bool EnumWindowsProc (IntPtr handle, IntPtr lParam);
+        private delegate bool EnumWindowsProc (WindowHandle handle, IntPtr lParam);
 
         private static WindowType GetWindowType (WindowHandle handle) {
             if( handle.GetWindowRect().IsEmpty ) {
@@ -72,7 +72,7 @@ namespace FrigoTab {
         private static bool IsAltTabWindow (WindowHandle hwnd) => GetLastActiveVisiblePopup(GetAncestor(hwnd, 3)) == hwnd;
 
         private static WindowHandle GetLastActiveVisiblePopup (WindowHandle root) {
-            WindowHandle hwndWalk = IntPtr.Zero;
+            WindowHandle hwndWalk = WindowHandle.Null;
             WindowHandle hwndTry = root;
             while( hwndWalk != hwndTry ) {
                 hwndWalk = hwndTry;
@@ -81,20 +81,20 @@ namespace FrigoTab {
                     return hwndTry;
                 }
             }
-            return IntPtr.Zero;
+            return WindowHandle.Null;
         }
 
         [DllImport("user32.dll")]
         private static extern bool EnumWindows (EnumWindowsProc enumFunc, IntPtr lParam);
 
         [DllImport("user32.dll")]
-        private static extern IntPtr GetAncestor (IntPtr hWnd, int gaFlags);
+        private static extern WindowHandle GetAncestor (WindowHandle hWnd, int gaFlags);
 
         [DllImport("user32.dll")]
-        private static extern IntPtr GetLastActivePopup (IntPtr hWnd);
+        private static extern WindowHandle GetLastActivePopup (WindowHandle hWnd);
 
         [DllImport("user32.dll")]
-        private static extern bool IsWindowVisible (IntPtr hWnd);
+        private static extern bool IsWindowVisible (WindowHandle hWnd);
 
     }
 

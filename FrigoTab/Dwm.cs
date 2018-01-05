@@ -48,7 +48,7 @@ namespace FrigoTab {
         }
 
         [DllImport("dwmapi.dll")]
-        public static extern int DwmRegisterThumbnail (IntPtr dest, IntPtr src, out IntPtr thumb);
+        public static extern int DwmRegisterThumbnail (WindowHandle dest, WindowHandle src, out IntPtr thumb);
 
         [DllImport("dwmapi.dll")]
         public static extern int DwmUnregisterThumbnail (IntPtr thumb);
@@ -60,10 +60,10 @@ namespace FrigoTab {
         public static extern int DwmQueryThumbnailSourceSize (IntPtr thumb, out Size pSize);
 
         [DllImport("dwmapi.dll")]
-        public static extern int DwmGetWindowAttribute (IntPtr hWnd, WindowAttribute dwAttribute, out bool pvAttribute, int cbAttribute);
+        public static extern int DwmGetWindowAttribute (WindowHandle hWnd, WindowAttribute dwAttribute, out bool pvAttribute, int cbAttribute);
 
         [DllImport("dwmapi.dll")]
-        public static extern int DwmGetWindowAttribute (IntPtr hWnd, WindowAttribute dwAttribute, out Rect pvAttribute, int cbAttribute);
+        public static extern int DwmGetWindowAttribute (WindowHandle hWnd, WindowAttribute dwAttribute, out Rect pvAttribute, int cbAttribute);
 
     }
 

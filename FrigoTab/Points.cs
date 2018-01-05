@@ -1,5 +1,4 @@
-﻿using System;
-using System.Drawing;
+﻿using System.Drawing;
 using System.Runtime.InteropServices;
 
 namespace FrigoTab {
@@ -17,10 +16,10 @@ namespace FrigoTab {
         }
 
         [DllImport("user32.dll")]
-        private static extern bool ClientToScreen (IntPtr hWnd, ref Point lpPoint);
+        private static extern bool ClientToScreen (WindowHandle hWnd, ref Point lpPoint);
 
         [DllImport("user32.dll")]
-        private static extern bool ScreenToClient (IntPtr hWnd, ref Point lpPoint);
+        private static extern bool ScreenToClient (WindowHandle hWnd, ref Point lpPoint);
 
     }
 

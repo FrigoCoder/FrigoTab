@@ -28,7 +28,9 @@ namespace FrigoTab {
 
     public struct WindowHandle {
 
+        public static readonly WindowHandle Null = new WindowHandle(IntPtr.Zero);
         public static WindowHandle GetForegroundWindowHandle () => GetForegroundWindow();
+
         public static implicit operator WindowHandle (IntPtr handle) => new WindowHandle(handle);
         public static implicit operator IntPtr (WindowHandle handle) => handle.handle;
         public static bool operator == (WindowHandle h1, WindowHandle h2) => h1.handle == h2.handle;
@@ -43,40 +45,40 @@ namespace FrigoTab {
         public override bool Equals (object obj) => obj != null && GetType() == obj.GetType() && handle == ((WindowHandle) obj).handle;
         public override int GetHashCode () => handle.GetHashCode();
         public Screen GetScreen () => Screen.FromHandle(handle);
-        public WindowStyles GetWindowStyles () => (WindowStyles) GetWindowLongPtr(handle, WindowLong.Style);
-        public WindowExStyles GetWindowExStyles () => (WindowExStyles) GetWindowLongPtr(handle, WindowLong.ExStyle);
+        public WindowStyles GetWindowStyles () => (WindowStyles) GetWindowLongPtr(this, WindowLong.Style);
+        public WindowExStyles GetWindowExStyles () => (WindowExStyles) GetWindowLongPtr(this, WindowLong.ExStyle);
 
         public void SetForeground () {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
-                ShowWindow(handle, ShowWindowCommand.Restore);
+                ShowWindow(this, ShowWindowCommand.Restore);
             }
             keybd_event(0, 0, 0, 0);
-            SetForegroundWindow(handle);
+            SetForegroundWindow(this);
         }
 
         public Rect GetWindowRect () {
-            GetWindowRect(handle, out Rect rect);
+            GetWindowRect(this, out Rect rect);
             return rect;
         }
 
         public string GetWindowText () {
-            StringBuilder text = new StringBuilder(GetWindowTextLength(handle) + 1);
-            GetWindowText(handle, text, text.Capacity);
+            StringBuilder text = new StringBuilder(GetWindowTextLength(this) + 1);
+            GetWindowText(this, text, text.Capacity);
             return text.ToString();
         }
 
         public Icon IconFromGetClassLongPtr () {
-            IntPtr icon = GetClassLongPtr(handle, ClassLong.Icon);
+            IntPtr icon = GetClassLongPtr(this, ClassLong.Icon);
             return icon == IntPtr.Zero ? null : Icon.FromHandle(icon);
         }
 
         public void RegisterIconCallback (Action<Icon> action) {
             IntPtr actionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(action));
-            SendMessageCallback(handle, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, CallbackDelegate, actionHandle);
+            SendMessageCallback(this, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, CallbackDelegate, actionHandle);
         }
 
         public void PostMessage (WindowMessages msg, int wParam, int lParam) {
-            PostMessage(handle, msg, (IntPtr) wParam, (IntPtr) lParam);
+            PostMessage(this, msg, (IntPtr) wParam, (IntPtr) lParam);
         }
 
         private enum ClassLong {
@@ -104,11 +106,11 @@ namespace FrigoTab {
 
         }
 
-        private delegate void SendMessageDelegate (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult);
+        private delegate void SendMessageDelegate (WindowHandle hWnd, int msg, IntPtr dwData, IntPtr lResult);
 
         private static readonly SendMessageDelegate CallbackDelegate = Callback;
 
-        private static void Callback (IntPtr hWnd, int msg, IntPtr dwData, IntPtr lResult) {
+        private static void Callback (WindowHandle hWnd, int msg, IntPtr dwData, IntPtr lResult) {
             GCHandle handle = GCHandle.FromIntPtr(dwData);
             Action<Icon> action = (Action<Icon>) handle.Target;
             handle.Free();
@@ -119,38 +121,38 @@ namespace FrigoTab {
         }
 
         [DllImport("user32.dll")]
-        private static extern int GetWindowTextLength (IntPtr hWnd);
+        private static extern int GetWindowTextLength (WindowHandle hWnd);
 
         [DllImport("user32.dll")]
-        private static extern int GetWindowText (IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+        private static extern int GetWindowText (WindowHandle hWnd, StringBuilder lpString, int nMaxCount);
 
         [DllImport("user32.dll")]
-        private static extern IntPtr GetWindowLongPtr (IntPtr hWnd, WindowLong nIndex);
+        private static extern IntPtr GetWindowLongPtr (WindowHandle hWnd, WindowLong nIndex);
 
         [DllImport("user32.dll")]
-        private static extern bool ShowWindow (IntPtr hWnd, ShowWindowCommand nCmdShow);
+        private static extern bool ShowWindow (WindowHandle hWnd, ShowWindowCommand nCmdShow);
 
         [DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow (IntPtr hwnd);
+        private static extern bool SetForegroundWindow (WindowHandle hWnd);
 
         [DllImport("user32.dll")]
-        private static extern IntPtr GetClassLongPtr (IntPtr hWnd, ClassLong nIndex);
+        private static extern IntPtr GetClassLongPtr (WindowHandle hWnd, ClassLong nIndex);
 
         [DllImport("user32.dll")]
-        private static extern bool SendMessageCallback (IntPtr hWnd, WindowMessages message, GetIconSize wParam, IntPtr lParam,
+        private static extern bool SendMessageCallback (WindowHandle hWnd, WindowMessages message, GetIconSize wParam, IntPtr lParam,
             SendMessageDelegate lpCallBack, IntPtr dwData);
 
         [DllImport("user32.dll")]
         private static extern void keybd_event (byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
 
         [DllImport("user32.dll")]
-        private static extern bool PostMessage (IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
+        private static extern bool PostMessage (WindowHandle hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
 
         [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow ();
+        private static extern WindowHandle GetForegroundWindow ();
 
         [DllImport("user32.dll")]
-        private static extern bool GetWindowRect (IntPtr hWnd, out Rect lpRect);
+        private static extern bool GetWindowRect (WindowHandle hWnd, out Rect lpRect);
 
     }
 
