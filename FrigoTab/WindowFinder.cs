@@ -69,17 +69,19 @@ namespace FrigoTab {
             return IsAltTabWindow(handle) ? WindowType.AppWindow : WindowType.Hidden;
         }
 
-        private static bool IsAltTabWindow (WindowHandle hwnd) {
+        private static bool IsAltTabWindow (WindowHandle hwnd) => GetLastActiveVisiblePopup(GetAncestor(hwnd, 3)) == hwnd;
+
+        private static WindowHandle GetLastActiveVisiblePopup (WindowHandle root) {
             WindowHandle hwndWalk = IntPtr.Zero;
-            WindowHandle hwndTry = GetAncestor(hwnd, 3);
-            while( hwndTry != hwndWalk ) {
+            WindowHandle hwndTry = root;
+            while( hwndWalk != hwndTry ) {
                 hwndWalk = hwndTry;
                 hwndTry = GetLastActivePopup(hwndWalk);
                 if( IsWindowVisible(hwndTry) ) {
-                    break;
+                    return hwndTry;
                 }
             }
-            return hwndTry == hwnd;
+            return IntPtr.Zero;
         }
 
         [DllImport("user32.dll")]
