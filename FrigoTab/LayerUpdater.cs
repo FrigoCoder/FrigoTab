@@ -3,6 +3,8 @@ using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
+#pragma warning disable 414
+
 namespace FrigoTab {
 
     public static class LayerUpdater {

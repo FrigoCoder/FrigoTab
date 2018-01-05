@@ -7,6 +7,8 @@ namespace FrigoTab {
 
     public static class Dwm {
 
+        [SuppressMessage("ReSharper", "NotAccessedField.Global")]
+        [SuppressMessage("ReSharper", "UnusedMember.Global")]
         public struct ThumbnailProperties {
 
             public ThumbnailFlags Flags;
@@ -19,7 +21,7 @@ namespace FrigoTab {
         }
 
         [Flags]
-        [SuppressMessage("ReSharper", "UnusedMember.Local")]
+        [SuppressMessage("ReSharper", "UnusedMember.Global")]
         public enum ThumbnailFlags {
 
             RectDestination = 1,

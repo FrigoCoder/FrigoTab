@@ -4,6 +4,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
+#pragma warning disable 169
+#pragma warning disable 649
+
 namespace FrigoTab {
 
     public class KeyHookEventArgs {

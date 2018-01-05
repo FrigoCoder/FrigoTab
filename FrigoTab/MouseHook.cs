@@ -5,6 +5,9 @@ using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
 
+#pragma warning disable 169
+#pragma warning disable 649
+
 namespace FrigoTab {
 
     public class MouseHookEventArgs {
