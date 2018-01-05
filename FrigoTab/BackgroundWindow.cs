@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Windows.Forms;
 
 namespace FrigoTab {
 
@@ -8,10 +7,10 @@ namespace FrigoTab {
         private readonly Thumbnail thumbnail;
         private bool disposed;
 
-        public BackgroundWindow (Form owner, WindowHandle window) {
-            thumbnail = new Thumbnail(window, owner.Handle);
+        public BackgroundWindow (FrigoForm owner, WindowHandle window) {
+            thumbnail = new Thumbnail(window, owner.WindowHandle);
             thumbnail.SetSourceRect(Dwm.GetExtendedFrameBounds(window).ScreenToClient(window));
-            thumbnail.SetDestinationRect(Dwm.GetExtendedFrameBounds(window).ScreenToClient(owner.Handle));
+            thumbnail.SetDestinationRect(Dwm.GetExtendedFrameBounds(window).ScreenToClient(owner.WindowHandle));
         }
 
         ~BackgroundWindow () {

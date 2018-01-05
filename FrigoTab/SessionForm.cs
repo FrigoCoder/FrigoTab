@@ -20,7 +20,7 @@ namespace FrigoTab {
         public void HandleKeyEvents (KeyHookEventArgs e) {
             if( e.Key == (Keys.Alt | Keys.Tab) ) {
                 e.Handled = true;
-                Handle.PostMessage(WindowMessages.BeginSession, 0, 0);
+                WindowHandle.PostMessage(WindowMessages.BeginSession, 0, 0);
             }
         }
 
@@ -28,9 +28,9 @@ namespace FrigoTab {
             if( !active ) {
                 return;
             }
-            Handle.PostMessage(WindowMessages.MouseMoved, e.Point.X, e.Point.Y);
+            WindowHandle.PostMessage(WindowMessages.MouseMoved, e.Point.X, e.Point.Y);
             if( e.Click ) {
-                Handle.PostMessage(WindowMessages.MouseClicked, e.Point.X, e.Point.Y);
+                WindowHandle.PostMessage(WindowMessages.MouseClicked, e.Point.X, e.Point.Y);
             }
         }
 
@@ -88,7 +88,7 @@ namespace FrigoTab {
             Visible = true;
             screenForms.Visible = true;
             applications.Visible = true;
-            Handle.SetForeground();
+            WindowHandle.SetForeground();
 
             active = true;
         }

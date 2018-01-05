@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Windows.Forms;
 
 namespace FrigoTab {
 
@@ -35,7 +34,7 @@ namespace FrigoTab {
         private readonly IList<ApplicationWindow> windows = new List<ApplicationWindow>();
         private ApplicationWindow selected;
 
-        public ApplicationWindows (Form owner, WindowFinder finder) {
+        public ApplicationWindows (FrigoForm owner, WindowFinder finder) {
             foreach( WindowHandle window in finder.Windows ) {
                 windows.Add(new ApplicationWindow(owner, window, windows.Count));
             }

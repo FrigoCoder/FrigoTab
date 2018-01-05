@@ -2,7 +2,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
-using System.Windows.Forms;
 
 namespace FrigoTab {
 
@@ -14,7 +13,7 @@ namespace FrigoTab {
             get => base.Bounds;
             set {
                 base.Bounds = value;
-                thumbnail.SetDestinationRect(new Rect(value).ScreenToClient(Owner.Handle));
+                thumbnail.SetDestinationRect(new Rect(value).ScreenToClient(OwnerHandle));
                 RenderOverlay();
             }
         }
@@ -43,12 +42,12 @@ namespace FrigoTab {
             }
         }
 
-        public ApplicationWindow (Form owner, WindowHandle application, int index) {
+        public ApplicationWindow (FrigoForm owner, WindowHandle application, int index) {
             Owner = owner;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             Application = application;
             this.index = index;
-            thumbnail = new Thumbnail(application, owner.Handle);
+            thumbnail = new Thumbnail(application, OwnerHandle);
             appIcon = Application.IconFromGetClassLongPtr() ?? Program.Icon;
             Application.RegisterIconCallback(icon => AppIcon = icon);
         }

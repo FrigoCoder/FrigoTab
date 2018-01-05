@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows.Forms;
 
 namespace FrigoTab {
 
@@ -9,7 +8,7 @@ namespace FrigoTab {
 
         private readonly IList<BackgroundWindow> backgrounds = new List<BackgroundWindow>();
 
-        public BackgroundWindows (Form owner, WindowFinder finder) {
+        public BackgroundWindows (FrigoForm owner, WindowFinder finder) {
             foreach( WindowHandle window in finder.ToolWindows.Reverse() ) {
                 backgrounds.Add(new BackgroundWindow(owner, window));
             }

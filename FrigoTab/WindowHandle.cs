@@ -30,15 +30,12 @@ namespace FrigoTab {
 
         public static readonly WindowHandle Null = new WindowHandle(IntPtr.Zero);
         public static WindowHandle GetForegroundWindowHandle () => GetForegroundWindow();
-
-        public static implicit operator WindowHandle (IntPtr handle) => new WindowHandle(handle);
-        public static implicit operator IntPtr (WindowHandle handle) => handle.handle;
         public static bool operator == (WindowHandle h1, WindowHandle h2) => h1.handle == h2.handle;
         public static bool operator != (WindowHandle h1, WindowHandle h2) => h1.handle != h2.handle;
 
         private readonly IntPtr handle;
 
-        private WindowHandle (IntPtr handle) {
+        public WindowHandle (IntPtr handle) {
             this.handle = handle;
         }
 
