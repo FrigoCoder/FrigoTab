@@ -26,13 +26,13 @@ namespace FrigoTab {
 
     }
 
-    public class WindowHandle {
+    public struct WindowHandle {
 
         public static WindowHandle GetForegroundWindowHandle () => GetForegroundWindow();
         public static implicit operator WindowHandle (IntPtr handle) => new WindowHandle(handle);
         public static implicit operator IntPtr (WindowHandle handle) => handle.handle;
-        public static bool operator == (WindowHandle h1, WindowHandle h2) => h1 == null ? h2 == null : h1.handle == h2.handle;
-        public static bool operator != (WindowHandle h1, WindowHandle h2) => !(h1 == h2);
+        public static bool operator == (WindowHandle h1, WindowHandle h2) => h1.handle == h2.handle;
+        public static bool operator != (WindowHandle h1, WindowHandle h2) => h1.handle != h2.handle;
 
         private readonly IntPtr handle;
 
