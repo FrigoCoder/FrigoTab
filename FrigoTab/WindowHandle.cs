@@ -29,10 +29,10 @@ namespace FrigoTab {
     public class WindowHandle {
 
         public static WindowHandle GetForegroundWindowHandle () => GetForegroundWindow();
-
         public static implicit operator WindowHandle (IntPtr handle) => new WindowHandle(handle);
-
         public static implicit operator IntPtr (WindowHandle handle) => handle.handle;
+        public static bool operator == (WindowHandle h1, WindowHandle h2) => h1 == null ? h2 == null : h1.handle == h2.handle;
+        public static bool operator != (WindowHandle h1, WindowHandle h2) => !(h1 == h2);
 
         private readonly IntPtr handle;
 
@@ -40,7 +40,11 @@ namespace FrigoTab {
             this.handle = handle;
         }
 
+        public override bool Equals (object obj) => obj != null && GetType() == obj.GetType() && handle == ((WindowHandle) obj).handle;
+        public override int GetHashCode () => handle.GetHashCode();
         public Screen GetScreen () => Screen.FromHandle(handle);
+        public WindowStyles GetWindowStyles () => (WindowStyles) GetWindowLongPtr(handle, WindowLong.Style);
+        public WindowExStyles GetWindowExStyles () => (WindowExStyles) GetWindowLongPtr(handle, WindowLong.ExStyle);
 
         public void SetForeground () {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
@@ -61,10 +65,6 @@ namespace FrigoTab {
             return text.ToString();
         }
 
-        public WindowStyles GetWindowStyles () => (WindowStyles) GetWindowLongPtr(handle, WindowLong.Style);
-
-        public WindowExStyles GetWindowExStyles () => (WindowExStyles) GetWindowLongPtr(handle, WindowLong.ExStyle);
-
         public Icon IconFromGetClassLongPtr () {
             IntPtr icon = GetClassLongPtr(handle, ClassLong.Icon);
             return icon == IntPtr.Zero ? null : Icon.FromHandle(icon);
@@ -75,18 +75,8 @@ namespace FrigoTab {
             SendMessageCallback(handle, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, CallbackDelegate, actionHandle);
         }
 
-        public void SendMessage (WindowMessages msg, int wParam, int lParam) {
-            SendMessage(handle, msg, (IntPtr) wParam, (IntPtr) lParam);
-        }
-
         public void PostMessage (WindowMessages msg, int wParam, int lParam) {
             PostMessage(handle, msg, (IntPtr) wParam, (IntPtr) lParam);
-        }
-
-        public string GetClassName () {
-            StringBuilder builder = new StringBuilder(256);
-            GetClassName(handle, builder, builder.Capacity);
-            return builder.ToString();
         }
 
         private enum ClassLong {
@@ -154,9 +144,6 @@ namespace FrigoTab {
         private static extern void keybd_event (byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
 
         [DllImport("user32.dll")]
-        private static extern bool SendMessage (IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("user32.dll")]
         private static extern bool PostMessage (IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
 
         [DllImport("user32.dll")]
@@ -164,9 +151,6 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern bool GetWindowRect (IntPtr hWnd, out Rect lpRect);
-
-        [DllImport("user32.dll")]
-        private static extern int GetClassName (IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
     }
 
