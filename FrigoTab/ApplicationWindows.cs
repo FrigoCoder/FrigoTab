@@ -13,9 +13,9 @@ namespace FrigoTab {
                 if( selected == value ) {
                     return;
                 }
-                selected?.Selected.Set(false);
+                selected?.Selected?.Set(false);
                 selected = value;
-                selected?.Selected.Set(true);
+                selected?.Selected?.Set(true);
             }
         }
 
