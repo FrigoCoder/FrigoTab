@@ -8,7 +8,7 @@ namespace FrigoTab {
     public class ApplicationWindow : FrigoForm {
 
         public readonly WindowHandle Application;
-        public readonly BooleanProperty Selected;
+        public readonly Property<bool> Selected;
         private readonly int index;
         private readonly Thumbnail thumbnail;
         private readonly WindowIcon windowIcon;
@@ -17,8 +17,8 @@ namespace FrigoTab {
             Owner = owner;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             Application = application;
-            Selected = new BooleanProperty();
-            Selected.Changed += RenderOverlay;
+            Selected = new Property<bool>();
+            Selected.Changed += (x, y) => RenderOverlay();
             this.index = index;
             thumbnail = new Thumbnail(application, OwnerHandle);
             windowIcon = new WindowIcon(application);
