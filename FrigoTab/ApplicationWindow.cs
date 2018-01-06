@@ -8,27 +8,17 @@ namespace FrigoTab {
     public class ApplicationWindow : FrigoForm {
 
         public readonly WindowHandle Application;
-
-        public bool Selected {
-            private get => selected;
-            set {
-                if( selected == value ) {
-                    return;
-                }
-                selected = value;
-                RenderOverlay();
-            }
-        }
-
+        public BooleanProperty Selected;
         private readonly int index;
         private readonly Thumbnail thumbnail;
         private readonly WindowIcon icon;
-        private bool selected;
 
         public ApplicationWindow (FrigoForm owner, WindowHandle application, int index) {
             Owner = owner;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             Application = application;
+            Selected = new BooleanProperty();
+            Selected.Changed += RenderOverlay;
             this.index = index;
             thumbnail = new Thumbnail(application, OwnerHandle);
             icon = new WindowIcon(application);
@@ -59,7 +49,7 @@ namespace FrigoTab {
         }
 
         private void RenderFrame (Graphics graphics) {
-            if( Selected ) {
+            if( Selected.Get() ) {
                 FillRectangle(graphics, graphics.VisibleClipBounds, Color.FromArgb(128, 0, 0, 255));
             }
         }
