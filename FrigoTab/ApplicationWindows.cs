@@ -52,13 +52,8 @@ namespace FrigoTab {
             windows.Clear();
         }
 
-        public void SelectByIndex (int index) {
-            Selected = index >= 0 && index < windows.Count ? windows[index] : null;
-        }
-
-        public void SelectByPoint (Point point) {
-            Selected = windows.FirstOrDefault(window => window.Bounds.Contains(point));
-        }
+        public void SelectByIndex (int index) => Selected = index >= 0 && index < windows.Count ? windows[index] : null;
+        public void SelectByPoint (Point point) => Selected = windows.FirstOrDefault(window => window.Bounds.Contains(point));
 
     }
 

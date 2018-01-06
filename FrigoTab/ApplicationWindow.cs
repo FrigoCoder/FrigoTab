@@ -59,9 +59,7 @@ namespace FrigoTab {
             base.Dispose(disposing);
         }
 
-        private void RenderOverlay () {
-            LayerUpdater.Update(this, RenderOverlay);
-        }
+        private void RenderOverlay () => LayerUpdater.Update(this, RenderOverlay);
 
         private void RenderOverlay (Graphics graphics) {
             graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;

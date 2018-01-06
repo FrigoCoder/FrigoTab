@@ -118,9 +118,7 @@ namespace FrigoTab {
             }
         }
 
-        private void MouseMoved (Point point) {
-            applications.SelectByPoint(point);
-        }
+        private void MouseMoved (Point point) => applications.SelectByPoint(point);
 
         private void MouseClicked (Point point) {
             applications.SelectByPoint(point);

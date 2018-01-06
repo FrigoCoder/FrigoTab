@@ -17,9 +17,7 @@ namespace FrigoTab {
             };
         }
 
-        public void Dispose () {
-            notifyIcon.Dispose();
-        }
+        public void Dispose () => notifyIcon.Dispose();
 
     }
 

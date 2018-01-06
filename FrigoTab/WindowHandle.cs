@@ -76,9 +76,7 @@ namespace FrigoTab {
             SendMessageCallback(this, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, CallbackDelegate, actionHandle);
         }
 
-        public void PostMessage (WindowMessages msg, int wParam, int lParam) {
-            PostMessage(this, msg, (IntPtr) wParam, (IntPtr) lParam);
-        }
+        public void PostMessage (WindowMessages msg, int wParam, int lParam) => PostMessage(this, msg, (IntPtr) wParam, (IntPtr) lParam);
 
         private enum ClassLong {
 

@@ -35,9 +35,7 @@ namespace FrigoTab {
             forms.Clear();
         }
 
-        public bool IsOnAToolBar (Point point) {
-            return forms.FirstOrDefault(form => form.Bounds.Contains(point)) == null;
-        }
+        public bool IsOnAToolBar (Point point) => forms.FirstOrDefault(form => form.Bounds.Contains(point)) == null;
 
     }
 

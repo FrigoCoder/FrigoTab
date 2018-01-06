@@ -48,9 +48,8 @@ namespace FrigoTab {
             return new RectangleF(location, new SizeF(size.Width - 2 * xMargin, size.Height - 2 * yMargin));
         }
 
-        private static List<ApplicationWindow> GetWindowsOnScreen (IEnumerable<ApplicationWindow> windows, Screen screen) {
-            return windows.Where(window => window.Application.GetScreen().Equals(screen)).ToList();
-        }
+        private static List<ApplicationWindow> GetWindowsOnScreen (IEnumerable<ApplicationWindow> windows, Screen screen) =>
+            windows.Where(window => window.Application.GetScreen().Equals(screen)).ToList();
 
         private static RectangleF CenterWithin (Size rectSize, RectangleF bounds) {
             SizeF size = ScaleWithin(rectSize, bounds.Size);
