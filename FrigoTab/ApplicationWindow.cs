@@ -9,15 +9,6 @@ namespace FrigoTab {
 
         public readonly WindowHandle Application;
 
-        public new Rectangle Bounds {
-            get => base.Bounds;
-            set {
-                base.Bounds = value;
-                thumbnail.SetDestinationRect(new Rect(value).ScreenToClient(OwnerHandle));
-                RenderOverlay();
-            }
-        }
-
         public bool Selected {
             private get => selected;
             set {
@@ -45,6 +36,12 @@ namespace FrigoTab {
         }
 
         public Size GetSourceSize () => thumbnail.GetSourceSize();
+
+        protected override void OnSizeChanged (EventArgs e) {
+            base.OnSizeChanged(e);
+            thumbnail.SetDestinationRect(new Rect(Bounds).ScreenToClient(OwnerHandle));
+            RenderOverlay();
+        }
 
         protected override void Dispose (bool disposing) {
             thumbnail.Dispose();
