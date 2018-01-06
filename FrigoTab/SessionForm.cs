@@ -32,6 +32,7 @@ namespace FrigoTab {
             }
             WindowHandle.PostMessage(WindowMessages.MouseMoved, e.Point.X, e.Point.Y);
             if( e.Click ) {
+                e.Handled = true;
                 WindowHandle.PostMessage(WindowMessages.MouseClicked, e.Point.X, e.Point.Y);
             }
         }

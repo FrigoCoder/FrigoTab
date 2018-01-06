@@ -14,6 +14,7 @@ namespace FrigoTab {
 
         public readonly Point Point;
         public readonly bool Click;
+        public bool Handled;
 
         public MouseHookEventArgs (Point point, bool click) {
             Point = point;
@@ -55,19 +56,22 @@ namespace FrigoTab {
         }
 
         private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelMouseStruct lParam) {
-            HookProcInner(nCode, (WindowMessages) wParam, ref lParam);
+            if( HookProcInner(nCode, (WindowMessages) wParam, ref lParam) ) {
+                return (IntPtr) 1;
+            }
             return CallNextHookEx(hookId, nCode, wParam, ref lParam);
         }
 
-        private void HookProcInner (int nCode, WindowMessages wParam, ref LowLevelMouseStruct lParam) {
+        private bool HookProcInner (int nCode, WindowMessages wParam, ref LowLevelMouseStruct lParam) {
             if( nCode < 0 ) {
-                return;
+                return false;
             }
             Point point = lParam.Point;
             WindowMessages[] clickMessages = {WindowMessages.LeftDown, WindowMessages.LeftUp, WindowMessages.RightDown, WindowMessages.RightUp};
             bool click = clickMessages.Contains(wParam);
             MouseHookEventArgs e = new MouseHookEventArgs(point, click);
             MouseEvent?.Invoke(e);
+            return e.Handled;
         }
 
         private struct LowLevelMouseStruct {
