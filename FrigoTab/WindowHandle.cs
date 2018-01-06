@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Diagnostics.Contracts;
-using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
@@ -63,24 +62,7 @@ namespace FrigoTab {
             return text.ToString();
         }
 
-        [Pure]
-        public Icon IconFromGetClassLongPtr () {
-            IntPtr icon = GetClassLongPtr(this, ClassLong.Icon);
-            return icon == IntPtr.Zero ? null : Icon.FromHandle(icon);
-        }
-
-        public void RegisterIconCallback (Action<Icon> action) {
-            IntPtr actionHandle = GCHandle.ToIntPtr(GCHandle.Alloc(action));
-            SendMessageCallback(this, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, CallbackDelegate, actionHandle);
-        }
-
         public void PostMessage (WindowMessages msg, int wParam, int lParam) => PostMessage(this, msg, (IntPtr) wParam, (IntPtr) lParam);
-
-        private enum ClassLong {
-
-            Icon = -14
-
-        }
 
         private enum ShowWindowCommand {
 
@@ -93,26 +75,6 @@ namespace FrigoTab {
             ExStyle = -20,
             Style = -16
 
-        }
-
-        private enum GetIconSize {
-
-            Big = 1
-
-        }
-
-        private delegate void SendMessageDelegate (WindowHandle hWnd, int msg, IntPtr dwData, IntPtr lResult);
-
-        private static readonly SendMessageDelegate CallbackDelegate = Callback;
-
-        private static void Callback (WindowHandle hWnd, int msg, IntPtr dwData, IntPtr lResult) {
-            GCHandle handle = GCHandle.FromIntPtr(dwData);
-            Action<Icon> action = (Action<Icon>) handle.Target;
-            handle.Free();
-
-            if( lResult != IntPtr.Zero ) {
-                action(Icon.FromHandle(lResult));
-            }
         }
 
         [DllImport("user32.dll")]
@@ -129,13 +91,6 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow (WindowHandle hWnd);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetClassLongPtr (WindowHandle hWnd, ClassLong nIndex);
-
-        [DllImport("user32.dll")]
-        private static extern bool SendMessageCallback (WindowHandle hWnd, WindowMessages message, GetIconSize wParam, IntPtr lParam,
-            SendMessageDelegate lpCallBack, IntPtr dwData);
 
         [DllImport("user32.dll")]
         private static extern void keybd_event (byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
