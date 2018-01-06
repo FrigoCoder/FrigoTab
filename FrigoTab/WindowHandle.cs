@@ -58,11 +58,6 @@ namespace FrigoTab {
             SetForegroundWindow(this);
         }
 
-        public Rect GetWindowRect () {
-            GetWindowRect(this, out Rect rect);
-            return rect;
-        }
-
         [Pure]
         public string GetWindowText () {
             StringBuilder text = new StringBuilder(GetWindowTextLength(this) + 1);
@@ -151,9 +146,6 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern bool PostMessage (WindowHandle hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("user32.dll")]
-        private static extern bool GetWindowRect (WindowHandle hWnd, out Rect lpRect);
 
     }
 

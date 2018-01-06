@@ -1,12 +1,8 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
-using System.Drawing;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace FrigoTab {
 
     public static class Dwm {
-
 
         public enum WindowAttribute {
 
@@ -24,7 +20,6 @@ namespace FrigoTab {
             DwmGetWindowAttribute(window, WindowAttribute.ExtendedFrameBounds, out Rect rect, Marshal.SizeOf(typeof(Rect)));
             return rect;
         }
-
 
         [DllImport("dwmapi.dll")]
         public static extern int DwmGetWindowAttribute (WindowHandle hWnd, WindowAttribute dwAttribute, out bool pvAttribute, int cbAttribute);

@@ -6,8 +6,6 @@ namespace FrigoTab {
     [SuppressMessage("ReSharper", "NotAccessedField.Local")]
     public struct Rect {
 
-        public bool IsEmpty => topLeft.X >= bottomRight.X || topLeft.Y >= bottomRight.Y;
-
         private readonly Point topLeft;
         private readonly Point bottomRight;
 
