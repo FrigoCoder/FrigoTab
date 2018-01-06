@@ -77,7 +77,9 @@ namespace FrigoTab {
             }
 
             WindowHandle.GetForegroundWindow().PostMessage(WindowMessages.ActivateApp, 0, Thread.CurrentThread.ManagedThreadId);
-            ChangeDisplaySettings(IntPtr.Zero, 0);
+            foreach( Screen screen in Screen.AllScreens ) {
+                ChangeDisplaySettingsEx(screen.DeviceName, IntPtr.Zero, IntPtr.Zero, 0, IntPtr.Zero);
+            }
             Bounds = GetScreenBounds();
 
             backgrounds = new BackgroundWindows(this, finder);
@@ -133,29 +135,14 @@ namespace FrigoTab {
             if( applications.Selected == null ) {
                 return;
             }
-            active = false;
             applications.Selected.Application.SetForeground();
-            active = true;
             EndSession();
         }
 
-        private void DisplayChange () {
-            bool preserve = active;
-            if( preserve ) {
-                EndSession();
-            }
-            Bounds = GetScreenBounds();
-            if( preserve ) {
-                BeginSession();
-            }
-        }
-
-        private static Rectangle GetScreenBounds () {
-            return Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
-        }
+        private static Rectangle GetScreenBounds () => Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
 
         [DllImport("user32.dll")]
-        private static extern int ChangeDisplaySettings (IntPtr lpDevMode, int dwFlags);
+        private static extern int ChangeDisplaySettingsEx (string lpszDeviceName, IntPtr lpDevMode, IntPtr hwnd, int dwflags, IntPtr lParam);
 
     }
 
