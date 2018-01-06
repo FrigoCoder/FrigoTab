@@ -30,9 +30,11 @@ namespace FrigoTab {
     public struct WindowHandle {
 
         public static readonly WindowHandle Null = new WindowHandle(IntPtr.Zero);
-        public static WindowHandle GetForegroundWindowHandle () => GetForegroundWindow();
         public static bool operator == (WindowHandle h1, WindowHandle h2) => h1.handle == h2.handle;
         public static bool operator != (WindowHandle h1, WindowHandle h2) => h1.handle != h2.handle;
+
+        [DllImport("user32.dll")]
+        public static extern WindowHandle GetForegroundWindow ();
 
         private readonly IntPtr handle;
 
@@ -149,9 +151,6 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern bool PostMessage (WindowHandle hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("user32.dll")]
-        private static extern WindowHandle GetForegroundWindow ();
 
         [DllImport("user32.dll")]
         private static extern bool GetWindowRect (WindowHandle hWnd, out Rect lpRect);

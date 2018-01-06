@@ -1,5 +1,7 @@
+using System;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -60,9 +62,6 @@ namespace FrigoTab {
                 case WindowMessages.MouseClicked:
                     MouseClicked(new Point((int) m.WParam, (int) m.LParam));
                     break;
-                case WindowMessages.DisplayChange:
-                    DisplayChange();
-                    break;
             }
             base.WndProc(ref m);
         }
@@ -77,7 +76,9 @@ namespace FrigoTab {
                 return;
             }
 
-            ForceResolutionChange();
+            WindowHandle.GetForegroundWindow().PostMessage(WindowMessages.ActivateApp, 0, Thread.CurrentThread.ManagedThreadId);
+            ChangeDisplaySettings(IntPtr.Zero, 0);
+            Bounds = GetScreenBounds();
 
             backgrounds = new BackgroundWindows(this, finder);
             screenForms = new ScreenForms(this);
@@ -149,14 +150,12 @@ namespace FrigoTab {
             }
         }
 
-        private static void ForceResolutionChange () {
-            WindowHandle foreground = WindowHandle.GetForegroundWindowHandle();
-            foreground.PostMessage(WindowMessages.ActivateApp, 0, Thread.CurrentThread.ManagedThreadId);
-        }
-
         private static Rectangle GetScreenBounds () {
             return Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
         }
+
+        [DllImport("user32.dll")]
+        private static extern int ChangeDisplaySettings (IntPtr lpDevMode, int dwFlags);
 
     }
 
