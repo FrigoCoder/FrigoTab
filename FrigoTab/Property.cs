@@ -2,7 +2,7 @@
 
 namespace FrigoTab {
 
-    public class Property<T> {
+    public struct Property<T> {
 
         public event Action<T, T> Changed;
         private T current;

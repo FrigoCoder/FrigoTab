@@ -8,7 +8,7 @@ namespace FrigoTab {
     public class ApplicationWindow : FrigoForm {
 
         public readonly WindowHandle Application;
-        public readonly Property<bool> Selected;
+        public Property<bool> Selected;
         private readonly int index;
         private readonly Thumbnail thumbnail;
         private readonly WindowIcon windowIcon;

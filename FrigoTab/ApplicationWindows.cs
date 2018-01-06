@@ -15,13 +15,13 @@ namespace FrigoTab {
             }
         }
 
-        public readonly Property<ApplicationWindow> Selected = new Property<ApplicationWindow>();
+        public Property<ApplicationWindow> Selected = new Property<ApplicationWindow>();
         private readonly IList<ApplicationWindow> windows = new List<ApplicationWindow>();
 
         public ApplicationWindows (FrigoForm owner, WindowFinder finder) {
             Selected.Changed += (oldWindow, newWindow) => {
-                oldWindow?.Selected?.Set(false);
-                newWindow?.Selected?.Set(true);
+                oldWindow?.Selected.Set(false);
+                newWindow?.Selected.Set(true);
             };
 
             foreach( WindowHandle window in finder.Windows ) {
