@@ -7,20 +7,14 @@ namespace FrigoTab {
     public class WindowIcon {
 
         public event Action Changed;
-
-        public Icon Icon {
-            get => icon;
-            private set {
-                icon = value;
-                Changed?.Invoke();
-            }
-        }
-
-        private Icon icon;
+        public Icon Icon;
 
         public WindowIcon (WindowHandle handle) {
-            icon = IconFromGetClassLongPtr(handle) ?? Program.Icon;
-            RegisterIconCallback(handle, icon => Icon = icon);
+            Icon = IconFromGetClassLongPtr(handle) ?? Program.Icon;
+            RegisterIconCallback(handle, icon => {
+                Icon = icon;
+                Changed?.Invoke();
+            });
         }
 
         private Icon IconFromGetClassLongPtr (WindowHandle handle) {
