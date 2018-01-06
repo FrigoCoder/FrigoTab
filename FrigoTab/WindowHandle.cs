@@ -38,9 +38,7 @@ namespace FrigoTab {
 
         private readonly IntPtr handle;
 
-        public WindowHandle (IntPtr handle) {
-            this.handle = handle;
-        }
+        public WindowHandle (IntPtr handle) => this.handle = handle;
 
         public override bool Equals (object obj) => obj != null && GetType() == obj.GetType() && handle == ((WindowHandle) obj).handle;
         public override int GetHashCode () => handle.GetHashCode();

@@ -42,9 +42,7 @@ namespace FrigoTab {
             }
         }
 
-        ~MouseHook () {
-            Dispose();
-        }
+        ~MouseHook () => Dispose();
 
         public void Dispose () {
             if( disposed ) {

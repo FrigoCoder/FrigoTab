@@ -11,13 +11,9 @@ namespace FrigoTab {
 
         private IntPtr thumbnail;
 
-        public Thumbnail (WindowHandle source, WindowHandle destination) {
-            DwmRegisterThumbnail(destination, source, out thumbnail);
-        }
+        public Thumbnail (WindowHandle source, WindowHandle destination) => DwmRegisterThumbnail(destination, source, out thumbnail);
 
-        ~Thumbnail () {
-            Dispose();
-        }
+        ~Thumbnail () => Dispose();
 
         public void Dispose () {
             if( thumbnail == IntPtr.Zero ) {

@@ -24,9 +24,7 @@ namespace FrigoTab {
             }
         }
 
-        ~ScreenForms () {
-            Dispose();
-        }
+        ~ScreenForms () => Dispose();
 
         public void Dispose () {
             foreach( ScreenForm form in forms ) {

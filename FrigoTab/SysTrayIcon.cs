@@ -9,13 +9,12 @@ namespace FrigoTab {
 
         private readonly NotifyIcon notifyIcon;
 
-        public SysTrayIcon () {
+        public SysTrayIcon () =>
             notifyIcon = new NotifyIcon {
                 Icon = Program.Icon,
                 ContextMenu = new ContextMenu(new[] {new MenuItem("Exit", (sender, args) => { Exit?.Invoke(); })}),
                 Visible = true
             };
-        }
 
         public void Dispose () => notifyIcon.Dispose();
 

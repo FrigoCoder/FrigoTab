@@ -14,9 +14,7 @@ namespace FrigoTab {
             }
         }
 
-        ~BackgroundWindows () {
-            Dispose();
-        }
+        ~BackgroundWindows () => Dispose();
 
         public void Dispose () {
             foreach( BackgroundWindow window in backgrounds ) {

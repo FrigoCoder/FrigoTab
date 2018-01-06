@@ -14,9 +14,7 @@ namespace FrigoTab {
         public readonly Keys Key;
         public bool Handled;
 
-        public KeyHookEventArgs (Keys key) {
-            Key = key;
-        }
+        public KeyHookEventArgs (Keys key) => Key = key;
 
     }
 
@@ -39,9 +37,7 @@ namespace FrigoTab {
             }
         }
 
-        ~KeyHook () {
-            Dispose();
-        }
+        ~KeyHook () => Dispose();
 
         public void Dispose () {
             if( disposed ) {

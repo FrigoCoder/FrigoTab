@@ -41,9 +41,7 @@ namespace FrigoTab {
             Layout.LayoutWindows(windows);
         }
 
-        ~ApplicationWindows () {
-            Dispose();
-        }
+        ~ApplicationWindows () => Dispose();
 
         public void Dispose () {
             foreach( ApplicationWindow window in windows ) {

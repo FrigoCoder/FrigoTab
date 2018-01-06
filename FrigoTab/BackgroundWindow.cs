@@ -13,9 +13,7 @@ namespace FrigoTab {
             thumbnail.SetDestinationRect(Dwm.GetExtendedFrameBounds(window).ScreenToClient(owner.WindowHandle));
         }
 
-        ~BackgroundWindow () {
-            Dispose();
-        }
+        ~BackgroundWindow () => Dispose();
 
         public void Dispose () {
             if( disposed ) {

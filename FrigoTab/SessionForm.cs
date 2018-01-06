@@ -14,9 +14,7 @@ namespace FrigoTab {
         private ApplicationWindows applications;
         private bool active;
 
-        public SessionForm () {
-            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
-        }
+        public SessionForm () => ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
 
         public void HandleKeyEvents (KeyHookEventArgs e) {
             if( e.Key == (Keys.Alt | Keys.Tab) ) {

@@ -9,9 +9,7 @@ namespace FrigoTab {
         public readonly IList<WindowHandle> Windows = new List<WindowHandle>();
         public readonly IList<WindowHandle> ToolWindows = new List<WindowHandle>();
 
-        public WindowFinder () {
-            EnumWindows(EnumWindowCallback, IntPtr.Zero);
-        }
+        public WindowFinder () => EnumWindows(EnumWindowCallback, IntPtr.Zero);
 
         private bool EnumWindowCallback (WindowHandle handle, IntPtr lParam) {
             switch( GetWindowType(handle) ) {
