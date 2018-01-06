@@ -128,10 +128,10 @@ namespace FrigoTab {
         }
 
         private void ActivateEndSession () {
-            if( applications.Selected == null ) {
+            if( applications.Selected.Get() == null ) {
                 return;
             }
-            applications.Selected.Application.SetForeground();
+            applications.Selected.Get().Application.SetForeground();
             EndSession();
         }
 

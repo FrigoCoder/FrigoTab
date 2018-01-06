@@ -7,18 +7,6 @@ namespace FrigoTab {
 
     public class ApplicationWindows : IDisposable {
 
-        public ApplicationWindow Selected {
-            get => selected;
-            private set {
-                if( selected == value ) {
-                    return;
-                }
-                selected?.Selected?.Set(false);
-                selected = value;
-                selected?.Selected?.Set(true);
-            }
-        }
-
         public bool Visible {
             set {
                 foreach( ApplicationWindow window in windows ) {
@@ -27,10 +15,15 @@ namespace FrigoTab {
             }
         }
 
+        public readonly Property<ApplicationWindow> Selected = new Property<ApplicationWindow>();
         private readonly IList<ApplicationWindow> windows = new List<ApplicationWindow>();
-        private ApplicationWindow selected;
 
         public ApplicationWindows (FrigoForm owner, WindowFinder finder) {
+            Selected.Changed += (oldWindow, newWindow) => {
+                oldWindow?.Selected?.Set(false);
+                newWindow?.Selected?.Set(true);
+            };
+
             foreach( WindowHandle window in finder.Windows ) {
                 windows.Add(new ApplicationWindow(owner, window, windows.Count));
             }
@@ -46,8 +39,8 @@ namespace FrigoTab {
             windows.Clear();
         }
 
-        public void SelectByIndex (int index) => Selected = index >= 0 && index < windows.Count ? windows[index] : null;
-        public void SelectByPoint (Point point) => Selected = windows.FirstOrDefault(window => window.Bounds.Contains(point));
+        public void SelectByIndex (int index) => Selected.Set(index >= 0 && index < windows.Count ? windows[index] : null);
+        public void SelectByPoint (Point point) => Selected.Set(windows.FirstOrDefault(window => window.Bounds.Contains(point)));
 
     }
 
