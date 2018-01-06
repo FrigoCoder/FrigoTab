@@ -8,10 +8,10 @@ namespace FrigoTab {
     public class ApplicationWindow : FrigoForm {
 
         public readonly WindowHandle Application;
-        public BooleanProperty Selected;
+        public readonly BooleanProperty Selected;
         private readonly int index;
         private readonly Thumbnail thumbnail;
-        private readonly WindowIcon icon;
+        private readonly WindowIcon windowIcon;
 
         public ApplicationWindow (FrigoForm owner, WindowHandle application, int index) {
             Owner = owner;
@@ -21,8 +21,8 @@ namespace FrigoTab {
             Selected.Changed += RenderOverlay;
             this.index = index;
             thumbnail = new Thumbnail(application, OwnerHandle);
-            icon = new WindowIcon(application);
-            icon.Changed += RenderOverlay;
+            windowIcon = new WindowIcon(application);
+            windowIcon.Changed += RenderOverlay;
         }
 
         public Size GetSourceSize () => thumbnail.GetSourceSize();
@@ -57,7 +57,7 @@ namespace FrigoTab {
         private void RenderTitle (Graphics graphics) {
             const int Pad = 8;
 
-            Icon icon = this.icon.Icon;
+            Icon icon = windowIcon.Icon;
             string text = Application.GetWindowText();
 
             Font font = new Font("Segoe UI", 11f);
