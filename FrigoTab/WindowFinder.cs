@@ -35,10 +35,16 @@ namespace FrigoTab {
 
         }
 
+        private enum WindowAttribute {
+
+            Cloaked = 0xe
+
+        }
+
         private delegate bool EnumWindowsProc (WindowHandle handle, IntPtr lParam);
 
         private static WindowType GetWindowType (WindowHandle handle) {
-            if( Dwm.IsCloaked(handle) ) {
+            if( IsCloaked(handle) ) {
                 return WindowType.Hidden;
             }
 
@@ -62,6 +68,11 @@ namespace FrigoTab {
             }
 
             return IsAltTabWindow(handle) ? WindowType.AppWindow : WindowType.Hidden;
+        }
+
+        private static bool IsCloaked (WindowHandle window) {
+            DwmGetWindowAttribute(window, WindowAttribute.Cloaked, out bool cloaked, Marshal.SizeOf(typeof(bool)));
+            return cloaked;
         }
 
         private static bool IsAltTabWindow (WindowHandle hwnd) => GetLastActiveVisiblePopup(GetAncestor(hwnd, 3)) == hwnd;
@@ -90,6 +101,9 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible (WindowHandle hWnd);
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmGetWindowAttribute (WindowHandle hWnd, WindowAttribute dwAttribute, out bool pvAttribute, int cbAttribute);
 
     }
 
