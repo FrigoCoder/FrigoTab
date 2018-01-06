@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Runtime.InteropServices;
 
@@ -9,22 +10,23 @@ namespace FrigoTab {
         public event Action Changed;
         public Icon Icon;
 
+        [SuppressMessage("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
+        private readonly SendMessageDelegate callback;
+
         public WindowIcon (WindowHandle handle) {
-            Icon = IconFromGetClassLongPtr(handle) ?? Program.Icon;
-            RegisterIconCallback(handle, icon => {
-                Icon = icon;
-                Changed?.Invoke();
-            });
-        }
-
-        private Icon IconFromGetClassLongPtr (WindowHandle handle) {
             IntPtr icon = GetClassLongPtr(handle, ClassLong.Icon);
-            return icon == IntPtr.Zero ? null : Icon.FromHandle(icon);
+            Icon = icon == IntPtr.Zero ? Program.Icon : Icon.FromHandle(icon);
+            callback = Callback;
+            SendMessageCallback(handle, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, callback, (IntPtr) 0);
         }
 
-        private void RegisterIconCallback (WindowHandle handle, Action<Icon> action) =>
-            SendMessageCallback(handle, WindowMessages.GetIcon, GetIconSize.Big, (IntPtr) 0, CallbackDelegate,
-                GCHandle.ToIntPtr(GCHandle.Alloc(action)));
+        private void Callback (WindowHandle hWnd, int msg, IntPtr dwData, IntPtr lResult) {
+            if( lResult == IntPtr.Zero ) {
+                return;
+            }
+            Icon = Icon.FromHandle(lResult);
+            Changed?.Invoke();
+        }
 
         private enum ClassLong {
 
@@ -39,18 +41,6 @@ namespace FrigoTab {
         }
 
         private delegate void SendMessageDelegate (WindowHandle hWnd, int msg, IntPtr dwData, IntPtr lResult);
-
-        private static readonly SendMessageDelegate CallbackDelegate = Callback;
-
-        private static void Callback (WindowHandle hWnd, int msg, IntPtr dwData, IntPtr lResult) {
-            GCHandle handle = GCHandle.FromIntPtr(dwData);
-            Action<Icon> action = (Action<Icon>) handle.Target;
-            handle.Free();
-
-            if( lResult != IntPtr.Zero ) {
-                action(Icon.FromHandle(lResult));
-            }
-        }
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetClassLongPtr (WindowHandle hWnd, ClassLong nIndex);
