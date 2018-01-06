@@ -15,7 +15,6 @@ namespace FrigoTab {
         private bool active;
 
         public SessionForm () {
-            Bounds = GetScreenBounds();
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
         }
 
@@ -81,7 +80,7 @@ namespace FrigoTab {
             foreach( Screen screen in Screen.AllScreens ) {
                 ChangeDisplaySettingsEx(screen.DeviceName, IntPtr.Zero, IntPtr.Zero, 0, IntPtr.Zero);
             }
-            Bounds = GetScreenBounds();
+            Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
 
             backgrounds = new BackgroundWindows(this, finder);
             screenForms = new ScreenForms(this);
@@ -139,8 +138,6 @@ namespace FrigoTab {
             applications.Selected.Application.SetForeground();
             EndSession();
         }
-
-        private static Rectangle GetScreenBounds () => Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
 
         [DllImport("user32.dll")]
         private static extern int ChangeDisplaySettingsEx (string lpszDeviceName, IntPtr lpDevMode, IntPtr hwnd, int dwflags, IntPtr lParam);
