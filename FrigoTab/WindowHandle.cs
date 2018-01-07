@@ -38,14 +38,12 @@ namespace FrigoTab {
         private readonly IntPtr handle;
 
         public WindowHandle (IntPtr handle) => this.handle = handle;
-
         public override bool Equals (object obj) => obj != null && GetType() == obj.GetType() && handle == ((WindowHandle) obj).handle;
         public override int GetHashCode () => handle.GetHashCode();
+        public Screen GetScreen () => Screen.FromHandle(handle);
         public WindowStyles GetWindowStyles () => (WindowStyles) GetWindowLongPtr(this, WindowLong.Style);
         public WindowExStyles GetWindowExStyles () => (WindowExStyles) GetWindowLongPtr(this, WindowLong.ExStyle);
-
-        [Pure]
-        public Screen GetScreen () => Screen.FromHandle(handle);
+        public void PostMessage (WindowMessages msg, int wParam, int lParam) => PostMessage(this, msg, (IntPtr) wParam, (IntPtr) lParam);
 
         public void SetForeground () {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
@@ -55,14 +53,11 @@ namespace FrigoTab {
             SetForegroundWindow(this);
         }
 
-        [Pure]
         public string GetWindowText () {
             StringBuilder text = new StringBuilder(GetWindowTextLength(this) + 1);
             GetWindowText(this, text, text.Capacity);
             return text.ToString();
         }
-
-        public void PostMessage (WindowMessages msg, int wParam, int lParam) => PostMessage(this, msg, (IntPtr) wParam, (IntPtr) lParam);
 
         private enum ShowWindowCommand {
 
