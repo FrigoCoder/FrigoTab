@@ -7,15 +7,8 @@ namespace FrigoTab {
 
     public class ApplicationWindows : IDisposable {
 
-        public bool Visible {
-            set {
-                foreach( ApplicationWindow window in windows ) {
-                    window.Visible = value;
-                }
-            }
-        }
-
-        public Property<ApplicationWindow> Selected = new Property<ApplicationWindow>();
+        public Property<ApplicationWindow> Selected;
+        public Property<bool> Visible;
         private readonly IList<ApplicationWindow> windows = new List<ApplicationWindow>();
 
         public ApplicationWindows (FrigoForm owner, WindowFinder finder) {
@@ -23,7 +16,11 @@ namespace FrigoTab {
                 oldWindow?.Selected.Set(false);
                 newWindow?.Selected.Set(true);
             };
-
+            Visible.Changed += (oldValue, value) => {
+                foreach( ApplicationWindow window in windows ) {
+                    window.Visible = value;
+                }
+            };
             foreach( WindowHandle window in finder.Windows ) {
                 windows.Add(new ApplicationWindow(owner, window, windows.Count));
             }

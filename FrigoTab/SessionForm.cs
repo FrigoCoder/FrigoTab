@@ -87,8 +87,8 @@ namespace FrigoTab {
             applications.SelectByIndex(0);
 
             Visible = true;
-            screenForms.Visible = true;
-            applications.Visible = true;
+            screenForms.Visible.Set(true);
+            applications.Visible.Set(true);
             WindowHandle.SetForeground();
 
             active = true;
@@ -100,8 +100,8 @@ namespace FrigoTab {
             }
             active = false;
 
-            applications.Visible = false;
-            screenForms.Visible = false;
+            applications.Visible.Set(false);
+            screenForms.Visible.Set(false);
             Visible = false;
 
             applications.Dispose();

@@ -17,7 +17,6 @@ namespace FrigoTab {
             Owner = owner;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             Application = application;
-            Selected = new Property<bool>();
             Selected.Changed += (x, y) => RenderOverlay();
             this.index = index;
             thumbnail = new Thumbnail(application, OwnerHandle);
