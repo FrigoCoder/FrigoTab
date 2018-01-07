@@ -7,6 +7,8 @@ namespace FrigoTab {
         public event Action<T, T> Changed;
         private T current;
 
+        public Property (T defaultValue) => current = defaultValue;
+
         public T Get () => current;
 
         public void Set (T value) {
