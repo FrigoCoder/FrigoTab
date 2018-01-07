@@ -87,8 +87,8 @@ namespace FrigoTab {
             applications.SelectByIndex(0);
 
             Visible = true;
-            screenForms.Visible.Set(true);
-            applications.Visible.Set(true);
+            screenForms.Visible.Value = true;
+            applications.Visible.Value = true;
             WindowHandle.SetForeground();
 
             active = true;
@@ -100,8 +100,8 @@ namespace FrigoTab {
             }
             active = false;
 
-            applications.Visible.Set(false);
-            screenForms.Visible.Set(false);
+            applications.Visible.Value = false;
+            screenForms.Visible.Value = false;
             Visible = false;
 
             applications.Dispose();
@@ -128,10 +128,10 @@ namespace FrigoTab {
         }
 
         private void ActivateEndSession () {
-            if( applications.Selected.Get() == null ) {
+            if( applications.Selected.Value == null ) {
                 return;
             }
-            applications.Selected.Get().Application.SetForeground();
+            applications.Selected.Value.Application.SetForeground();
             EndSession();
         }
 

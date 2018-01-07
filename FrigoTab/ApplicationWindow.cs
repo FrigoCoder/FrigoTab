@@ -48,7 +48,7 @@ namespace FrigoTab {
         }
 
         private void RenderFrame (Graphics graphics) {
-            if( Selected.Get() ) {
+            if( Selected.Value ) {
                 FillRectangle(graphics, graphics.VisibleClipBounds, Color.FromArgb(128, 0, 0, 255));
             }
         }
