@@ -15,11 +15,8 @@ namespace FrigoTab {
         public LayoutScreen (Screen screen, IList<ApplicationWindow> windows) {
             this.screen = screen;
             this.windows = windows;
-            if( windows.Count == 0 ) {
-                return;
-            }
             columns = (int) Math.Ceiling(Math.Sqrt(windows.Count));
-            rows = (int) Math.Ceiling((double) windows.Count / columns);
+            rows = windows.Count == 0 ? 0 : (int) Math.Ceiling((double) windows.Count / columns);
         }
 
         public void Layout () {
