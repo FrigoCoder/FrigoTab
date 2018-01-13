@@ -19,7 +19,7 @@ namespace FrigoTab {
             Application = application;
             Selected.Changed += (x, y) => RenderOverlay();
             this.index = index;
-            thumbnail = new Thumbnail(application, OwnerHandle);
+            thumbnail = new Thumbnail(application, owner.WindowHandle);
             windowIcon = new WindowIcon(application);
             windowIcon.Changed += RenderOverlay;
         }
@@ -28,7 +28,7 @@ namespace FrigoTab {
 
         protected override void OnSizeChanged (EventArgs e) {
             base.OnSizeChanged(e);
-            thumbnail.SetDestinationRect(new Rect(Bounds).ScreenToClient(OwnerHandle));
+            thumbnail.SetDestinationRect(new Rect(Bounds).ScreenToClient(((FrigoForm) Owner).WindowHandle));
             RenderOverlay();
         }
 

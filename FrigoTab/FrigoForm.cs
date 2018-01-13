@@ -7,7 +7,6 @@ namespace FrigoTab {
 
     public class FrigoForm : Form {
 
-        public WindowHandle OwnerHandle => new WindowHandle(Owner.Handle);
         public WindowHandle WindowHandle => new WindowHandle(Handle);
         protected WindowExStyles ExStyle = WindowExStyles.ToolWindow;
 
