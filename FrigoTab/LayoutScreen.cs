@@ -7,12 +7,14 @@ namespace FrigoTab {
 
     public class LayoutScreen {
 
+        public readonly IDictionary<WindowHandle, Rectangle> Bounds;
         private readonly Screen screen;
-        private readonly IList<ApplicationWindow> windows;
+        private readonly IList<WindowHandle> windows;
         private readonly int columns;
         private readonly int rows;
 
-        public LayoutScreen (Screen screen, IList<ApplicationWindow> windows) {
+        public LayoutScreen (Screen screen, IList<WindowHandle> windows) {
+            Bounds = new Dictionary<WindowHandle, Rectangle>();
             this.screen = screen;
             this.windows = windows;
             columns = (int) Math.Ceiling(Math.Sqrt(windows.Count));
@@ -24,9 +26,9 @@ namespace FrigoTab {
                 float xMargin = screen.Bounds.Width * 0.005f;
                 float yMargin = screen.Bounds.Height * 0.005f;
                 RectangleF cell = GetCellBounds(i % columns, i / columns, xMargin, yMargin);
-                RectangleF bounds = CenterWithin(windows[i].GetSourceSize(), cell);
+                RectangleF bounds = CenterWithin(windows[i].GetRect().Size(), cell);
                 bounds.Offset(screen.WorkingArea.Location);
-                windows[i].Bounds = Rectangle.Round(bounds);
+                Bounds[windows[i]] = Rectangle.Round(bounds);
             }
         }
 

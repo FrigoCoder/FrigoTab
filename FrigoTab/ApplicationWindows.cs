@@ -21,10 +21,12 @@ namespace FrigoTab {
                     window.Visible = value;
                 }
             };
-            foreach( WindowHandle window in finder.Windows ) {
-                windows.Add(new ApplicationWindow(owner, window, windows.Count));
+            Layout layout = new Layout(finder.Windows);
+            foreach( WindowHandle handle in finder.Windows ) {
+                ApplicationWindow window = new ApplicationWindow(owner, handle, windows.Count);
+                window.Bounds = layout.Bounds[handle];
+                windows.Add(window);
             }
-            Layout.LayoutWindows(windows);
         }
 
         ~ApplicationWindows () => Dispose();
