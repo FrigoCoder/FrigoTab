@@ -24,6 +24,7 @@ namespace FrigoTab {
             thumbnail.SetDestinationRect(new Rect(Bounds).ScreenToClient(owner.WindowHandle));
             windowIcon = new WindowIcon(application);
             windowIcon.Changed += RenderOverlay;
+            RenderOverlay();
         }
 
         protected override void Dispose (bool disposing) {
