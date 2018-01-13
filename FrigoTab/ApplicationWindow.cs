@@ -13,23 +13,17 @@ namespace FrigoTab {
         private readonly Thumbnail thumbnail;
         private readonly WindowIcon windowIcon;
 
-        public ApplicationWindow (FrigoForm owner, WindowHandle application, int index) {
+        public ApplicationWindow (FrigoForm owner, WindowHandle application, int index, Rectangle bounds) {
+            Bounds = bounds;
             Owner = owner;
             ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             Application = application;
             Selected.Changed += (x, y) => RenderOverlay();
             this.index = index;
             thumbnail = new Thumbnail(application, owner.WindowHandle);
+            thumbnail.SetDestinationRect(new Rect(Bounds).ScreenToClient(owner.WindowHandle));
             windowIcon = new WindowIcon(application);
             windowIcon.Changed += RenderOverlay;
-        }
-
-        public Size GetSourceSize () => Application.GetRect().Size();
-
-        protected override void OnSizeChanged (EventArgs e) {
-            base.OnSizeChanged(e);
-            thumbnail.SetDestinationRect(new Rect(Bounds).ScreenToClient(((FrigoForm) Owner).WindowHandle));
-            RenderOverlay();
         }
 
         protected override void Dispose (bool disposing) {

@@ -23,9 +23,7 @@ namespace FrigoTab {
             };
             Layout layout = new Layout(finder.Windows);
             foreach( WindowHandle handle in finder.Windows ) {
-                ApplicationWindow window = new ApplicationWindow(owner, handle, windows.Count);
-                window.Bounds = layout.Bounds[handle];
-                windows.Add(window);
+                windows.Add(new ApplicationWindow(owner, handle, windows.Count, layout.Bounds[handle]));
             }
         }
 
