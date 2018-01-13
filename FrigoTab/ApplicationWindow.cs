@@ -24,7 +24,7 @@ namespace FrigoTab {
             windowIcon.Changed += RenderOverlay;
         }
 
-        public Size GetSourceSize () => thumbnail.GetSourceSize();
+        public Size GetSourceSize () => Application.GetRect().Size();
 
         protected override void OnSizeChanged (EventArgs e) {
             base.OnSizeChanged(e);

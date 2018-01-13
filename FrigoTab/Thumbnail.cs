@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Drawing;
 using System.Runtime.InteropServices;
 
 #pragma warning disable 169
@@ -22,11 +21,6 @@ namespace FrigoTab {
             DwmUnregisterThumbnail(thumbnail);
             thumbnail = IntPtr.Zero;
             GC.SuppressFinalize(this);
-        }
-
-        public Size GetSourceSize () {
-            DwmQueryThumbnailSourceSize(thumbnail, out Size size);
-            return size;
         }
 
         public void SetSourceRect (Rect sourceRect) {
@@ -72,9 +66,6 @@ namespace FrigoTab {
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmUpdateThumbnailProperties (IntPtr thumb, ref ThumbnailProperties props);
-
-        [DllImport("dwmapi.dll")]
-        private static extern int DwmQueryThumbnailSourceSize (IntPtr thumb, out Size pSize);
 
     }
 

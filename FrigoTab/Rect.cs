@@ -20,6 +20,7 @@ namespace FrigoTab {
         }
 
         public Rect ScreenToClient (WindowHandle window) => new Rect(topLeft.ScreenToClient(window), bottomRight.ScreenToClient(window));
+        public Size Size () => new Size(bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y);
 
     }
 
