@@ -35,22 +35,11 @@ namespace FrigoTab {
                 case WindowMessages.EndSession:
                     EndSession();
                     break;
-                case WindowMessages.KeyDown:
-                case WindowMessages.KeyUp:
-                case WindowMessages.SysKeyDown:
-                case WindowMessages.SysKeyUp:
-                    KeyPressed((Keys) m.WParam);
-                    break;
-                case WindowMessages.MouseMoved:
-                    MouseMoved(new Point((int) m.WParam, (int) m.LParam));
-                    break;
-                case WindowMessages.MouseClicked:
-                    MouseClicked(new Point((int) m.WParam, (int) m.LParam));
-                    break;
             }
             base.WndProc(ref m);
         }
 
+        protected override void OnKeyDown (KeyEventArgs e) => KeyPressed(e.KeyCode);
         protected override void OnMouseMove (MouseEventArgs e) => MouseMoved(e.Location.ClientToScreen(WindowHandle));
         protected override void OnMouseDown (MouseEventArgs e) => MouseClicked(e.Location.ClientToScreen(WindowHandle));
 
