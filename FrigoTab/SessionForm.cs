@@ -84,6 +84,9 @@ namespace FrigoTab {
         }
 
         private void KeyPressed (Keys key) {
+            if( key == Keys.Escape || key == (Keys.Menu | Keys.F4) ) {
+                EndSession();
+            }
             if( Keys.D1 <= key && key <= Keys.D9 || Keys.NumPad1 <= key && key <= Keys.NumPad9 ) {
                 applications.SelectByIndex((char) key - '1');
                 ActivateEndSession();
