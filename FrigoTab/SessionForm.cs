@@ -27,13 +27,8 @@ namespace FrigoTab {
 
         protected override void WndProc (ref Message m) {
             WindowMessages wm = (WindowMessages) m.Msg;
-            switch( wm ) {
-                case WindowMessages.BeginSession:
-                    BeginSession();
-                    break;
-                case WindowMessages.EndSession:
-                    EndSession();
-                    break;
+            if( wm == WindowMessages.BeginSession ) {
+                BeginSession();
             }
             base.WndProc(ref m);
         }
