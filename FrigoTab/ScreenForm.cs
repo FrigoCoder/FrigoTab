@@ -7,6 +7,7 @@ namespace FrigoTab {
         public ScreenForm (Form owner, Screen screen) {
             Owner = owner;
             Bounds = screen.WorkingArea;
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
         }
 
     }

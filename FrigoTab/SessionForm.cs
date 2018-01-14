@@ -14,23 +14,10 @@ namespace FrigoTab {
         private ApplicationWindows applications;
         private bool active;
 
-        public SessionForm () => ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
-
         public void HandleKeyEvents (KeyHookEventArgs e) {
             if( e.Key == (Keys.Alt | Keys.Tab) ) {
                 e.Handled = true;
                 WindowHandle.PostMessage(WindowMessages.BeginSession, 0, 0);
-            }
-        }
-
-        public void HandleMouseEvents (MouseHookEventArgs e) {
-            if( !active ) {
-                return;
-            }
-            WindowHandle.PostMessage(WindowMessages.MouseMoved, e.Point.X, e.Point.Y);
-            if( e.Click ) {
-                e.Handled = true;
-                WindowHandle.PostMessage(WindowMessages.MouseClicked, e.Point.X, e.Point.Y);
             }
         }
 
@@ -63,6 +50,9 @@ namespace FrigoTab {
             }
             base.WndProc(ref m);
         }
+
+        protected override void OnMouseMove (MouseEventArgs e) => MouseMoved(e.Location.ClientToScreen(WindowHandle));
+        protected override void OnMouseDown (MouseEventArgs e) => MouseClicked(e.Location.ClientToScreen(WindowHandle));
 
         private void BeginSession () {
             if( active ) {
