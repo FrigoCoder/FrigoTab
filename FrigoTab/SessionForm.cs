@@ -10,7 +10,6 @@ namespace FrigoTab {
     public class SessionForm : FrigoForm {
 
         private BackgroundWindows backgrounds;
-        private ScreenForms screenForms;
         private ApplicationWindows applications;
         private bool active;
 
@@ -60,13 +59,11 @@ namespace FrigoTab {
             Bounds = Screen.AllScreens.Select(screen => screen.Bounds).Aggregate(Rectangle.Union);
 
             backgrounds = new BackgroundWindows(this, finder);
-            screenForms = new ScreenForms(this);
             applications = new ApplicationWindows(this, finder);
 
             applications.SelectByIndex(0);
 
             Visible = true;
-            screenForms.Visible.Value = true;
             applications.Visible.Value = true;
             WindowHandle.SetForeground();
 
@@ -80,11 +77,9 @@ namespace FrigoTab {
             active = false;
 
             applications.Visible.Value = false;
-            screenForms.Visible.Value = false;
             Visible = false;
 
             applications.Dispose();
-            screenForms.Dispose();
             backgrounds.Dispose();
         }
 
@@ -99,11 +94,7 @@ namespace FrigoTab {
 
         private void MouseClicked (Point point) {
             applications.SelectByPoint(point);
-            if( screenForms.IsOnAToolBar(point) ) {
-                EndSession();
-            } else {
-                ActivateEndSession();
-            }
+            ActivateEndSession();
         }
 
         private void ActivateEndSession () {
