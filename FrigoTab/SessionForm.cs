@@ -59,7 +59,7 @@ namespace FrigoTab {
             applications.SelectByIndex(0);
 
             Visible = true;
-            applications.Visible.Value = true;
+            applications.Visible = true;
             WindowHandle.SetForeground();
 
             active = true;
@@ -71,7 +71,7 @@ namespace FrigoTab {
             }
             active = false;
 
-            applications.Visible.Value = false;
+            applications.Visible = false;
             Visible = false;
 
             applications.Dispose();
