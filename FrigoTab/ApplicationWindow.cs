@@ -12,6 +12,7 @@ namespace FrigoTab {
         private readonly int index;
         private readonly Thumbnail thumbnail;
         private readonly WindowIcon windowIcon;
+        private readonly LayerUpdater layerUpdater;
 
         public ApplicationWindow (FrigoForm owner, WindowHandle application, int index, Rectangle bounds) {
             Bounds = bounds;
@@ -22,17 +23,19 @@ namespace FrigoTab {
             this.index = index;
             thumbnail = new Thumbnail(application, owner.WindowHandle);
             thumbnail.SetDestinationRect(new Rect(Bounds).ScreenToClient(owner.WindowHandle));
+            layerUpdater = new LayerUpdater(this);
             windowIcon = new WindowIcon(application);
             windowIcon.Changed += RenderOverlay;
             RenderOverlay();
         }
 
         protected override void Dispose (bool disposing) {
+            layerUpdater.Dispose();
             thumbnail.Dispose();
             base.Dispose(disposing);
         }
 
-        private void RenderOverlay () => LayerUpdater.Update(this, RenderOverlay);
+        private void RenderOverlay () => layerUpdater.Update(RenderOverlay);
 
         private void RenderOverlay (Graphics graphics) {
             graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
