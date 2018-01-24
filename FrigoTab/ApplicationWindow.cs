@@ -5,34 +5,39 @@ using System.Drawing.Text;
 
 namespace FrigoTab {
 
-    public class ApplicationWindow : FrigoForm {
+    public class ApplicationWindow : IDisposable {
 
+        public readonly Rectangle Bounds;
         public readonly WindowHandle Application;
         public Property<bool> Selected;
         private readonly int index;
+        private readonly LayerUpdater layerUpdater;
         private readonly Thumbnail thumbnail;
         private readonly WindowIcon windowIcon;
-        private readonly LayerUpdater layerUpdater;
+        private bool disposed;
 
-        public ApplicationWindow (FrigoForm owner, WindowHandle application, int index, Rectangle bounds) {
-            Bounds = bounds;
-            Owner = owner;
-            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
+        public ApplicationWindow (FrigoForm owner, WindowHandle application, int index, Rectangle bounds, LayerUpdater layerUpdater) {
+            Bounds = bounds.ScreenToClient(owner.WindowHandle);
             Application = application;
             Selected.Changed += (x, y) => RenderOverlay();
             this.index = index;
+            this.layerUpdater = layerUpdater;
             thumbnail = new Thumbnail(application, owner.WindowHandle);
-            thumbnail.SetDestinationRect(new Rect(Bounds).ScreenToClient(owner.WindowHandle));
-            layerUpdater = new LayerUpdater(this);
+            thumbnail.SetDestinationRect(new Rect(Bounds));
             windowIcon = new WindowIcon(application);
             windowIcon.Changed += RenderOverlay;
             RenderOverlay();
         }
 
-        protected override void Dispose (bool disposing) {
-            layerUpdater.Dispose();
+        ~ApplicationWindow () => Dispose();
+
+        public void Dispose () {
+            if( disposed ) {
+                return;
+            }
             thumbnail.Dispose();
-            base.Dispose(disposing);
+            disposed = true;
+            GC.SuppressFinalize(this);
         }
 
         private void RenderOverlay () => layerUpdater.Update(RenderOverlay);
@@ -40,9 +45,12 @@ namespace FrigoTab {
         private void RenderOverlay (Graphics graphics) {
             graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            graphics.SetClip(Bounds);
+            graphics.Clear(Color.Empty);
             RenderFrame(graphics);
             RenderTitle(graphics);
             RenderNumber(graphics);
+            graphics.ResetClip();
         }
 
         private void RenderFrame (Graphics graphics) {

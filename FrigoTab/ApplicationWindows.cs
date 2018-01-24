@@ -7,6 +7,7 @@ namespace FrigoTab {
     public class ApplicationWindows : FrigoForm {
 
         public Property<ApplicationWindow> Selected;
+        public readonly LayerUpdater LayerUpdater;
         private readonly IList<ApplicationWindow> windows = new List<ApplicationWindow>();
 
         public ApplicationWindows (FrigoForm owner, WindowFinder finder) {
@@ -17,28 +18,25 @@ namespace FrigoTab {
                 oldWindow?.Selected.Set(false);
                 newWindow?.Selected.Set(true);
             };
+            LayerUpdater = new LayerUpdater(this);
             Layout layout = new Layout(finder.Windows);
             foreach( WindowHandle handle in finder.Windows ) {
-                windows.Add(new ApplicationWindow(owner, handle, windows.Count, layout.Bounds[handle]));
+                windows.Add(new ApplicationWindow(owner, handle, windows.Count, layout.Bounds[handle], LayerUpdater));
             }
         }
 
         public void SelectByIndex (int index) => Selected.Value = index >= 0 && index < windows.Count ? windows[index] : null;
-        public void SelectByPoint (Point point) => Selected.Value = windows.FirstOrDefault(window => window.Bounds.Contains(point));
+
+        public void SelectByPoint (Point point) =>
+            Selected.Value = windows.FirstOrDefault(window => window.Bounds.Contains(point.ScreenToClient(WindowHandle)));
 
         protected override void Dispose (bool disposing) {
             foreach( ApplicationWindow window in windows ) {
-                window.Close();
+                window.Dispose();
             }
             windows.Clear();
+            LayerUpdater.Dispose();
             base.Dispose(disposing);
-        }
-
-        protected override void SetVisibleCore (bool value) {
-            foreach( ApplicationWindow window in windows ) {
-                window.Visible = value;
-            }
-            base.SetVisibleCore(value);
         }
 
     }

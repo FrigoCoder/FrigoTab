@@ -45,7 +45,6 @@ namespace FrigoTab {
                 return;
             }
             using( Graphics graphics = Graphics.FromHdc(memDc) ) {
-                graphics.Clear(Color.Empty);
                 renderer(graphics);
             }
             UpdateLayeredWindow();
