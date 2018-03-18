@@ -7,60 +7,26 @@ using System.Windows.Forms;
 
 namespace FrigoTab {
 
-    public class LayerUpdater : IDisposable {
+    public static class LayerUpdater {
 
         public delegate void Renderer (Graphics graphics);
 
-        private readonly Form form;
-        private readonly IntPtr screenDc;
-        private readonly IntPtr memDc;
-        private readonly IntPtr hBitmap;
-        private readonly IntPtr hOldBitmap;
-        private bool disposed;
-
-        public LayerUpdater (Form form) {
-            this.form = form;
-            screenDc = GetDC(IntPtr.Zero);
-            memDc = CreateCompatibleDC(screenDc);
-            hBitmap = CreateCompatibleBitmap(screenDc, form.Bounds.Width, form.Bounds.Height);
-            hOldBitmap = SelectObject(memDc, hBitmap);
-        }
-
-        ~LayerUpdater () => Dispose();
-
-        public void Dispose () {
-            if( disposed ) {
+        public static void Update (Form form, Renderer renderer) {
+            if( form.IsDisposed ) {
                 return;
             }
+            IntPtr screenDc = GetDC(IntPtr.Zero);
+            IntPtr memDc = CreateCompatibleDC(screenDc);
+            IntPtr hBitmap = CreateCompatibleBitmap(screenDc, form.Bounds.Width, form.Bounds.Height);
+            IntPtr hOldBitmap = SelectObject(memDc, hBitmap);
+            using( Graphics graphics = Graphics.FromHdc(memDc) ) {
+                renderer(graphics);
+            }
+            UpdateLayeredWindow(form, memDc);
             SelectObject(memDc, hOldBitmap);
             DeleteDC(memDc);
             DeleteObject(hBitmap);
             ReleaseDC(IntPtr.Zero, screenDc);
-            disposed = true;
-            GC.SuppressFinalize(this);
-        }
-
-        public void Update (Renderer renderer) {
-            if( form.IsDisposed ) {
-                return;
-            }
-            using( Graphics graphics = Graphics.FromHdc(memDc) ) {
-                renderer(graphics);
-            }
-            UpdateLayeredWindow();
-        }
-
-        private void UpdateLayeredWindow () {
-            Point pptDst = form.Bounds.Location;
-            Size pSize = form.Bounds.Size;
-            Point pptSrc = Point.Empty;
-            BlendFunction pblend = new BlendFunction {
-                BlendOperation = BlendOperation.SourceOver,
-                BlendFlags = 0,
-                SourceConstantAlpha = 0xff,
-                AlphaFormat = AlphaFormat.SourceAlpha
-            };
-            UpdateLayeredWindow(form.Handle, IntPtr.Zero, ref pptDst, ref pSize, memDc, ref pptSrc, 0, ref pblend, UpdateLayeredWindowFlags.Alpha);
         }
 
         private struct BlendFunction {
@@ -89,6 +55,19 @@ namespace FrigoTab {
 
             Alpha = 2
 
+        }
+
+        private static void UpdateLayeredWindow (Control form, IntPtr hdc) {
+            Point pptDst = form.Bounds.Location;
+            Size pSize = form.Bounds.Size;
+            Point pptSrc = Point.Empty;
+            BlendFunction pblend = new BlendFunction {
+                BlendOperation = BlendOperation.SourceOver,
+                BlendFlags = 0,
+                SourceConstantAlpha = 0xff,
+                AlphaFormat = AlphaFormat.SourceAlpha
+            };
+            UpdateLayeredWindow(form.Handle, IntPtr.Zero, ref pptDst, ref pSize, hdc, ref pptSrc, 0, ref pblend, UpdateLayeredWindowFlags.Alpha);
         }
 
         [DllImport("user32.dll")]

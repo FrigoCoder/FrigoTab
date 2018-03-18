@@ -5,52 +5,41 @@ using System.Drawing.Text;
 
 namespace FrigoTab {
 
-    public class ApplicationWindow : IDisposable {
+    public class ApplicationWindow : FrigoForm {
 
-        public readonly Rectangle Bounds;
         public readonly WindowHandle Application;
         public Property<bool> Selected;
         private readonly int index;
-        private readonly LayerUpdater layerUpdater;
         private readonly Thumbnail thumbnail;
         private readonly WindowIcon windowIcon;
-        private bool disposed;
 
-        public ApplicationWindow (FrigoForm owner, WindowHandle application, int index, Rectangle bounds, LayerUpdater layerUpdater) {
-            Bounds = bounds.ScreenToClient(owner.WindowHandle);
+        public ApplicationWindow (FrigoForm owner, WindowHandle application, int index, Rectangle bounds) {
+            Bounds = bounds;
+            Owner = owner;
+            ExStyle |= WindowExStyles.Transparent | WindowExStyles.Layered;
             Application = application;
             Selected.Changed += (x, y) => RenderOverlay();
             this.index = index;
-            this.layerUpdater = layerUpdater;
             thumbnail = new Thumbnail(application, owner.WindowHandle);
-            thumbnail.SetDestinationRect(new Rect(Bounds));
+            thumbnail.SetDestinationRect(new Rect(Bounds).ScreenToClient(owner.WindowHandle));
             windowIcon = new WindowIcon(application);
             windowIcon.Changed += RenderOverlay;
             RenderOverlay();
         }
 
-        ~ApplicationWindow () => Dispose();
-
-        public void Dispose () {
-            if( disposed ) {
-                return;
-            }
+        protected override void Dispose (bool disposing) {
             thumbnail.Dispose();
-            disposed = true;
-            GC.SuppressFinalize(this);
+            base.Dispose(disposing);
         }
 
-        private void RenderOverlay () => layerUpdater.Update(RenderOverlay);
+        private void RenderOverlay () => LayerUpdater.Update(this, RenderOverlay);
 
         private void RenderOverlay (Graphics graphics) {
             graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            graphics.SetClip(Bounds);
-            graphics.Clear(Color.Empty);
             RenderFrame(graphics);
             RenderTitle(graphics);
             RenderNumber(graphics);
-            graphics.ResetClip();
         }
 
         private void RenderFrame (Graphics graphics) {

@@ -15,9 +15,6 @@ namespace FrigoTab {
             return point;
         }
 
-        public static Rectangle ScreenToClient (this Rectangle rectangle, WindowHandle handle) =>
-            new Rectangle(rectangle.Location.ScreenToClient(handle), rectangle.Size);
-
         [DllImport("user32.dll")]
         private static extern bool ClientToScreen (WindowHandle hWnd, ref Point lpPoint);
 

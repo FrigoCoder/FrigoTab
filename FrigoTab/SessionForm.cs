@@ -56,8 +56,10 @@ namespace FrigoTab {
             backgrounds = new BackgroundWindows(this, finder);
             applications = new ApplicationWindows(this, finder);
 
+            applications.SelectByIndex(0);
+
             Visible = true;
-            applications.Visible = true;
+            applications.Visible.Value = true;
             WindowHandle.SetForeground();
 
             active = true;
@@ -69,7 +71,7 @@ namespace FrigoTab {
             }
             active = false;
 
-            applications.Visible = false;
+            applications.Visible.Value = false;
             Visible = false;
 
             applications.Dispose();
