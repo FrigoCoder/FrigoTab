@@ -13,8 +13,12 @@ namespace FrigoTab {
 
         public ApplicationWindows (FrigoForm owner, WindowFinder finder) {
             Selected.Changed += (oldWindow, newWindow) => {
-                oldWindow?.Selected.Set(false);
-                newWindow?.Selected.Set(true);
+                if( oldWindow != null ) {
+                    oldWindow.Selected.Value = false;
+                }
+                if( newWindow != null ) {
+                    newWindow.Selected.Value = true;
+                }
             };
             Visible.Changed += (oldValue, value) => {
                 foreach( ApplicationWindow window in windows ) {

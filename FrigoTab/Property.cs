@@ -20,9 +20,6 @@ namespace FrigoTab {
 
         private T current;
 
-        public T Get () => Value;
-        public void Set (T value) => Value = value;
-
     }
 
 }
