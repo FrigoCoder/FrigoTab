@@ -13,6 +13,7 @@ namespace FrigoTab.Core {
         private readonly Action<KeyboardInput> handler;
         private readonly int capacity;
         private int pending;
+        private int generation;
 
         public DeferredKeyboardDispatcher (
             Func<Action, bool> post,
@@ -34,12 +35,29 @@ namespace FrigoTab.Core {
 
         public int PendingCount => Volatile.Read(ref pending);
 
-        public bool TryDispatch (KeyboardInput input) {
-            if( Interlocked.Increment(ref pending) > capacity ) {
+        /// <summary>
+        /// Prevents callbacks posted before a session/desktop interruption
+        /// from reaching the handler after input state has been reset.
+        /// Already-posted callbacks still release their bounded queue slots.
+        /// </summary>
+        public void InvalidatePending () => Interlocked.Increment(ref generation);
+
+        public bool TryDispatch (KeyboardInput input) => TryDispatch(input, capacity);
+
+        /// <summary>
+        /// Uses one reserved slot beyond the ordinary queue capacity. Session
+        /// termination must survive a burst of repeat events while the UI
+        /// thread is constructing or rendering the overlay.
+        /// </summary>
+        public bool TryDispatchCritical (KeyboardInput input) => TryDispatch(input, capacity + 1);
+
+        private bool TryDispatch (KeyboardInput input, int limit) {
+            if( Interlocked.Increment(ref pending) > limit ) {
                 Interlocked.Decrement(ref pending);
                 return false;
             }
 
+            int dispatchGeneration = Volatile.Read(ref generation);
             int released = 0;
             Action release = () => {
                 if( Interlocked.Exchange(ref released, 1) == 0 ) {
@@ -48,6 +66,9 @@ namespace FrigoTab.Core {
             };
             Action callback = () => {
                 release();
+                if( dispatchGeneration != Volatile.Read(ref generation) ) {
+                    return;
+                }
                 handler(input);
             };
 

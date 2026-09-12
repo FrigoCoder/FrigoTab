@@ -9,10 +9,10 @@ namespace FrigoTab.AcceptanceTests {
     [TestCategory("Acceptance")]
     [TestCategory("CurrentFeature")]
     [TestCategory("Regression")]
-    public sealed class GridLayoutAcceptanceTests {
+    public sealed class T20260912T090300Z_031_GridLayoutAcceptanceTests {
 
         [TestMethod]
-        public void T20260912T090300Z_031_FourWindowsUseANearSquareGrid () {
+        public void FourWindowsUseANearSquareGrid () {
             LayoutMonitor primary = Monitor("primary", 0, 0, 1920, 1080, 0, 0, 1920, 1040);
             var windows = new List<LayoutWindow> {
                 Window("one", "primary", 800, 600),
@@ -30,7 +30,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_032_WideSourceWindowKeepsItsAspectRatio () {
+        public void WideSourceWindowKeepsItsAspectRatio () {
             LayoutMonitor primary = Monitor("primary", 0, 0, 1000, 800, 0, 0, 1000, 800);
             var windows = new List<LayoutWindow> {
                 Window("wide", "primary", 1600, 900)
@@ -48,7 +48,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_033_TilesRetainAMarginFromTheMonitorEdges () {
+        public void TilesRetainAMarginFromTheMonitorEdges () {
             LayoutMonitor primary = Monitor("primary", 0, 0, 1000, 1000, 0, 0, 1000, 1000);
             var windows = new List<LayoutWindow> {
                 Window("square", "primary", 1000, 1000)
@@ -64,7 +64,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_034_EachMonitorReceivesItsOwnIndependentGrid () {
+        public void EachMonitorReceivesItsOwnIndependentGrid () {
             LayoutMonitor left = Monitor("left", -1920, 0, 1920, 1080, -1920, 0, 1920, 1040);
             LayoutMonitor primary = Monitor("primary", 0, 0, 1920, 1080, 0, 0, 1920, 1040);
             var windows = new List<LayoutWindow> {
@@ -82,7 +82,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_035_InvalidSourceDimensionsAreIgnored () {
+        public void InvalidSourceDimensionsAreIgnored () {
             LayoutMonitor primary = Monitor("primary", 0, 0, 1920, 1080, 0, 0, 1920, 1040);
             var windows = new List<LayoutWindow> {
                 Window("zeroWidth", "primary", 0, 600),

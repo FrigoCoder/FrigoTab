@@ -8,10 +8,10 @@ namespace FrigoTab.AcceptanceTests {
     [TestCategory("Acceptance")]
     [TestCategory("CurrentFeature")]
     [TestCategory("Regression")]
-    public sealed class PropertyAcceptanceTests {
+    public sealed class T20260912T090300Z_036_PropertyAcceptanceTests {
 
         [TestMethod]
-        public void T20260912T090300Z_036_EqualAssignmentIsSilentAndChangedAssignmentNotifiesOnce () {
+        public void EqualAssignmentIsSilentAndChangedAssignmentNotifiesOnce () {
             var property = new Property<string>();
             var changes = new List<PropertyChange>();
             property.Value = "before";

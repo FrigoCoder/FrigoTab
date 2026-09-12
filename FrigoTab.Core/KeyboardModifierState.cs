@@ -9,11 +9,25 @@ namespace FrigoTab.Core {
     /// </summary>
     public sealed class KeyboardModifierState {
 
+        private readonly object gate = new object();
         private readonly HashSet<KeyboardModifierKey> altKeys = new HashSet<KeyboardModifierKey>();
         private readonly HashSet<KeyboardModifierKey> shiftKeys = new HashSet<KeyboardModifierKey>();
 
-        public bool AltDown => altKeys.Count > 0;
-        public bool ShiftDown => shiftKeys.Count > 0;
+        public bool AltDown {
+            get {
+                lock( gate ) {
+                    return altKeys.Count > 0;
+                }
+            }
+        }
+
+        public bool ShiftDown {
+            get {
+                lock( gate ) {
+                    return shiftKeys.Count > 0;
+                }
+            }
+        }
 
         public KeyboardInput CreateInput (
             SwitcherKey key,
@@ -32,43 +46,47 @@ namespace FrigoTab.Core {
             bool nativeAltDown,
             bool injected,
             KeyboardModifierKey physicalModifier) {
-            bool isDown = transition == KeyTransition.Down;
-            bool alt = nativeAltDown || AltDown || (IsAlt(physicalModifier) && isDown);
-            bool shift = ShiftDown || (IsShift(physicalModifier) && isDown);
+            lock( gate ) {
+                bool isDown = transition == KeyTransition.Down;
+                bool alt = nativeAltDown || altKeys.Count > 0 || (IsAlt(physicalModifier) && isDown);
+                bool shift = shiftKeys.Count > 0 || (IsShift(physicalModifier) && isDown);
 
-            KeyboardInput input = new KeyboardInput(key, transition, alt, shift, injected);
-            if( injected ) {
+                KeyboardInput input = new KeyboardInput(key, transition, alt, shift, injected);
+                if( injected ) {
+                    return input;
+                }
+
+                // Apply the transition after taking the snapshot.  Alt-up therefore
+                // still reports Alt=true to the switcher and can commit selection.
+                if( IsAlt(physicalModifier) ) {
+                    if( isDown ) {
+                        altKeys.Add(physicalModifier);
+                    }
+                    else {
+                        altKeys.Remove(physicalModifier);
+                        // Alt is the sentinel used when LLKHF_ALTDOWN recovers a
+                        // transition missed during hook installation/reset.
+                        altKeys.Remove(KeyboardModifierKey.Alt);
+                    }
+                }
+                else if( IsShift(physicalModifier) ) {
+                    Update(shiftKeys, physicalModifier, isDown);
+                }
+                if( nativeAltDown && altKeys.Count == 0 && !IsAlt(physicalModifier) ) {
+                    // LLKHF_ALTDOWN is part of this hook event, not a separately
+                    // sampled asynchronous state. Remember it until an Alt-up.
+                    altKeys.Add(KeyboardModifierKey.Alt);
+                }
+
                 return input;
             }
-
-            // Apply the transition after taking the snapshot.  Alt-up therefore
-            // still reports Alt=true to the switcher and can commit selection.
-            if( IsAlt(physicalModifier) ) {
-                if( isDown ) {
-                    altKeys.Add(physicalModifier);
-                }
-                else {
-                    altKeys.Remove(physicalModifier);
-                    // Alt is the sentinel used when LLKHF_ALTDOWN recovers a
-                    // transition missed during hook installation/reset.
-                    altKeys.Remove(KeyboardModifierKey.Alt);
-                }
-            }
-            else if( IsShift(physicalModifier) ) {
-                Update(shiftKeys, physicalModifier, isDown);
-            }
-            if( nativeAltDown && !AltDown && !IsAlt(physicalModifier) ) {
-                // LLKHF_ALTDOWN is part of this hook event, not a separately
-                // sampled asynchronous state. Remember it until an Alt-up.
-                altKeys.Add(KeyboardModifierKey.Alt);
-            }
-
-            return input;
         }
 
         public void Reset () {
-            altKeys.Clear();
-            shiftKeys.Clear();
+            lock( gate ) {
+                altKeys.Clear();
+                shiftKeys.Clear();
+            }
         }
 
         private static void Update (

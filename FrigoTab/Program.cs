@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
@@ -9,6 +8,7 @@ namespace FrigoTab {
     public static class Program {
 
         public static readonly Icon Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        private static Timer debugQuitTimer;
 
         [STAThread]
         private static void Main () {
@@ -38,7 +38,7 @@ namespace FrigoTab {
                         try {
                             keyHook = new KeyHook(sessionForm);
                         }
-                        catch( Win32Exception exception ) {
+                        catch( Exception exception ) {
                             MessageBox.Show(
                                 "FrigoTab could not install its global keyboard hook.\n\n" + exception.Message,
                                 "FrigoTab could not start",
@@ -67,11 +67,16 @@ namespace FrigoTab {
 
         [Conditional("DEBUG")]
         private static void StartQuitTimer () {
-            Timer timer = new Timer {
+            debugQuitTimer = new Timer {
                 Interval = 10 * 1000
             };
-            timer.Tick += (sender, args) => { Application.Exit(); };
-            timer.Start();
+            debugQuitTimer.Tick += (sender, args) => {
+                debugQuitTimer.Stop();
+                debugQuitTimer.Dispose();
+                debugQuitTimer = null;
+                Application.Exit();
+            };
+            debugQuitTimer.Start();
         }
 
     }

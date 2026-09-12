@@ -158,7 +158,11 @@ namespace FrigoTab.Core {
                 port.Relayout();
             }
             catch (Exception) {
-                CloseAfterPortFailure();
+                // A display/compositor transition invalidates more than the
+                // current native surface.  Treat it as an interruption so a
+                // consumed-key ledger cannot survive after the physical input
+                // stream or desktop topology may already have changed.
+                Interrupt();
             }
         }
 

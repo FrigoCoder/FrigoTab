@@ -9,9 +9,11 @@
 
         ActivateApp = 0x001c,
         QueryEndSession = 0x0011,
+        EraseBackground = 0x0014,
         EndSessionNative = 0x0016,
         DisplayChange = 0x007e,
         DpiChanged = 0x02e0,
+        DwmCompositionChanged = 0x031e,
         GetIcon = 0x007f,
 
         User = 0x4000,

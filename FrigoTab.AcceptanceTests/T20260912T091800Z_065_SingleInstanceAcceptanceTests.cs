@@ -7,10 +7,10 @@ namespace FrigoTab.AcceptanceTests {
     [TestClass]
     [TestCategory("Acceptance")]
     [TestCategory("Regression")]
-    public sealed class SingleInstanceAcceptanceTests {
+    public sealed class T20260912T091800Z_065_SingleInstanceAcceptanceTests {
 
         [TestMethod]
-        public void T20260912T091800Z_065_CompetingThreadCannotAcquireApplicationMutex () {
+        public void CompetingThreadCannotAcquireApplicationMutex () {
             string name = "Local\\FrigoTab.AcceptanceTests." + Guid.NewGuid().ToString("N");
             SingleInstanceGuard first;
             Assert.IsTrue(SingleInstanceGuard.TryAcquire(name, out first));

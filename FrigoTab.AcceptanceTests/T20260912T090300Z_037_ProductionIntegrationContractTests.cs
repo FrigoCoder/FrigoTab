@@ -11,12 +11,12 @@ namespace FrigoTab.AcceptanceTests {
     [TestCategory("Acceptance")]
     [TestCategory("Regression")]
     [TestCategory("ContractProbe")]
-    public sealed class ProductionIntegrationContractTests {
+    public sealed class T20260912T090300Z_037_ProductionIntegrationContractTests {
 
         private static readonly Type SessionFormType = typeof(SessionForm);
 
         [TestMethod]
-        public void T20260912T090300Z_037_SessionFormIsWiredToTheTestedSwitcherPolicy () {
+        public void SessionFormIsWiredToTheTestedSwitcherPolicy () {
             Assert.IsTrue(
                 typeof(ISwitcherSessionPort).IsAssignableFrom(SessionFormType),
                 "The production session form must adapt native UI operations to the tested switcher policy.");

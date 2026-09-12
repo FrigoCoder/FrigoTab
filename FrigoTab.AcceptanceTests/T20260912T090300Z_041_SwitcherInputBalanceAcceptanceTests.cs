@@ -6,10 +6,10 @@ namespace FrigoTab.AcceptanceTests {
     [TestClass]
     [TestCategory("Acceptance")]
     [TestCategory("Regression")]
-    public sealed class SwitcherInputBalanceAcceptanceTests : SwitcherAcceptanceTestBase {
+    public sealed class T20260912T090300Z_041_SwitcherInputBalanceAcceptanceTests : SwitcherAcceptanceTestBase {
 
         [TestMethod]
-        public void T20260912T090300Z_041_ConsumedAltTabKeyDownAlsoConsumesItsTabKeyUp () {
+        public void ConsumedAltTabKeyDownAlsoConsumesItsTabKeyUp () {
             GivenPort(3);
             SendAltTab();
             SendTabUp();
@@ -18,7 +18,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_042_ConsumedDigitKeyDownAlsoConsumesItsKeyUp () {
+        public void ConsumedDigitKeyDownAlsoConsumesItsKeyUp () {
             GivenPort(3);
             SendAltTab();
             SendDigitDown(1);
@@ -28,7 +28,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_043_ConsumedEscapeKeyDownAlsoConsumesItsKeyUp () {
+        public void ConsumedEscapeKeyDownAlsoConsumesItsKeyUp () {
             GivenPort(3);
             SendAltTab();
             SendEscapeDown();
@@ -38,7 +38,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_044_ConsumedAltF4KeyDownAlsoConsumesItsF4KeyUp () {
+        public void ConsumedAltF4KeyDownAlsoConsumesItsF4KeyUp () {
             GivenPort(3);
             SendAltTab();
             SendAltF4Down();

@@ -11,10 +11,10 @@ namespace FrigoTab.AcceptanceTests {
     [TestClass]
     [TestCategory("Acceptance")]
     [TestCategory("NativeContract")]
-    public sealed class ThumbnailAcceptanceTests {
+    public sealed class T20260912T091800Z_062_ThumbnailAcceptanceTests {
 
         [TestMethod]
-        public void T20260912T091800Z_062_ThumbnailUpdateRequestsVisibleOpaqueDestination () {
+        public void ThumbnailUpdateRequestsVisibleOpaqueDestination () {
             FakeDwmThumbnailApi api = new FakeDwmThumbnailApi();
 
             using( Thumbnail thumbnail = new Thumbnail(
@@ -35,7 +35,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T091800Z_063_FailedThumbnailRegistrationReleasesReturnedHandle () {
+        public void FailedThumbnailRegistrationReleasesReturnedHandle () {
             FakeDwmThumbnailApi api = new FakeDwmThumbnailApi {
                 RegisterResult = unchecked((int) 0x80004005)
             };
@@ -49,7 +49,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T091800Z_064_FailedThumbnailUpdateIsSurfacedAndDisposable () {
+        public void FailedThumbnailUpdateIsSurfacedAndDisposable () {
             FakeDwmThumbnailApi api = new FakeDwmThumbnailApi {
                 UpdateResult = unchecked((int) 0x80004005)
             };
@@ -65,7 +65,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T093300Z_071_ThumbnailSourceUpdateIsVisibleAndOpaque () {
+        public void ThumbnailSourceUpdateIsVisibleAndOpaque () {
             FakeDwmThumbnailApi api = new FakeDwmThumbnailApi();
 
             using( Thumbnail thumbnail = new Thumbnail(
@@ -84,7 +84,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T093300Z_072_FailedThumbnailUnregisterIsDiagnosedWithoutEscapingDispose () {
+        public void FailedThumbnailUnregisterIsDiagnosedWithoutEscapingDispose () {
             FakeDwmThumbnailApi api = new FakeDwmThumbnailApi {
                 UnregisterResult = unchecked((int) 0x80004005)
             };

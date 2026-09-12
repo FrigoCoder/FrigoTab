@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 using FrigoTab.Core;
@@ -8,9 +9,11 @@ namespace FrigoTab {
     public class SessionForm : FrigoForm, ISwitcherSessionPort {
 
         private readonly SwitcherApplication controller;
-        private DesktopSnapshot desktopSnapshot;
+        private DwmGlassBackdrop glassBackdrop;
+        private DwmDesktopBackdrop desktopBackdrop;
         private ApplicationWindows applications;
         private bool disposed;
+        private bool reportedSessionVisibility;
 
         public event Action<bool> SessionVisibilityChanged;
         public event Action InputResetRequested;
@@ -18,6 +21,9 @@ namespace FrigoTab {
         public bool IsSessionVisible => controller.State == SwitcherState.Visible;
 
         public SessionForm () {
+            // DWM owns the live glass pixels. Avoid allocating a second full
+            // redirected surface for this virtual-desktop-sized owner.
+            ExStyle |= WindowExStyles.NoRedirectionBitmap;
             controller = new SwitcherApplication(this);
         }
 
@@ -38,16 +44,35 @@ namespace FrigoTab {
         }
 
         protected override void OnPaint (PaintEventArgs e) {
-            DesktopSnapshot currentSnapshot = desktopSnapshot;
-            if( currentSnapshot == null ) {
+            DwmGlassBackdrop currentGlass = glassBackdrop;
+            if( currentGlass != null && currentGlass.IsAvailable ) {
+                // Alpha-zero/no-paint client pixels let the DWM frame expose
+                // the live desktop. DWM application thumbnails are composed
+                // into this same non-layered owner at full opacity.
+                return;
+            }
+
+            DwmDesktopBackdrop currentBackdrop = desktopBackdrop;
+            if( currentBackdrop == null || !currentBackdrop.IsAvailable ) {
                 e.Graphics.Clear(Color.Black);
                 return;
             }
-            currentSnapshot.Draw(e.Graphics, ClientRectangle);
+            // The DWM thumbnail is composited directly into this owner HWND.
+            // Painting a solid base keeps the fallback deterministic without
+            // copying or scaling a full virtual-desktop bitmap on the UI
+            // thread.
+            currentBackdrop.DrawFallback(e.Graphics);
         }
 
         protected override void WndProc (ref Message m) {
             WindowMessages wm = (WindowMessages) m.Msg;
+            if( wm == WindowMessages.EraseBackground &&
+                glassBackdrop != null && glassBackdrop.IsAvailable ) {
+                // Prevent WinForms/GDI from replacing the transparent glass
+                // client with its default opaque background.
+                m.Result = new IntPtr(1);
+                return;
+            }
             switch( wm ) {
                 case WindowMessages.BeginSession:
                     // Keep the private message as a compatibility path for
@@ -71,7 +96,16 @@ namespace FrigoTab {
                     break;
                 case WindowMessages.DisplayChange:
                 case WindowMessages.DpiChanged:
+                case WindowMessages.DwmCompositionChanged:
+                    bool wasVisible = controller.State == SwitcherState.Visible;
                     controller.Relayout();
+                    if( wasVisible && controller.State != SwitcherState.Visible ) {
+                        // Relayout currently closes a live session.  Reset the
+                        // hook's modifier/suppression state as well because a
+                        // desktop or compositor transition may have lost the
+                        // matching native key-up event.
+                        InputResetRequested?.Invoke();
+                    }
                     NotifySessionVisibility();
                     break;
             }
@@ -128,7 +162,8 @@ namespace FrigoTab {
 
             CloseSessionResources();
 
-            DesktopSnapshot newDesktopSnapshot = null;
+            DwmGlassBackdrop newGlassBackdrop = null;
+            DwmDesktopBackdrop newDesktopBackdrop = null;
             ApplicationWindows newApplications = null;
             try {
                 WindowFinder finder = new WindowFinder();
@@ -142,12 +177,14 @@ namespace FrigoTab {
                 }
                 Bounds = bounds;
 
-                // Capture the desktop while the switcher is still hidden. The
-                // snapshot replaces the old per-tool-window DWM thumbnails and
-                // preserves exactly what was visible when the gesture began.
-                // Capture failure is intentionally non-fatal; DesktopSnapshot
-                // then renders the solid fallback background.
-                newDesktopSnapshot = new DesktopSnapshot(bounds);
+                // The non-layered DWM glass owner exposes the actual live
+                // desktop without a GDI readback or per-window reconstruction.
+                // A shell thumbnail remains a cheap fallback when frame
+                // extension is unavailable.
+                newGlassBackdrop = new DwmGlassBackdrop(WindowHandle);
+                if( !newGlassBackdrop.IsAvailable ) {
+                    newDesktopBackdrop = new DwmDesktopBackdrop(WindowHandle, bounds);
+                }
 
                 // Keep the resource graph local until every constructor has
                 // succeeded. Only a complete session is published to the
@@ -155,20 +192,27 @@ namespace FrigoTab {
                 newApplications = new ApplicationWindows(this, finder);
                 if( newApplications.Count == 0 ) {
                     newApplications.Dispose();
-                    newDesktopSnapshot.Dispose();
+                    newDesktopBackdrop?.Dispose();
+                    newGlassBackdrop.Dispose();
                     return false;
                 }
 
-                desktopSnapshot = newDesktopSnapshot;
+                glassBackdrop = newGlassBackdrop;
+                desktopBackdrop = newDesktopBackdrop;
                 applications = newApplications;
-                newDesktopSnapshot = null;
+                newGlassBackdrop = null;
+                newDesktopBackdrop = null;
                 newApplications = null;
 
                 Visible = true;
                 applications.Visible.Value = true;
                 if( !WindowHandle.SetForeground() ) {
-                    CloseSessionResources();
-                    return false;
+                    // Windows may legitimately deny SetForegroundWindow even
+                    // though this process owns the physical Alt+Tab gesture.
+                    // The overlay and hook admission have already succeeded;
+                    // treating focus acquisition as fatal would replay the
+                    // gesture and expose the native switcher intermittently.
+                    Trace.WriteLine("The switcher opened, but Windows denied foreground activation.");
                 }
 
                 candidateCount = applications.Count;
@@ -182,7 +226,13 @@ namespace FrigoTab {
                     // Best-effort cleanup; preserve fail-open behavior.
                 }
                 try {
-                    newDesktopSnapshot?.Dispose();
+                    newDesktopBackdrop?.Dispose();
+                }
+                catch {
+                    // Best-effort cleanup; preserve fail-open behavior.
+                }
+                try {
+                    newGlassBackdrop?.Dispose();
                 }
                 catch {
                     // Best-effort cleanup; preserve fail-open behavior.
@@ -195,9 +245,11 @@ namespace FrigoTab {
 
         private void CloseSessionResources () {
             ApplicationWindows currentApplications = applications;
-            DesktopSnapshot currentDesktopSnapshot = desktopSnapshot;
+            DwmGlassBackdrop currentGlassBackdrop = glassBackdrop;
+            DwmDesktopBackdrop currentDesktopBackdrop = desktopBackdrop;
             applications = null;
-            desktopSnapshot = null;
+            glassBackdrop = null;
+            desktopBackdrop = null;
 
             try {
                 if( currentApplications != null ) {
@@ -222,10 +274,16 @@ namespace FrigoTab {
                 // Application teardown is intentionally idempotent/best effort.
             }
             try {
-                currentDesktopSnapshot?.Dispose();
+                currentDesktopBackdrop?.Dispose();
             }
             catch {
                 // Application teardown is intentionally idempotent/best effort.
+            }
+            try {
+                currentGlassBackdrop?.Dispose();
+            }
+            catch {
+                // Restore ordinary owner margins even if other teardown fails.
             }
         }
 
@@ -242,8 +300,14 @@ namespace FrigoTab {
             return found && bounds.Width > 0 && bounds.Height > 0;
         }
 
-        private void NotifySessionVisibility () =>
-            SessionVisibilityChanged?.Invoke(controller.State == SwitcherState.Visible);
+        private void NotifySessionVisibility () {
+            bool visible = controller.State == SwitcherState.Visible;
+            if( visible == reportedSessionVisibility ) {
+                return;
+            }
+            reportedSessionVisibility = visible;
+            SessionVisibilityChanged?.Invoke(visible);
+        }
 
     }
 

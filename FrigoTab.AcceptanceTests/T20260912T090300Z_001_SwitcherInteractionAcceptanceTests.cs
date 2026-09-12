@@ -8,10 +8,10 @@ namespace FrigoTab.AcceptanceTests {
     [TestCategory("Acceptance")]
     [TestCategory("CurrentFeature")]
     [TestCategory("Regression")]
-    public sealed class SwitcherInteractionAcceptanceTests : SwitcherAcceptanceTestBase {
+    public sealed class T20260912T090300Z_001_SwitcherInteractionAcceptanceTests : SwitcherAcceptanceTestBase {
 
         [TestMethod]
-        public void T20260912T090300Z_001_FirstAltTabOpensAndSelectsTheFirstCandidate () {
+        public void FirstAltTabOpensAndSelectsTheFirstCandidate () {
             GivenPort(3);
             SendAltTab();
 
@@ -21,7 +21,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_002_EmptyCandidateListFailsOpenAndCleansUp () {
+        public void EmptyCandidateListFailsOpenAndCleansUp () {
             GivenPort(0);
             SendAltTab();
 
@@ -31,7 +31,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_003_ExceptionWhileOpeningFailsOpenAndCleansUp () {
+        public void ExceptionWhileOpeningFailsOpenAndCleansUp () {
             GivenPort(3);
             Port.ThrowOnOpen = true;
             SendAltTab();
@@ -42,7 +42,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_004_ExceptionWhileSelectingInitialCandidateFailsOpenAndCleansUp () {
+        public void ExceptionWhileSelectingInitialCandidateFailsOpenAndCleansUp () {
             GivenPort(3);
             Port.ThrowOnSelect = true;
             SendAltTab();
@@ -53,7 +53,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_005_UnrelatedKeyIsPassedThroughWhileIdle () {
+        public void UnrelatedKeyIsPassedThroughWhileIdle () {
             GivenPort(3);
             Send(new KeyboardInput(SwitcherKey.Unknown, KeyTransition.Down, false, false, false));
 
@@ -62,7 +62,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_006_InjectedAltTabIsPassedThrough () {
+        public void InjectedAltTabIsPassedThrough () {
             GivenPort(3);
             SendAltTab(injected: true);
 
@@ -71,7 +71,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_007_KeyUpEventIsPassedThroughWhileIdle () {
+        public void KeyUpEventIsPassedThroughWhileIdle () {
             GivenPort(3);
             SendTabUp();
 
@@ -80,7 +80,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_008_RepeatedAltTabAdvancesAndWrapsForward () {
+        public void RepeatedAltTabAdvancesAndWrapsForward () {
             GivenPort(3);
             SendAltTab();
             SendAltTab();
@@ -92,7 +92,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_009_ShiftAltTabMovesBackwardsAndWraps () {
+        public void ShiftAltTabMovesBackwardsAndWraps () {
             GivenPort(3);
             SendAltTab();
             SendAltTab(shift: true);
@@ -101,7 +101,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_010_ReleasingAltActivatesTheSelectedCandidateAndCloses () {
+        public void ReleasingAltActivatesTheSelectedCandidateAndCloses () {
             GivenPort(3);
             SendAltTab();
             SendAltUp();
@@ -113,7 +113,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_011_EscapeCancelsWithoutActivation () {
+        public void EscapeCancelsWithoutActivation () {
             GivenPort(3);
             SendAltTab();
             SendEscapeDown();
@@ -124,7 +124,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_012_AltF4CancelsWithoutActivation () {
+        public void AltF4CancelsWithoutActivation () {
             GivenPort(3);
             SendAltTab();
             SendAltF4Down();
@@ -135,7 +135,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_013_D1SelectsAndActivatesTheFirstCandidate () {
+        public void D1SelectsAndActivatesTheFirstCandidate () {
             GivenPort(3);
             SendAltTab();
             SendDigitDown(1);
@@ -145,7 +145,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_014_NumPad2SelectsAndActivatesTheSecondCandidate () {
+        public void NumPad2SelectsAndActivatesTheSecondCandidate () {
             GivenPort(3);
             SendAltTab();
             SendNumPadDown(2);
@@ -155,7 +155,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_015_InvalidDigitPreservesTheCurrentSelection () {
+        public void InvalidDigitPreservesTheCurrentSelection () {
             GivenPort(3);
             SendAltTab();
             SendDigitDown(9);
@@ -165,7 +165,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_016_PointerHoverSelectsTheCandidateUnderThePointer () {
+        public void PointerHoverSelectsTheCandidateUnderThePointer () {
             GivenPort(3);
             Port.HitTestResult = 2;
             SendAltTab();
@@ -175,7 +175,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_017_PointerClickActivatesTheCandidateUnderThePointer () {
+        public void PointerClickActivatesTheCandidateUnderThePointer () {
             GivenPort(3);
             Port.HitTestResult = 1;
             SendAltTab();
@@ -186,7 +186,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_018_PointerOutsideEveryTileClearsSelectionWithoutActivation () {
+        public void PointerOutsideEveryTileClearsSelectionWithoutActivation () {
             GivenPort(3);
             Port.HitTestResult = null;
             SendAltTab();
@@ -197,7 +197,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_019_AltTabRestoresKeyboardSelectionAfterPointerClearsIt () {
+        public void AltTabRestoresKeyboardSelectionAfterPointerClearsIt () {
             GivenPort(3);
             Port.HitTestResult = null;
             SendAltTab();
@@ -210,7 +210,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_020_ShiftAltTabRestoresTheLastSelectionAfterPointerClearsIt () {
+        public void ShiftAltTabRestoresTheLastSelectionAfterPointerClearsIt () {
             GivenPort(3);
             Port.HitTestResult = null;
             SendAltTab();
@@ -221,7 +221,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_021_InvalidPointerCandidateClosesTheInconsistentSessionSafely () {
+        public void InvalidPointerCandidateClosesTheInconsistentSessionSafely () {
             GivenPort(3);
             Port.HitTestResult = 99;
             SendAltTab();
@@ -233,7 +233,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_022_HitTestFailureClosesTheSessionSafely () {
+        public void HitTestFailureClosesTheSessionSafely () {
             GivenPort(3);
             Port.ThrowOnHitTest = true;
             SendAltTab();
@@ -244,7 +244,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_023_SelectionClearFailureClosesTheSessionSafely () {
+        public void SelectionClearFailureClosesTheSessionSafely () {
             GivenPort(3);
             Port.HitTestResult = null;
             Port.ThrowOnClearSelection = true;
@@ -256,7 +256,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_024_ActivationFailureLeavesTheSessionVisibleForRetryOrCancel () {
+        public void ActivationFailureLeavesTheSessionVisibleForRetryOrCancel () {
             GivenPort(3);
             Port.ActivationResult = false;
             SendAltTab();
@@ -268,7 +268,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_025_ActivationExceptionLeavesTheSessionVisibleForRetryOrCancel () {
+        public void ActivationExceptionLeavesTheSessionVisibleForRetryOrCancel () {
             GivenPort(3);
             Port.ThrowOnActivation = true;
             SendAltTab();
@@ -280,7 +280,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_026_InterruptionReturnsTheApplicationToIdle () {
+        public void InterruptionReturnsTheApplicationToIdle () {
             GivenPort(3);
             SendAltTab();
             Interrupt();
@@ -290,7 +290,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_027_CleanupExceptionCannotLeaveTheApplicationActive () {
+        public void CleanupExceptionCannotLeaveTheApplicationActive () {
             GivenPort(3);
             Port.ThrowOnClose = true;
             SendAltTab();
@@ -301,7 +301,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_028_DisplayChangeRelayoutsAVisibleSession () {
+        public void DisplayChangeRelayoutsAVisibleSession () {
             GivenPort(3);
             SendAltTab();
             Relayout();
@@ -311,7 +311,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_029_RelayoutFailureClosesTheVisibleSessionSafely () {
+        public void RelayoutFailureClosesTheVisibleSessionSafely () {
             GivenPort(3);
             Port.ThrowOnRelayout = true;
             SendAltTab();
@@ -322,7 +322,19 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void T20260912T090300Z_030_ClosedSessionCanBeOpenedAgain () {
+        public void RelayoutFailureClearsConsumedKeysFromTheInterruptedSession () {
+            GivenPort(3);
+            Port.ThrowOnRelayout = true;
+            SendAltTab();
+            Relayout();
+            SendTabUp();
+
+            AssertIdle();
+            AssertPassedThrough();
+        }
+
+        [TestMethod]
+        public void ClosedSessionCanBeOpenedAgain () {
             GivenPort(3);
             SendAltTab();
             SendAltUp();

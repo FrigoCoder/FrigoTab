@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows.Forms;
 using FrigoTab.Core;
 
@@ -91,6 +92,10 @@ namespace FrigoTab {
 
         private const int LowLevelKeyboardHook = 13;
         private const int MaxPendingKeyboardEvents = 64;
+        private const uint QuitMessage = 0x0012;
+        private const uint PeekMessageNoRemove = 0x0000;
+        private const int StartupTimeoutMilliseconds = 5000;
+        private const int ShutdownTimeoutMilliseconds = 2000;
 
         public event Action<KeyHookEventArgs> KeyEvent;
 
@@ -100,8 +105,15 @@ namespace FrigoTab {
         private readonly KeyboardModifierState modifiers = new KeyboardModifierState();
         private readonly KeyboardSuppressionState suppression = new KeyboardSuppressionState();
         private readonly DeferredKeyboardDispatcher deferredDispatcher;
-        private readonly IntPtr hookId;
-        private bool disposed;
+        private readonly object inputStateGate = new object();
+        private readonly Thread hookThread;
+        private readonly ManualResetEventSlim hookStartup = new ManualResetEventSlim(false);
+        private int disposed;
+        private uint hookThreadId;
+        private IntPtr hookId;
+        private Exception hookStartupException;
+
+        private bool IsDisposed => Volatile.Read(ref disposed) != 0;
 
         public KeyHook (Control dispatcherControl) {
             if( dispatcherControl == null ) {
@@ -116,12 +128,142 @@ namespace FrigoTab {
                 DispatchOnUiThread,
                 MaxPendingKeyboardEvents);
             hookProc = HookProc;
-            IntPtr moduleHandle = IntPtr.Zero;
+            hookThread = new Thread(HookThreadMain) {
+                IsBackground = true,
+                Name = "FrigoTab keyboard hook"
+            };
+            hookThread.Start();
+
+            if( !hookStartup.Wait(StartupTimeoutMilliseconds) ) {
+                Dispose();
+                throw new TimeoutException(
+                    "Timed out while starting the dedicated FrigoTab keyboard hook thread.");
+            }
+            if( hookStartupException != null ) {
+                Exception exception = hookStartupException;
+                Dispose();
+                throw exception;
+            }
+        }
+
+        public void Dispose () {
+            if( Interlocked.Exchange(ref disposed, 1) != 0 ) {
+                return;
+            }
+
+            lock( inputStateGate ) {
+                deferredDispatcher.InvalidatePending();
+                suppression.Reset();
+                modifiers.Reset();
+            }
+
+            uint threadId = Volatile.Read(ref hookThreadId);
+            if( threadId != 0 ) {
+                PostThreadMessage(threadId, QuitMessage, UIntPtr.Zero, IntPtr.Zero);
+            }
+
+            Thread currentThread = hookThread;
+            if( currentThread != null && currentThread != Thread.CurrentThread && currentThread.IsAlive ) {
+                if( !currentThread.Join(ShutdownTimeoutMilliseconds) ) {
+                    // The hook normally uninstalls in its own message-loop
+                    // thread.  A hung thread must not leave the global hook
+                    // installed indefinitely or block application shutdown.
+                    IntPtr id = Interlocked.Exchange(ref hookId, IntPtr.Zero);
+                    if( id != IntPtr.Zero ) {
+                        UnhookWindowsHookEx(id);
+                    }
+                    currentThread.Join(ShutdownTimeoutMilliseconds);
+                }
+            }
+            GC.SuppressFinalize(this);
+        }
+
+        private void HookThreadMain () {
+            try {
+                Volatile.Write(ref hookThreadId, GetCurrentThreadId());
+
+                // PostThreadMessage cannot target a thread until its message
+                // queue exists. PeekMessage creates it before the constructor
+                // is released, so shutdown can always wake this thread.
+                NativeMessage message;
+                PeekMessage(
+                    out message,
+                    IntPtr.Zero,
+                    0,
+                    0,
+                    PeekMessageNoRemove);
+
+                IntPtr moduleHandle = ResolveModuleHandle();
+                IntPtr installedHook = SetWindowsHookEx(
+                    LowLevelKeyboardHook,
+                    hookProc,
+                    moduleHandle,
+                    0);
+                if( installedHook == IntPtr.Zero ) {
+                    int error = Marshal.GetLastWin32Error();
+                    throw new Win32Exception(
+                        error == 0 ? 1 : error,
+                        "Unable to install the global keyboard hook. FrigoTab cannot intercept Alt+Tab.");
+                }
+
+                Interlocked.Exchange(ref hookId, installedHook);
+            }
+            catch( Exception exception ) {
+                hookStartupException = exception;
+            }
+            finally {
+                hookStartup.Set();
+            }
+
+            if( hookStartupException != null || IsDisposed ) {
+                UninstallHookOnCurrentThread();
+                return;
+            }
+
+            try {
+                while( !IsDisposed ) {
+                    int result = GetMessage(
+                        out NativeMessage message,
+                        IntPtr.Zero,
+                        0,
+                        0);
+                    if( result == -1 ) {
+                        Debug.WriteLine("GetMessage failed for the FrigoTab keyboard hook thread: " +
+                            Marshal.GetLastWin32Error());
+                        break;
+                    }
+                    if( result == 0 ) {
+                        break;
+                    }
+
+                    TranslateMessage(ref message);
+                    DispatchMessage(ref message);
+                }
+            }
+            catch( Exception exception ) {
+                // The thread must still uninstall the hook if the message
+                // loop encounters an unexpected interop/runtime failure.
+                Debug.WriteLine(exception);
+            }
+            finally {
+                UninstallHookOnCurrentThread();
+                Volatile.Write(ref hookThreadId, 0);
+            }
+        }
+
+        private void UninstallHookOnCurrentThread () {
+            IntPtr id = Interlocked.Exchange(ref hookId, IntPtr.Zero);
+            if( id != IntPtr.Zero ) {
+                UnhookWindowsHookEx(id);
+            }
+        }
+
+        private static IntPtr ResolveModuleHandle () {
             try {
                 using( Process curProcess = Process.GetCurrentProcess() ) {
                     using( ProcessModule curModule = curProcess.MainModule ) {
                         if( curModule != null ) {
-                            moduleHandle = GetModuleHandle(curModule.ModuleName);
+                            return GetModuleHandle(curModule.ModuleName);
                         }
                     }
                 }
@@ -133,49 +275,37 @@ namespace FrigoTab {
                     "Unable to resolve the FrigoTab module for the global keyboard hook: " + exception.Message);
             }
 
-            hookId = SetWindowsHookEx(LowLevelKeyboardHook, hookProc, moduleHandle, 0);
-            if( hookId == IntPtr.Zero ) {
-                int error = Marshal.GetLastWin32Error();
-                throw new Win32Exception(
-                    error == 0 ? 1 : error,
-                    "Unable to install the global keyboard hook. FrigoTab cannot intercept Alt+Tab.");
-            }
-        }
-
-        ~KeyHook () => Dispose();
-
-        public void Dispose () {
-            if( disposed ) {
-                return;
-            }
-
-            disposed = true;
-            suppression.Reset();
-            modifiers.Reset();
-            if( hookId != IntPtr.Zero ) {
-                UnhookWindowsHookEx(hookId);
-            }
-            GC.SuppressFinalize(this);
+            throw new Win32Exception(
+                1,
+                "Unable to resolve the FrigoTab module for the global keyboard hook.");
         }
 
         private IntPtr HookProc (int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam) {
-            bool handled = false;
             try {
-                handled = HookProcInner(nCode, (WindowMessages) wParam, ref lParam);
+                if( HookProcInner(nCode, (WindowMessages) wParam, ref lParam) ) {
+                    return (IntPtr) 1;
+                }
             }
             catch( Exception exception ) {
                 // Never allow an exception to cross the unmanaged hook boundary.
                 Debug.WriteLine(exception);
             }
 
-            if( handled ) {
-                return (IntPtr) 1;
+            try {
+                return CallNextHookEx(
+                    Volatile.Read(ref hookId),
+                    nCode,
+                    wParam,
+                    ref lParam);
             }
-            return CallNextHookEx(hookId, nCode, wParam, ref lParam);
+            catch( Exception exception ) {
+                Debug.WriteLine(exception);
+                return IntPtr.Zero;
+            }
         }
 
         private bool HookProcInner (int nCode, WindowMessages wParam, ref LowLevelKeyStruct lParam) {
-            if( nCode < 0 || disposed ) {
+            if( nCode < 0 || IsDisposed ) {
                 return false;
             }
 
@@ -192,54 +322,135 @@ namespace FrigoTab {
                 return false;
             }
 
-            KeyboardInput input = modifiers.CreateInput(
-                key,
-                transition,
-                lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown),
-                false,
-                MapModifierKey(keyCode));
+            KeyboardInput input;
+            bool consume;
+            bool replayInitialGesture = false;
+            bool altStillDown = false;
+            bool shiftStillDown = false;
+            lock( inputStateGate ) {
+                if( IsDisposed ) {
+                    return false;
+                }
 
-            // BeginInvoke only posts a Windows message.  Window enumeration,
-            // DWM setup, rendering, and activation run later on the UI thread,
-            // after LowLevelKeyboardProc has returned.
-            if( !deferredDispatcher.TryDispatch(input) ) {
-                return false;
+                input = modifiers.CreateInput(
+                    key,
+                    transition,
+                    lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown),
+                    false,
+                    MapModifierKey(keyCode));
+
+                long admissionToken;
+                consume = suppression.ShouldConsume(input, out admissionToken);
+                bool delivered = IsSessionEndingInput(input)
+                    ? deferredDispatcher.TryDispatchCritical(input)
+                    : deferredDispatcher.TryDispatch(input);
+                if( !delivered ) {
+                    // Never accidentally expose a consumed Alt+Tab when the UI
+                    // handle is being torn down or its bounded queue is full. A
+                    // failed original admission has an explicit recovery path;
+                    // a failed repeat has no admission token and cannot cancel
+                    // the already queued original event.
+                    replayInitialGesture = consume &&
+                        suppression.AbortPendingAdmission(admissionToken);
+                    if( replayInitialGesture ) {
+                        altStillDown = modifiers.AltDown;
+                        shiftStillDown = modifiers.ShiftDown;
+                    }
+                    else {
+                        // Once a session is active, dropping an event is safer
+                        // than exposing half a switcher gesture to another app.
+                        return consume;
+                    }
+                }
             }
-            return suppression.ShouldConsume(input);
+
+            if( replayInitialGesture ) {
+                return ReplayNativeAltTab(altStillDown, input.Shift, shiftStillDown);
+            }
+            return consume;
         }
 
-        public void SetSessionVisible (bool visible) => suppression.SetSessionVisible(visible);
+        private static bool IsSessionEndingInput (KeyboardInput input) =>
+            (input.IsUp && input.Key == SwitcherKey.Alt) ||
+            (input.IsDown && input.Key == SwitcherKey.Escape) ||
+            (input.IsDown && input.Key == SwitcherKey.F4 && input.Alt);
+
+        public void SetSessionVisible (bool visible) {
+            lock( inputStateGate ) {
+                if( IsDisposed ) {
+                    return;
+                }
+                if( !visible ) {
+                    // Close/failure notifications form a generation barrier:
+                    // repeats posted for the old session must never reopen a
+                    // new session after this transition reaches the UI.
+                    deferredDispatcher.InvalidatePending();
+                }
+                suppression.SetSessionVisible(visible);
+            }
+        }
 
         public void ResetInputState () {
-            modifiers.Reset();
-            suppression.Reset();
+            lock( inputStateGate ) {
+                deferredDispatcher.InvalidatePending();
+                modifiers.Reset();
+                suppression.Reset();
+            }
         }
 
         private bool PostToUiThread (Action action) {
-            if( disposed || dispatcherControl.IsDisposed || dispatcherControl.Disposing ) {
+            if( IsDisposed || dispatcherControl.IsDisposed || dispatcherControl.Disposing ) {
                 return false;
             }
-            dispatcherControl.BeginInvoke(action);
-            return true;
+            try {
+                // BeginInvoke only posts a Windows message. Window enumeration,
+                // DWM setup, rendering, and activation run later on the UI
+                // thread, after the hook callback has returned.
+                dispatcherControl.BeginInvoke(action);
+                return true;
+            }
+            catch( ObjectDisposedException ) {
+                return false;
+            }
+            catch( InvalidOperationException ) {
+                return false;
+            }
         }
 
         private void DispatchOnUiThread (KeyboardInput input) {
-            if( disposed ) {
+            if( IsDisposed ) {
                 return;
             }
 
             Keys keyCode = MapLegacyKey(input.Key);
             Keys legacyKey = input.Alt ? keyCode | Keys.Alt : keyCode;
             KeyHookEventArgs e = new KeyHookEventArgs(legacyKey, input);
-            try {
-                KeyEvent?.Invoke(e);
-            }
-            catch( Exception exception ) {
-                // Subscriber failures are contained on the managed UI thread.
-                Debug.WriteLine(exception);
+            Action<KeyHookEventArgs> subscribers = KeyEvent;
+            if( subscribers != null ) {
+                bool handled = false;
+                foreach( Delegate subscription in subscribers.GetInvocationList() ) {
+                    e.Handled = handled;
+                    try {
+                        ((Action<KeyHookEventArgs>) subscription)(e);
+                    }
+                    catch( Exception exception ) {
+                        // Isolate one extension/subscriber without preventing
+                        // the production session handler from receiving the
+                        // input. If any subscriber successfully admitted the
+                        // gesture, a later failure cannot undo that decision.
+                        Debug.WriteLine(exception);
+                    }
+                    handled |= e.Handled;
+                }
+                e.Handled = handled;
             }
 
             if( !e.Handled && input.IsDown && input.Key == SwitcherKey.Tab && input.Alt ) {
+                // A failed initial UI admission remains Idle, so SessionForm's
+                // change-only notification has nothing to publish. Resolve
+                // the pending hook admission here and invalidate its repeats
+                // before replaying the native gesture.
+                SetSessionVisible(false);
                 try {
                     ReplayNativeAltTab(modifiers.AltDown, input.Shift, modifiers.ShiftDown);
                 }
@@ -251,7 +462,7 @@ namespace FrigoTab {
             }
         }
 
-        private static void ReplayNativeAltTab (bool altStillDown, bool reverse, bool shiftStillDown) {
+        private static bool ReplayNativeAltTab (bool altStillDown, bool reverse, bool shiftStillDown) {
             KeyboardInput[] recovery = AltTabRecoveryPlan.Create(altStillDown, reverse, shiftStillDown);
             NativeInput[] inputs = new NativeInput[recovery.Length];
             for( int index = 0; index < recovery.Length; index++ ) {
@@ -264,7 +475,9 @@ namespace FrigoTab {
             if( sent != (uint) inputs.Length ) {
                 Debug.WriteLine("Unable to replay Alt+Tab after switcher admission failed. Win32 error: " +
                     Marshal.GetLastWin32Error());
+                return false;
             }
+            return true;
         }
 
         private static bool TryGetTransition (WindowMessages message, out KeyTransition transition) {
@@ -494,9 +707,25 @@ namespace FrigoTab {
         [UnmanagedFunctionPointer(CallingConvention.Winapi)]
         private delegate IntPtr LowLevelKeyProc (int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam);
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeMessage {
+
+            public IntPtr HWnd;
+            public uint Message;
+            public UIntPtr WParam;
+            public IntPtr LParam;
+            public uint Time;
+            public int PointX;
+            public int PointY;
+
+        }
+
         [DllImport("kernel32.dll", EntryPoint = "GetModuleHandleW", CharSet = CharSet.Unicode,
             ExactSpelling = true, SetLastError = true)]
         private static extern IntPtr GetModuleHandle (string lpModuleName);
+
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        private static extern uint GetCurrentThreadId ();
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr SetWindowsHookEx (int idHook, LowLevelKeyProc lpfn, IntPtr hMod, int dwThreadId);
@@ -506,6 +735,34 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern IntPtr CallNextHookEx (IntPtr hhk, int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool PostThreadMessage (
+            uint threadId,
+            uint message,
+            UIntPtr wParam,
+            IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool PeekMessage (
+            out NativeMessage message,
+            IntPtr window,
+            uint minimumMessage,
+            uint maximumMessage,
+            uint removeMessage);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int GetMessage (
+            out NativeMessage message,
+            IntPtr window,
+            uint minimumMessage,
+            uint maximumMessage);
+
+        [DllImport("user32.dll")]
+        private static extern bool TranslateMessage (ref NativeMessage message);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr DispatchMessage (ref NativeMessage message);
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern uint SendInput (uint inputCount, NativeInput[] inputs, int inputSize);

@@ -51,24 +51,66 @@ namespace FrigoTab.AcceptanceTests.Support {
             }
         }
 
+        public bool DebugSafetyTimerIsRootedUntilItFires {
+            get {
+                string program = ReadSource("FrigoTab", "Program.cs");
+                return program.Contains("private static Timer debugQuitTimer", StringComparison.Ordinal) &&
+                    program.Contains("debugQuitTimer = new Timer", StringComparison.Ordinal) &&
+                    program.Contains("debugQuitTimer.Dispose()", StringComparison.Ordinal) &&
+                    program.Contains("debugQuitTimer = null", StringComparison.Ordinal);
+            }
+        }
+
         public bool HookInstallationFailureReported {
             get {
                 string program = ReadSource("FrigoTab", "Program.cs");
-                return Regex.IsMatch(program, @"catch\s*\(\s*Win32Exception") &&
+                return Regex.IsMatch(program, @"catch\s*\(\s*(?:Win32Exception|Exception)") &&
                     program.Contains("MessageBox.Show", StringComparison.Ordinal);
             }
         }
 
-        public bool DesktopBackgroundUsesSingleSnapshot {
+        public bool DesktopBackgroundUsesLiveDwmGlassWithoutPixelCapture {
             get {
                 string session = ReadSource("FrigoTab", "SessionForm.cs");
+                string glass = ReadSource("FrigoTab", "DwmGlassBackdrop.cs");
+                string backdrop = ReadSource("FrigoTab", "DwmDesktopBackdrop.cs");
+                string handle = ReadSource("FrigoTab", "WindowHandle.cs");
                 string finder = ReadSource("FrigoTab", "WindowFinder.cs");
-                int capture = session.IndexOf("new DesktopSnapshot", StringComparison.Ordinal);
+                int glassRegistration = session.IndexOf("new DwmGlassBackdrop", StringComparison.Ordinal);
+                int fallbackRegistration = session.IndexOf("new DwmDesktopBackdrop", StringComparison.Ordinal);
                 int show = session.IndexOf("Visible = true", StringComparison.Ordinal);
-                return capture >= 0 && show > capture &&
-                    session.Contains("currentDesktopSnapshot?.Dispose", StringComparison.Ordinal) &&
+                return glassRegistration >= 0 &&
+                    fallbackRegistration > glassRegistration &&
+                    show > fallbackRegistration &&
+                    session.Contains("WindowExStyles.NoRedirectionBitmap", StringComparison.Ordinal) &&
+                    session.Contains("WindowMessages.EraseBackground", StringComparison.Ordinal) &&
+                    session.Contains("currentDesktopBackdrop?.Dispose", StringComparison.Ordinal) &&
+                    glass.Contains("DwmExtendFrameIntoClientArea", StringComparison.Ordinal) &&
+                    glass.Contains("DwmMargins.EntireWindow", StringComparison.Ordinal) &&
+                    backdrop.Contains("GetShellWindow()", StringComparison.Ordinal) &&
+                    handle.Contains("NoRedirectionBitmap = 0x200000", StringComparison.Ordinal) &&
+                    !glass.Contains("CopyFromScreen", StringComparison.Ordinal) &&
+                    !backdrop.Contains("CopyFromScreen", StringComparison.Ordinal) &&
                     !finder.Contains("ToolWindows", StringComparison.Ordinal) &&
-                    !File.Exists(Path.Combine(repositoryRoot, "FrigoTab", "BackgroundWindows.cs"));
+                    !File.Exists(Path.Combine(repositoryRoot, "FrigoTab", "BackgroundWindows.cs")) &&
+                    !File.Exists(Path.Combine(repositoryRoot, "FrigoTab", "DesktopSnapshot.cs"));
+            }
+        }
+
+        public bool ForegroundAcquisitionIsBestEffort {
+            get {
+                string session = ReadSource("FrigoTab", "SessionForm.cs");
+                Match foregroundFailure = Regex.Match(
+                    session,
+                    @"if\s*\(\s*!WindowHandle\.SetForeground\(\)\s*\)\s*\{(?<body>[^}]*)\}");
+                if( !foregroundFailure.Success ) {
+                    return false;
+                }
+
+                string body = foregroundFailure.Groups["body"].Value;
+                return body.Contains("Trace.WriteLine", StringComparison.Ordinal) &&
+                    !body.Contains("CloseSessionResources", StringComparison.Ordinal) &&
+                    !body.Contains("return false", StringComparison.Ordinal);
             }
         }
 
@@ -105,7 +147,51 @@ namespace FrigoTab.AcceptanceTests.Support {
                 string hook = ReadSource("FrigoTab", "KeyHook.cs");
                 return hook.Contains("DeferredKeyboardDispatcher", StringComparison.Ordinal) &&
                     hook.Contains("BeginInvoke(action)", StringComparison.Ordinal) &&
-                    Regex.IsMatch(hook, @"private\s+void\s+DispatchOnUiThread[\s\S]*?KeyEvent\?\.Invoke");
+                    hook.Contains("ShouldConsume(input, out admissionToken)", StringComparison.Ordinal) &&
+                    hook.Contains("AbortPendingAdmission(admissionToken)", StringComparison.Ordinal) &&
+                    hook.Contains("deferredDispatcher.InvalidatePending()", StringComparison.Ordinal) &&
+                    hook.Contains("lock( inputStateGate )", StringComparison.Ordinal) &&
+                    hook.Contains("TryDispatchCritical(input)", StringComparison.Ordinal) &&
+                    hook.Contains("IsSessionEndingInput", StringComparison.Ordinal) &&
+                    Regex.IsMatch(hook, @"private\s+void\s+DispatchOnUiThread[\s\S]*?subscribers\.GetInvocationList\(\)");
+            }
+        }
+
+        public bool HookRunsOnDedicatedMessageLoopThread {
+            get {
+                string hook = ReadSource("FrigoTab", "KeyHook.cs");
+                Match threadMain = Regex.Match(
+                    hook,
+                    @"private\s+void\s+HookThreadMain\s*\(\s*\)[\s\S]*?private\s+void\s+UninstallHookOnCurrentThread");
+                return hook.Contains("new Thread(HookThreadMain)", StringComparison.Ordinal) &&
+                    !hook.Contains("~KeyHook", StringComparison.Ordinal) &&
+                    hook.Contains("PeekMessage(", StringComparison.Ordinal) &&
+                    threadMain.Success &&
+                    threadMain.Value.Contains("SetWindowsHookEx(", StringComparison.Ordinal) &&
+                    threadMain.Value.Contains("GetMessage(", StringComparison.Ordinal);
+            }
+        }
+
+        public bool HookSubscriberFailuresAreIsolated {
+            get {
+                string hook = ReadSource("FrigoTab", "KeyHook.cs");
+                Match dispatch = Regex.Match(
+                    hook,
+                    @"private\s+void\s+DispatchOnUiThread[\s\S]*?private\s+static\s+bool\s+ReplayNativeAltTab");
+                if( !dispatch.Success ) {
+                    return false;
+                }
+
+                Match failure = Regex.Match(
+                    dispatch.Value,
+                    @"catch\s*\(\s*Exception\s+exception\s*\)\s*\{(?<body>[^}]*)\}");
+                string body = failure.Success ? failure.Groups["body"].Value : String.Empty;
+                return dispatch.Value.Contains("GetInvocationList()", StringComparison.Ordinal) &&
+                    dispatch.Value.Contains("handled |= e.Handled", StringComparison.Ordinal) &&
+                    body.Contains("Debug.WriteLine(exception)", StringComparison.Ordinal) &&
+                    !body.Contains("return;", StringComparison.Ordinal) &&
+                    !body.Contains("SetSessionVisible", StringComparison.Ordinal) &&
+                    !body.Contains("ReplayNativeAltTab", StringComparison.Ordinal);
             }
         }
 
@@ -160,13 +246,13 @@ namespace FrigoTab.AcceptanceTests.Support {
         public bool DeterministicNativeDisposal {
             get {
                 string applicationWindow = ReadSource("FrigoTab", "ApplicationWindow.cs");
-                string desktopSnapshot = ReadSource("FrigoTab", "DesktopSnapshot.cs");
+                string desktopBackdrop = ReadSource("FrigoTab", "DwmDesktopBackdrop.cs");
                 bool fontsDisposed = Regex.Matches(applicationWindow, @"new\s+Font\s*\(").Count ==
                     Regex.Matches(applicationWindow, @"using\s*\(\s*Font\b").Count;
                 bool constructorsAreTransactional =
                     Regex.IsMatch(applicationWindow, @"public\s+ApplicationWindow[\s\S]*?catch\s*\{") &&
-                    Regex.IsMatch(desktopSnapshot, @"private\s+void\s+Capture[\s\S]*?finally\s*\{");
-                bool backdropIsDisposable = typeof(IDisposable).IsAssignableFrom(typeof(DesktopSnapshot));
+                    Regex.IsMatch(desktopBackdrop, @"private\s+void\s+TryRegister[\s\S]*?finally\s*\{");
+                bool backdropIsDisposable = typeof(IDisposable).IsAssignableFrom(typeof(DwmDesktopBackdrop));
                 return fontsDisposed && constructorsAreTransactional && backdropIsDisposable && typeof(IDisposable).IsAssignableFrom(typeof(WindowIcon));
             }
         }

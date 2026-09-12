@@ -12,9 +12,9 @@ The acceptance requirements and test policy are documented in:
 - [Acceptance test matrix](docs/test-matrix.md)
 - [Architecture and test boundaries](docs/architecture.md)
 
-The suite is plain C# MSTest. Reqnroll, Gherkin, `.feature` files, and a separate intentionally-red test lane are no longer used. There are currently 76 green acceptance/contract tests.
+The suite is plain C# MSTest. Reqnroll, Gherkin, `.feature` files, and a separate intentionally-red test lane are no longer used. There are currently 95 green acceptance/contract tests.
 
-Every test method name begins with `TYYYYMMDDTHHMMSSZ_NNN`. The timestamp is an immutable UTC record of when that test was introduced; `NNN` is its stable test sequence suffix. The current sequence reaches `_076`; do not rewrite an existing timestamp when a test is refactored.
+Each `[TestClass]` and its matching source file begins with `TYYYYMMDDTHHMMSSZ_NNN_DescriptiveFamilyName`. The timestamp is an immutable UTC record of when that test family was introduced; the family suffix is stable, and the current set has 12 families ending at `_077`. Test methods use descriptive plain C# names. Do not rewrite an existing family timestamp when tests are refactored; the naming-convention test enforces this policy.
 
 `build.ps1` is the local build entry point; no CI/CD service is assumed yet:
 
@@ -30,7 +30,9 @@ Every test method name begins with `TYYYYMMDDTHHMMSSZ_NNN`. The timestamp is an 
 
 `Verify` and `Test` run the complete green MSTest suite. `Publish` and `PublishPortable` repeat the Release build and green test gate before producing their artifacts. `Clean` removes generated `bin`, `obj`, and `artifacts` outputs. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
 
-The Debug executable retains the historical `StartQuitTimer` 10-second safety timer for development. It is not release behavior; use a Release publish for sustained interactive testing. The native Windows checks in the matrix still require real HWNDs, hooks, DWM, focus, monitor/DPI changes, lock/unlock, and pointer input.
+The Debug executable retains the historical `StartQuitTimer` 10-second safety timer for development. It is not release behavior; use a Release publish for sustained interactive testing. The hook owns a dedicated native message-loop thread: suppression admission is synchronous and bounded in the hook callback, while expensive enumeration/rendering/construction is deferred to the UI thread. Foreground activation is best effort. The native Windows checks in the matrix still require real HWNDs, hooks, DWM, focus, monitor/DPI changes, lock/unlock, UIPI/elevation, and pointer input.
+
+The primary backdrop is a non-layered DWM glass owner with `WS_EX_NOREDIRECTIONBITMAP`. It exposes the actual live desktop below the switcher while DWM keeps the application previews opaque; FrigoTab does not call `CopyFromScreen`, scale a virtual-desktop bitmap, or manually reconstruct the z-order from application windows. A one-thumbnail shell view obtained through `GetShellWindow` is the fallback when glass-frame extension is unavailable. The live path was verified with a disposable native spike on this Windows desktop, but multi-monitor, RDP, protected-surface, and supported-version behavior remains in the manual release matrix.
 
 ## Runtime and distribution
 
