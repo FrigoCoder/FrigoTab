@@ -35,6 +35,10 @@ namespace FrigoTab {
             base.Dispose(disposing);
         }
 
+        public void SetSelected (bool value) => Selected.Value = value;
+
+        public bool TryActivate () => Application.SetForeground();
+
         private void RenderOverlay () => layerUpdater.Update(RenderOverlay);
 
         private void RenderOverlay (Graphics graphics) {

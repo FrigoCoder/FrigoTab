@@ -45,12 +45,12 @@ namespace FrigoTab {
         public WindowExStyles GetWindowExStyles () => (WindowExStyles) GetWindowLongPtr(this, WindowLong.ExStyle);
         public void PostMessage (WindowMessages msg, int wParam, int lParam) => PostMessage(this, msg, (IntPtr) wParam, (IntPtr) lParam);
 
-        public void SetForeground () {
+        public bool SetForeground () {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 ShowWindow(this, ShowWindowCommand.Restore);
             }
             keybd_event(0, 0, 0, 0);
-            SetForegroundWindow(this);
+            return SetForegroundWindow(this);
         }
 
         public string GetWindowText () {

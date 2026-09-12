@@ -10,17 +10,35 @@ namespace FrigoTab {
         public readonly IDictionary<WindowHandle, Rectangle> Bounds = new Dictionary<WindowHandle, Rectangle>();
 
         public Layout (IList<WindowHandle> windows) {
-            foreach( Screen screen in Screen.AllScreens ) {
-                LayoutScreen layout = new LayoutScreen(screen, GetWindowsOnScreen(windows, screen));
-                layout.Layout();
-                foreach( WindowHandle window in layout.Bounds.Keys ) {
-                    Bounds[window] = layout.Bounds[window];
-                }
+            Screen[] screens = Screen.AllScreens;
+            List<FrigoTab.Core.LayoutMonitor> monitors = screens.Select(screen => new FrigoTab.Core.LayoutMonitor(
+                screen.DeviceName,
+                ToCoreRectangle(screen.Bounds),
+                ToCoreRectangle(screen.WorkingArea))).ToList();
+
+            var ids = new Dictionary<string, WindowHandle>();
+            var candidates = new List<FrigoTab.Core.LayoutWindow>();
+            for( int index = 0; index < windows.Count; index++ ) {
+                WindowHandle window = windows[index];
+                Size size = window.GetRect().Size();
+                string id = index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                ids.Add(id, window);
+                candidates.Add(new FrigoTab.Core.LayoutWindow(
+                    id,
+                    window.GetScreen().DeviceName,
+                    new FrigoTab.Core.ScreenRectangle(0, 0, size.Width, size.Height)));
+            }
+
+            IDictionary<string, FrigoTab.Core.ScreenRectangle> arranged =
+                new FrigoTab.Core.GridLayout().Arrange(candidates, monitors);
+            foreach( KeyValuePair<string, FrigoTab.Core.ScreenRectangle> item in arranged ) {
+                FrigoTab.Core.ScreenRectangle bounds = item.Value;
+                Bounds[ids[item.Key]] = new Rectangle(bounds.X, bounds.Y, bounds.Width, bounds.Height);
             }
         }
 
-        private static List<WindowHandle> GetWindowsOnScreen (IEnumerable<WindowHandle> windows, Screen screen) =>
-            windows.Where(window => window.GetScreen().Equals(screen)).ToList();
+        private static FrigoTab.Core.ScreenRectangle ToCoreRectangle (Rectangle rectangle) =>
+            new FrigoTab.Core.ScreenRectangle(rectangle.X, rectangle.Y, rectangle.Width, rectangle.Height);
 
     }
 

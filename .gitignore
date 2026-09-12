@@ -1,4 +1,23 @@
-.*
-bin
-obj
-packages
+# Visual Studio and IDE state
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# .NET build outputs
+bin/
+obj/
+artifacts/
+TestResults/
+coverage/
+
+# NuGet and local tooling caches
+packages/
+*.nupkg
+*.snupkg
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
