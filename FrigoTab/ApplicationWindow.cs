@@ -87,6 +87,19 @@ namespace FrigoTab {
 
         public void SetSelected (bool value) => Selected.Value = value;
 
+        public void SetSessionVisible (bool value) {
+            if( disposed ) {
+                return;
+            }
+
+            try {
+                thumbnail?.SetVisible(value);
+            }
+            finally {
+                Visible = value;
+            }
+        }
+
         public bool TryActivate () => Application.SetForeground();
 
         protected override void WndProc (ref System.Windows.Forms.Message m) {
@@ -169,6 +182,9 @@ namespace FrigoTab {
             try {
                 result = new Thumbnail(application, owner);
                 result.SetDestinationRect(new Rect(bounds).ScreenToClient(owner));
+                // Keep the compositor preview hidden until SessionForm has
+                // synchronously painted the retained shell desktop frame.
+                result.SetVisible(false);
                 return result;
             }
             catch( Exception exception ) when(

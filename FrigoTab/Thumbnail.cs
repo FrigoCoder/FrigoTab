@@ -58,18 +58,26 @@ namespace FrigoTab {
 
         public void SetSourceRect (Rect sourceRect) {
             DwmThumbnailProperties properties = new DwmThumbnailProperties {
-                Flags = (DwmThumbnailFlags) (ThumbnailFlags.RectSource | ThumbnailFlags.Opacity | ThumbnailFlags.Visible),
+                Flags = (DwmThumbnailFlags) (ThumbnailFlags.RectSource | ThumbnailFlags.Opacity),
                 Source = sourceRect
             };
-            Update(properties);
+            Update(properties, setOpacity: true);
         }
 
         public void SetDestinationRect (Rect destinationRect) {
             DwmThumbnailProperties properties = new DwmThumbnailProperties {
-                Flags = (DwmThumbnailFlags) (ThumbnailFlags.RectDestination | ThumbnailFlags.Opacity | ThumbnailFlags.Visible),
+                Flags = (DwmThumbnailFlags) (ThumbnailFlags.RectDestination | ThumbnailFlags.Opacity),
                 Destination = destinationRect
             };
-            Update(properties);
+            Update(properties, setOpacity: true);
+        }
+
+        public void SetVisible (bool value) {
+            DwmThumbnailProperties properties = new DwmThumbnailProperties {
+                Flags = (DwmThumbnailFlags) ThumbnailFlags.Visible,
+                Visible = value
+            };
+            Update(properties, setOpacity: false);
         }
 
         // Kept as a private compatibility shape for existing contract probes;
@@ -84,13 +92,14 @@ namespace FrigoTab {
 
         }
 
-        private void Update (DwmThumbnailProperties properties) {
+        private void Update (DwmThumbnailProperties properties, bool setOpacity) {
             if( thumbnail == IntPtr.Zero ) {
                 throw new ObjectDisposedException(nameof(Thumbnail));
             }
 
-            properties.Visible = true;
-            properties.Opacity = byte.MaxValue;
+            if( setOpacity ) {
+                properties.Opacity = byte.MaxValue;
+            }
             int hresult = api.Update(thumbnail, ref properties);
             ThrowIfFailed(hresult, "DwmUpdateThumbnailProperties");
         }

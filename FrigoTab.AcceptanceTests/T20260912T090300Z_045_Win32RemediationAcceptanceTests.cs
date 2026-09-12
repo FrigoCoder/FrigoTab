@@ -9,12 +9,12 @@ namespace FrigoTab.AcceptanceTests {
     public sealed class T20260912T090300Z_045_Win32RemediationAcceptanceTests {
 
         [TestMethod]
-        public void DwmThumbnailsRequestVisibility () {
+        public void DwmThumbnailsHaveAnExplicitVisibilityPhase () {
             CurrentWin32Capabilities capabilities = new CurrentWin32Capabilities();
 
             Assert.IsTrue(
                 capabilities.DwmThumbnailVisibilityRequested,
-                "Thumbnail registration/update must request DWM_TNP_VISIBLE with fVisible = TRUE.");
+                "DWM thumbnail visibility must be changed explicitly after geometry is configured.");
         }
 
         [TestMethod]

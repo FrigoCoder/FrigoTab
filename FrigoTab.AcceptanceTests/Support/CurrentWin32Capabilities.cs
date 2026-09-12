@@ -26,8 +26,9 @@ namespace FrigoTab.AcceptanceTests.Support {
                 FieldInfo visible = flags?.GetField("Visible", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
                 string source = ReadSource("FrigoTab", "Thumbnail.cs");
                 return visible != null && Convert.ToInt32(visible.GetValue(null)) == 8 &&
+                    Regex.IsMatch(source, @"public\s+void\s+SetVisible\s*\(\s*bool\s+value\s*\)") &&
                     Regex.IsMatch(source, @"Flags\s*=\s*[^;]*ThumbnailFlags\.Visible") &&
-                    Regex.IsMatch(source, @"Visible\s*=\s*true");
+                    Regex.IsMatch(source, @"Visible\s*=\s*value");
             }
         }
 
@@ -155,6 +156,29 @@ namespace FrigoTab.AcceptanceTests.Support {
             }
         }
 
+        public bool FirstVisibleFrameIsPaintedBeforePreviews {
+            get {
+                string session = ReadSource("FrigoTab", "SessionForm.cs");
+                string applicationWindows = ReadSource("FrigoTab", "ApplicationWindows.cs");
+                string applicationWindow = ReadSource("FrigoTab", "ApplicationWindow.cs");
+                Match tryOpen = Regex.Match(
+                    session,
+                    @"private\s+bool\s+TryOpen[\s\S]*?private\s+void\s+CloseSessionResources");
+                if( !tryOpen.Success ) {
+                    return false;
+                }
+
+                int showOwner = tryOpen.Value.IndexOf("Visible = true", StringComparison.Ordinal);
+                int paintOwner = tryOpen.Value.IndexOf("Refresh()", StringComparison.Ordinal);
+                int showPreviews = tryOpen.Value.IndexOf("applications.Visible.Value = true", StringComparison.Ordinal);
+                return showOwner >= 0 &&
+                    paintOwner > showOwner &&
+                    showPreviews > paintOwner &&
+                    applicationWindows.Contains("SetSessionVisible(value)", StringComparison.Ordinal) &&
+                    applicationWindow.Contains("thumbnail?.SetVisible(value)", StringComparison.Ordinal);
+            }
+        }
+
         public bool ForegroundAcquisitionIsBestEffort {
             get {
                 string session = ReadSource("FrigoTab", "SessionForm.cs");
@@ -169,6 +193,36 @@ namespace FrigoTab.AcceptanceTests.Support {
                 return body.Contains("Trace.WriteLine", StringComparison.Ordinal) &&
                     !body.Contains("CloseSessionResources", StringComparison.Ordinal) &&
                     !body.Contains("return false", StringComparison.Ordinal);
+            }
+        }
+
+        public bool ForegroundActivationAvoidsThreadInputAttachment {
+            get {
+                string handle = ReadSource("FrigoTab", "WindowHandle.cs");
+                string uncommentedHandle = Regex.Replace(handle, @"//[^\r\n]*", String.Empty);
+                int methodStart = handle.IndexOf("public bool SetForeground", StringComparison.Ordinal);
+                int methodEnd = handle.IndexOf("public string GetWindowText", StringComparison.Ordinal);
+                if( methodStart < 0 || methodEnd <= methodStart ) {
+                    return false;
+                }
+
+                string setForeground = handle.Substring(methodStart, methodEnd - methodStart);
+                int inputNudge = setForeground.IndexOf("keybd_event(0, 0, 0, UIntPtr.Zero)", StringComparison.Ordinal);
+                int activation = setForeground.IndexOf("SetForegroundWindow(this)", StringComparison.Ordinal);
+                return inputNudge >= 0 && activation > inputNudge &&
+                    !Regex.IsMatch(uncommentedHandle, @"\bAttachThreadInput\s*\(");
+            }
+        }
+
+        public bool IntentionalTargetActivationDoesNotResetInputState {
+            get {
+                string session = ReadSource("FrigoTab", "SessionForm.cs");
+                return session.Contains("private bool activatingSelection", StringComparison.Ordinal) &&
+                    session.Contains("activatingSelection = true", StringComparison.Ordinal) &&
+                    session.Contains("activatingSelection = false", StringComparison.Ordinal) &&
+                    Regex.IsMatch(
+                        session,
+                        @"WindowMessages\.ActivateApp[\s\S]*?!activatingSelection[\s\S]*?controller\.Interrupt\s*\(\s*\)");
             }
         }
 
@@ -292,10 +346,11 @@ namespace FrigoTab.AcceptanceTests.Support {
                 Type keyboardData = typeof(KeyHook).GetNestedType("LowLevelKeyStruct", BindingFlags.NonPublic);
                 FieldInfo extraInfo = keyboardData?.GetField("DwExtraInfo", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo sendMessage = NativeMethods().Single(method => method.DeclaringType == typeof(WindowIcon) && method.Name == "SendMessageCallback");
-                bool deprecatedSyntheticInputRemoved = !NativeMethods().Any(
+                MethodInfo keybdEvent = NativeMethods().SingleOrDefault(
                     method => method.DeclaringType == typeof(WindowHandle) && method.Name == "keybd_event");
                 return IsPointer(extraInfo?.FieldType) &&
-                    deprecatedSyntheticInputRemoved &&
+                    keybdEvent != null &&
+                    IsPointer(ParameterType(keybdEvent, "dwExtraInfo")) &&
                     IsPointer(ParameterType(sendMessage, "wParam")) &&
                     IsPointer(ParameterType(sendMessage, "dwData"));
             }

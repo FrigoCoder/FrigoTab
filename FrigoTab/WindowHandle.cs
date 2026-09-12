@@ -49,6 +49,13 @@ namespace FrigoTab {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 ShowWindow(this, ShowWindowCommand.Restore);
             }
+
+            // FrigoTab historically used this input-queue-independent nudge
+            // after AttachThreadInput caused focus and key-state corruption.
+            // It gives SetForegroundWindow the same recent-input context as
+            // the intercepted gesture without joining another process's input
+            // thread or synthesizing a real Alt transition.
+            keybd_event(0, 0, 0, UIntPtr.Zero);
             return SetForegroundWindow(this);
         }
 
@@ -157,6 +164,9 @@ namespace FrigoTab {
 
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow (WindowHandle hWnd);
+
+        [DllImport("user32.dll", ExactSpelling = true)]
+        private static extern void keybd_event (byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
         [DllImport("user32.dll", EntryPoint = "PostMessageW", CharSet = CharSet.Unicode,
             ExactSpelling = true, SetLastError = true)]

@@ -204,10 +204,11 @@ namespace FrigoTab.Core {
             }
 
             if( input.IsUp && input.Key == SwitcherKey.Alt ) {
-                TryCommitSelection();
                 // The physical Alt-down event was allowed through before the
-                // switcher opened.  Pass its release through as well so the
+                // switcher opened. Pass its release through as well so the
                 // foreground application cannot be left with a stuck modifier.
+                // FrigoTab is deliberately sticky: releasing Alt does not
+                // choose a target; a number or pointer click does that.
                 return KeyHandling.PassThrough;
             }
 

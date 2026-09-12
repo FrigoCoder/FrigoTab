@@ -55,12 +55,39 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
+        public void FirstVisibleFramePaintsTheShellBeforeApplicationPreviews () {
+            CurrentWin32Capabilities capabilities = new CurrentWin32Capabilities();
+
+            Assert.IsTrue(
+                capabilities.FirstVisibleFrameIsPaintedBeforePreviews,
+                "the visible owner must synchronously paint the retained shell frame before DWM thumbnails and tile overlays become visible.");
+        }
+
+        [TestMethod]
         public void ForegroundActivationDenialDoesNotReplayNativeAltTab () {
             CurrentWin32Capabilities capabilities = new CurrentWin32Capabilities();
 
             Assert.IsTrue(
                 capabilities.ForegroundAcquisitionIsBestEffort,
                 "foreground activation is best effort after admission and must not close the overlay or replay native Alt+Tab.");
+        }
+
+        [TestMethod]
+        public void ForegroundActivationUsesTheHistoricalInputNudgeWithoutJoiningThreads () {
+            CurrentWin32Capabilities capabilities = new CurrentWin32Capabilities();
+
+            Assert.IsTrue(
+                capabilities.ForegroundActivationAvoidsThreadInputAttachment,
+                "foreground activation must use the proven input nudge and must never join another application's input queue with AttachThreadInput.");
+        }
+
+        [TestMethod]
+        public void IntentionalTargetActivationDoesNotMasqueradeAsAnInputInterruption () {
+            CurrentWin32Capabilities capabilities = new CurrentWin32Capabilities();
+
+            Assert.IsTrue(
+                capabilities.IntentionalTargetActivationDoesNotResetInputState,
+                "WM_ACTIVATEAPP during a selected-target handoff must not clear the consumed-key ledger before that key's matching release.");
         }
 
         [TestMethod]

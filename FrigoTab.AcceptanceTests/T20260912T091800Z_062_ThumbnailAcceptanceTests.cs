@@ -14,7 +14,7 @@ namespace FrigoTab.AcceptanceTests {
     public sealed class T20260912T091800Z_062_ThumbnailAcceptanceTests {
 
         [TestMethod]
-        public void ThumbnailUpdateRequestsVisibleOpaqueDestination () {
+        public void ThumbnailDestinationStaysHiddenUntilItIsExplicitlyShown () {
             FakeDwmThumbnailApi api = new FakeDwmThumbnailApi();
 
             using( Thumbnail thumbnail = new Thumbnail(
@@ -25,10 +25,21 @@ namespace FrigoTab.AcceptanceTests {
 
                 DwmThumbnailProperties update = api.Updates[0];
                 Assert.IsTrue(update.Flags.HasFlag(DwmThumbnailFlags.RectDestination));
-                Assert.IsTrue(update.Flags.HasFlag(DwmThumbnailFlags.Visible));
                 Assert.IsTrue(update.Flags.HasFlag(DwmThumbnailFlags.Opacity));
-                Assert.IsTrue(update.Visible);
+                Assert.IsFalse(update.Flags.HasFlag(DwmThumbnailFlags.Visible));
                 Assert.AreEqual(byte.MaxValue, update.Opacity);
+
+                thumbnail.SetVisible(true);
+
+                DwmThumbnailProperties shown = api.Updates[1];
+                Assert.AreEqual(DwmThumbnailFlags.Visible, shown.Flags);
+                Assert.IsTrue(shown.Visible);
+
+                thumbnail.SetVisible(false);
+
+                DwmThumbnailProperties hidden = api.Updates[2];
+                Assert.AreEqual(DwmThumbnailFlags.Visible, hidden.Flags);
+                Assert.IsFalse(hidden.Visible);
             }
 
             Assert.AreEqual(1, api.UnregisterCalls);
@@ -65,7 +76,7 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void ThumbnailSourceUpdateIsVisibleAndOpaque () {
+        public void ThumbnailSourceGeometryDoesNotMakeItVisible () {
             FakeDwmThumbnailApi api = new FakeDwmThumbnailApi();
 
             using( Thumbnail thumbnail = new Thumbnail(
@@ -76,9 +87,8 @@ namespace FrigoTab.AcceptanceTests {
 
                 DwmThumbnailProperties update = api.Updates[0];
                 Assert.IsTrue(update.Flags.HasFlag(DwmThumbnailFlags.RectSource));
-                Assert.IsTrue(update.Flags.HasFlag(DwmThumbnailFlags.Visible));
                 Assert.IsTrue(update.Flags.HasFlag(DwmThumbnailFlags.Opacity));
-                Assert.IsTrue(update.Visible);
+                Assert.IsFalse(update.Flags.HasFlag(DwmThumbnailFlags.Visible));
                 Assert.AreEqual(byte.MaxValue, update.Opacity);
             }
         }

@@ -13,6 +13,7 @@ namespace FrigoTab {
         private ShellDesktopSnapshot desktopSnapshot;
         private Rectangle desktopSnapshotBounds;
         private ApplicationWindows applications;
+        private bool activatingSelection;
         private bool disposed;
         private bool reportedSessionVisibility;
         private int desktopSnapshotRefreshRunning;
@@ -88,7 +89,9 @@ namespace FrigoTab {
                     NotifySessionVisibility();
                     break;
                 case WindowMessages.ActivateApp:
-                    if( m.WParam == IntPtr.Zero && controller.State == SwitcherState.Visible ) {
+                    if( m.WParam == IntPtr.Zero &&
+                        controller.State == SwitcherState.Visible &&
+                        !activatingSelection ) {
                         controller.Interrupt();
                         InputResetRequested?.Invoke();
                         NotifySessionVisibility();
@@ -141,7 +144,20 @@ namespace FrigoTab {
         }
 
         bool ISwitcherSessionPort.TryActivateSelected () {
-            return applications != null && applications.TryActivateSelected();
+            if( applications == null ) {
+                return false;
+            }
+
+            // SetForegroundWindow synchronously deactivates this form. That
+            // WM_ACTIVATEAPP is the expected handoff, not an interruption: the
+            // hook must retain the consumed digit until its key-up arrives.
+            activatingSelection = true;
+            try {
+                return applications.TryActivateSelected();
+            }
+            finally {
+                activatingSelection = false;
+            }
         }
 
         void ISwitcherSessionPort.Close () => CloseSessionResources();
@@ -178,8 +194,9 @@ namespace FrigoTab {
 
                 // The shell frame was prepared before hook installation and
                 // is refreshed while the switcher is idle. A topology change
-                // may briefly use the opaque black fallback until the new
-                // frame is ready; opening never blocks on Explorer rendering.
+                // can use the opaque black fallback for this session; the
+                // queued replacement is published while idle for the next
+                // session. Opening never blocks on Explorer rendering.
                 if( desktopSnapshot == null || desktopSnapshotBounds != bounds ) {
                     QueueDesktopSnapshotRefresh(bounds);
                 }
@@ -197,6 +214,11 @@ namespace FrigoTab {
                 newApplications = null;
 
                 Visible = true;
+                // Showing the HWND does not synchronously populate its DWM
+                // redirection surface. Paint the retained Explorer desktop
+                // now, while every application thumbnail is still hidden, so
+                // the compositor can never expose stale application pixels.
+                Refresh();
                 applications.Visible.Value = true;
                 if( !WindowHandle.SetForeground() ) {
                     // Windows may legitimately deny SetForegroundWindow even

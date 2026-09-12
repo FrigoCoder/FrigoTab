@@ -101,15 +101,21 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void ReleasingAltActivatesTheSelectedCandidateAndCloses () {
+        public void ReleasingAltLeavesTheSwitcherOpenUntilExplicitSelection () {
             GivenPort(3);
             SendAltTab();
             SendAltUp();
 
-            AssertActivated(0);
+            AssertVisible(0);
+            AssertNoActivation();
+            AssertClosed(0);
+            AssertPassedThrough();
+
+            SendDigitDown(2);
+
+            AssertActivated(1);
             AssertIdle();
             AssertClosed(1);
-            AssertPassedThrough();
         }
 
         [TestMethod]
@@ -260,7 +266,7 @@ namespace FrigoTab.AcceptanceTests {
             GivenPort(3);
             Port.ActivationResult = false;
             SendAltTab();
-            SendAltUp();
+            SendDigitDown(1);
 
             AssertVisible(0);
             AssertActivationAttempts(1);
@@ -272,7 +278,7 @@ namespace FrigoTab.AcceptanceTests {
             GivenPort(3);
             Port.ThrowOnActivation = true;
             SendAltTab();
-            SendAltUp();
+            SendDigitDown(1);
 
             AssertVisible(0);
             AssertActivationAttempts(1);
@@ -337,7 +343,8 @@ namespace FrigoTab.AcceptanceTests {
         public void ClosedSessionCanBeOpenedAgain () {
             GivenPort(3);
             SendAltTab();
-            SendAltUp();
+            SendEscapeDown();
+            SendEscapeUp();
             SendAltTab();
 
             AssertVisible(0);

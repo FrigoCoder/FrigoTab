@@ -56,8 +56,9 @@ namespace FrigoTab.Core {
                     return input;
                 }
 
-                // Apply the transition after taking the snapshot.  Alt-up therefore
-                // still reports Alt=true to the switcher and can commit selection.
+                // Apply the transition after taking the snapshot. Alt-up therefore
+                // still describes the physical state before the release without
+                // relying on GetAsyncKeyState inside the low-level hook.
                 if( IsAlt(physicalModifier) ) {
                     if( isDown ) {
                         altKeys.Add(physicalModifier);

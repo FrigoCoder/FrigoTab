@@ -28,7 +28,7 @@ namespace FrigoTab {
             };
             Visible.Changed += (oldValue, value) => {
                 foreach( ApplicationWindow window in windows ) {
-                    window.Visible = value;
+                    window.SetSessionVisible(value);
                 }
             };
             try {
