@@ -46,12 +46,12 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void BackgroundUsesOneOpaqueNativeSnapshotWithoutPerPaintCapture () {
+        public void BackgroundUsesTheShellSurfaceWithoutCapturingApplications () {
             CurrentWin32Capabilities capabilities = new CurrentWin32Capabilities();
 
             Assert.IsTrue(
-                capabilities.DesktopBackgroundUsesOpaqueNativeSnapshot,
-                "capture the desktop once into an opaque native frame before showing the owner, then reuse it without per-paint GDI+ capture or scaling.");
+                capabilities.DesktopBackgroundUsesShellSurfaceSnapshot,
+                "prepare an opaque full-content shell-host render while the switcher is idle, reuse it without blocking Alt+Tab, and never capture or reconstruct application windows.");
         }
 
         [TestMethod]

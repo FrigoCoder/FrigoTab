@@ -9,27 +9,27 @@ namespace FrigoTab.AcceptanceTests {
     [TestClass]
     [TestCategory("Acceptance")]
     [TestCategory("Regression")]
-    public sealed class T20260912T100000Z_077_DesktopSnapshotAcceptanceTests {
+    public sealed class T20260912T100000Z_077_ShellDesktopSnapshotAcceptanceTests {
 
         [TestMethod]
-        public void CapturesTheExactVirtualDesktopBoundsOnce () {
+        public void CapturesTheExactShellSurfaceBoundsOnce () {
             Rectangle virtualDesktop = new Rectangle(-1920, 0, 4480, 1440);
-            FakeSnapshotFrame frame = new FakeSnapshotFrame(virtualDesktop.Size);
-            FakeSnapshotApi api = new FakeSnapshotApi(frame);
+            FakeShellDesktopSnapshotFrame frame = new FakeShellDesktopSnapshotFrame(virtualDesktop.Size);
+            FakeShellDesktopSnapshotApi api = new FakeShellDesktopSnapshotApi(frame);
 
-            using( DesktopSnapshot snapshot = new DesktopSnapshot(virtualDesktop, api) ) {
+            using( ShellDesktopSnapshot snapshot = new ShellDesktopSnapshot(virtualDesktop, api) ) {
                 Assert.AreEqual(1, api.CaptureCalls);
                 Assert.AreEqual(virtualDesktop, api.CapturedBounds);
             }
         }
 
         [TestMethod]
-        public void RepeatedPaintsReuseTheCapturedFrameWithoutRecapturing () {
+        public void RepeatedPaintsReuseTheCapturedShellFrameWithoutRecapturing () {
             Rectangle virtualDesktop = new Rectangle(-1920, 0, 4480, 1440);
-            FakeSnapshotFrame frame = new FakeSnapshotFrame(virtualDesktop.Size);
-            FakeSnapshotApi api = new FakeSnapshotApi(frame);
+            FakeShellDesktopSnapshotFrame frame = new FakeShellDesktopSnapshotFrame(virtualDesktop.Size);
+            FakeShellDesktopSnapshotApi api = new FakeShellDesktopSnapshotApi(frame);
 
-            using( DesktopSnapshot snapshot = new DesktopSnapshot(virtualDesktop, api) )
+            using( ShellDesktopSnapshot snapshot = new ShellDesktopSnapshot(virtualDesktop, api) )
             using( Bitmap canvas = new Bitmap(virtualDesktop.Width, virtualDesktop.Height) )
             using( Graphics graphics = Graphics.FromImage(canvas) ) {
                 Rectangle clientBounds = new Rectangle(0, 0, virtualDesktop.Width, virtualDesktop.Height);
@@ -46,13 +46,13 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void CaptureFailureLeavesAnOpaqueBlackFallback () {
+        public void ShellCaptureFailureLeavesAnOpaqueBlackFallback () {
             Rectangle virtualDesktop = new Rectangle(-1920, 0, 4480, 1440);
-            FakeSnapshotApi api = new FakeSnapshotApi {
+            FakeShellDesktopSnapshotApi api = new FakeShellDesktopSnapshotApi {
                 Failure = new InvalidOperationException("desktop capture unavailable")
             };
 
-            using( DesktopSnapshot snapshot = new DesktopSnapshot(virtualDesktop, api) )
+            using( ShellDesktopSnapshot snapshot = new ShellDesktopSnapshot(virtualDesktop, api) )
             using( Bitmap canvas = new Bitmap(1, 1) )
             using( Graphics graphics = Graphics.FromImage(canvas) ) {
                 graphics.Clear(Color.White);
@@ -64,11 +64,11 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void MissingFrameLeavesAnOpaqueBlackFallback () {
+        public void MissingShellFrameLeavesAnOpaqueBlackFallback () {
             Rectangle virtualDesktop = new Rectangle(-1920, 0, 4480, 1440);
-            FakeSnapshotApi api = new FakeSnapshotApi();
+            FakeShellDesktopSnapshotApi api = new FakeShellDesktopSnapshotApi();
 
-            using( DesktopSnapshot snapshot = new DesktopSnapshot(virtualDesktop, api) )
+            using( ShellDesktopSnapshot snapshot = new ShellDesktopSnapshot(virtualDesktop, api) )
             using( Bitmap canvas = new Bitmap(1, 1) )
             using( Graphics graphics = Graphics.FromImage(canvas) ) {
                 graphics.Clear(Color.White);
@@ -80,13 +80,13 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void ExactClientBoundsAreForwardedToTheCapturedFrame () {
+        public void ExactClientBoundsAreForwardedToTheCapturedShellFrame () {
             Rectangle virtualDesktop = new Rectangle(-1920, 0, 4480, 1440);
-            FakeSnapshotFrame frame = new FakeSnapshotFrame(virtualDesktop.Size);
-            FakeSnapshotApi api = new FakeSnapshotApi(frame);
+            FakeShellDesktopSnapshotFrame frame = new FakeShellDesktopSnapshotFrame(virtualDesktop.Size);
+            FakeShellDesktopSnapshotApi api = new FakeShellDesktopSnapshotApi(frame);
             Rectangle clientBounds = new Rectangle(0, 0, virtualDesktop.Width, virtualDesktop.Height);
 
-            using( DesktopSnapshot snapshot = new DesktopSnapshot(virtualDesktop, api) )
+            using( ShellDesktopSnapshot snapshot = new ShellDesktopSnapshot(virtualDesktop, api) )
             using( Bitmap canvas = new Bitmap(virtualDesktop.Width, virtualDesktop.Height) )
             using( Graphics graphics = Graphics.FromImage(canvas) ) {
                 snapshot.Draw(graphics, clientBounds);
@@ -97,20 +97,20 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void EmptyBoundsFailOpenWithoutInvokingNativeCapture () {
-            FakeSnapshotApi api = new FakeSnapshotApi(new FakeSnapshotFrame(Size.Empty));
+        public void EmptyBoundsFailOpenWithoutInvokingShellCapture () {
+            FakeShellDesktopSnapshotApi api = new FakeShellDesktopSnapshotApi(new FakeShellDesktopSnapshotFrame(Size.Empty));
 
-            using( DesktopSnapshot snapshot = new DesktopSnapshot(Rectangle.Empty, api) ) {
+            using( ShellDesktopSnapshot snapshot = new ShellDesktopSnapshot(Rectangle.Empty, api) ) {
                 Assert.AreEqual(0, api.CaptureCalls);
             }
         }
 
         [TestMethod]
-        public void DisposeReleasesTheCapturedFrameOnceAndRejectsFurtherPainting () {
+        public void DisposeReleasesTheCapturedShellFrameOnceAndRejectsFurtherPainting () {
             Rectangle virtualDesktop = new Rectangle(-1920, 0, 4480, 1440);
-            FakeSnapshotFrame frame = new FakeSnapshotFrame(virtualDesktop.Size);
-            FakeSnapshotApi api = new FakeSnapshotApi(frame);
-            DesktopSnapshot snapshot = new DesktopSnapshot(virtualDesktop, api);
+            FakeShellDesktopSnapshotFrame frame = new FakeShellDesktopSnapshotFrame(virtualDesktop.Size);
+            FakeShellDesktopSnapshotApi api = new FakeShellDesktopSnapshotApi(frame);
+            ShellDesktopSnapshot snapshot = new ShellDesktopSnapshot(virtualDesktop, api);
 
             snapshot.Dispose();
             snapshot.Dispose();
@@ -126,17 +126,17 @@ namespace FrigoTab.AcceptanceTests {
         private static void AssertThrowsObjectDisposedException (Action action) {
             try {
                 action();
-                Assert.Fail("Expected painting a disposed desktop snapshot to fail.");
+                Assert.Fail("Expected painting a disposed shell desktop snapshot to fail.");
             }
             catch( ObjectDisposedException ) {
             }
         }
 
-        private sealed class FakeSnapshotApi : IDesktopSnapshotApi {
+        private sealed class FakeShellDesktopSnapshotApi : IShellDesktopSnapshotApi {
 
-            private readonly IDesktopSnapshotFrame frame;
+            private readonly IShellDesktopSnapshotFrame frame;
 
-            public FakeSnapshotApi (IDesktopSnapshotFrame frame = null) {
+            public FakeShellDesktopSnapshotApi (IShellDesktopSnapshotFrame frame = null) {
                 this.frame = frame;
             }
 
@@ -144,7 +144,7 @@ namespace FrigoTab.AcceptanceTests {
             public Rectangle CapturedBounds { get; private set; }
             public Exception Failure { get; set; }
 
-            public IDesktopSnapshotFrame Capture (Rectangle sourceBounds) {
+            public IShellDesktopSnapshotFrame Capture (Rectangle sourceBounds) {
                 CaptureCalls++;
                 CapturedBounds = sourceBounds;
                 if( Failure != null ) {
@@ -155,9 +155,9 @@ namespace FrigoTab.AcceptanceTests {
 
         }
 
-        private sealed class FakeSnapshotFrame : IDesktopSnapshotFrame {
+        private sealed class FakeShellDesktopSnapshotFrame : IShellDesktopSnapshotFrame {
 
-            public FakeSnapshotFrame (Size size) {
+            public FakeShellDesktopSnapshotFrame (Size size) {
                 Size = size;
             }
 

@@ -69,23 +69,70 @@ namespace FrigoTab.AcceptanceTests.Support {
             }
         }
 
-        public bool DesktopBackgroundUsesOpaqueNativeSnapshot {
+        public bool DesktopBackgroundUsesShellSurfaceSnapshot {
             get {
                 string session = ReadSource("FrigoTab", "SessionForm.cs");
-                string snapshot = ReadSource("FrigoTab", "DesktopSnapshot.cs");
-                int snapshotRegistration = session.IndexOf("new DesktopSnapshot", StringComparison.Ordinal);
+                string program = ReadSource("FrigoTab", "Program.cs");
+                string snapshot = ReadSource("FrigoTab", "ShellDesktopSnapshot.cs");
+                string uncommentedSnapshot = Regex.Replace(snapshot, @"//[^\r\n]*", String.Empty);
+                Match tryOpen = Regex.Match(
+                    session,
+                    @"private\s+bool\s+TryOpen[\s\S]*?private\s+void\s+CloseSessionResources");
+                Match refreshWorker = Regex.Match(
+                    session,
+                    @"private\s+void\s+QueueDesktopSnapshotRefresh\s*\(\s*Rectangle\s+bounds\s*\)[\s\S]*?private\s+void\s+PublishDesktopSnapshot");
+                Match publication = Regex.Match(
+                    session,
+                    @"private\s+void\s+PublishDesktopSnapshot[\s\S]*?private\s+static\s+bool\s+TryGetVirtualBounds");
+                int snapshotRegistration = session.IndexOf("new ShellDesktopSnapshot", StringComparison.Ordinal);
                 int applicationsRegistration = session.IndexOf("new ApplicationWindows", StringComparison.Ordinal);
                 int show = session.IndexOf("Visible = true", StringComparison.Ordinal);
+                int sessionConstruction = program.IndexOf("new SessionForm", StringComparison.Ordinal);
+                int hookConstruction = program.IndexOf("new KeyHook", StringComparison.Ordinal);
+                int beginPublication = refreshWorker.Value.IndexOf("BeginInvoke", StringComparison.Ordinal);
+                int earlyAdmissionRelease = beginPublication < 0
+                    ? -1
+                    : refreshWorker.Value.LastIndexOf(
+                        "Interlocked.Exchange(ref desktopSnapshotRefreshRunning, 0)",
+                        beginPublication,
+                        StringComparison.Ordinal);
                 return snapshotRegistration >= 0 &&
                     applicationsRegistration > snapshotRegistration &&
                     show > applicationsRegistration &&
-                    session.Contains("currentSnapshot.Draw", StringComparison.Ordinal) &&
+                    sessionConstruction >= 0 &&
+                    hookConstruction > sessionConstruction &&
+                    (session.Contains("currentSnapshot.Draw", StringComparison.Ordinal) ||
+                        session.Contains("currentDesktopSnapshot.Draw", StringComparison.Ordinal)) &&
+                    tryOpen.Success &&
+                    !tryOpen.Value.Contains("new ShellDesktopSnapshot", StringComparison.Ordinal) &&
+                    session.Contains("ThreadPool.QueueUserWorkItem", StringComparison.Ordinal) &&
+                    refreshWorker.Success &&
+                    beginPublication >= 0 &&
+                    earlyAdmissionRelease < 0 &&
+                    publication.Success &&
+                    publication.Value.Contains(
+                        "Interlocked.Exchange(ref desktopSnapshotRefreshRunning, 0)",
+                        StringComparison.Ordinal) &&
+                    !session.Contains("new DesktopSnapshot", StringComparison.Ordinal) &&
                     !session.Contains("DwmGlassBackdrop", StringComparison.Ordinal) &&
                     !session.Contains("DwmDesktopBackdrop", StringComparison.Ordinal) &&
                     !session.Contains("NoRedirectionBitmap", StringComparison.Ordinal) &&
-                    snapshot.Contains("IDesktopSnapshotApi", StringComparison.Ordinal) &&
-                    snapshot.Contains("IDesktopSnapshotFrame", StringComparison.Ordinal) &&
-                    snapshot.Contains("GdiDesktopSnapshotApi", StringComparison.Ordinal) &&
+                    snapshot.Contains("IShellDesktopSnapshotApi", StringComparison.Ordinal) &&
+                    snapshot.Contains("IShellDesktopSnapshotFrame", StringComparison.Ordinal) &&
+                    snapshot.Contains("GdiShellDesktopSnapshotApi", StringComparison.Ordinal) &&
+                    snapshot.Contains("SHELLDLL_DefView", StringComparison.Ordinal) &&
+                    snapshot.Contains("SysListView32", StringComparison.Ordinal) &&
+                    snapshot.Contains("FindWindowEx", StringComparison.Ordinal) &&
+                    (snapshot.Contains("GetShellWindow", StringComparison.Ordinal) ||
+                        snapshot.Contains("Progman", StringComparison.Ordinal)) &&
+                    snapshot.Contains("WorkerW", StringComparison.Ordinal) &&
+                    snapshot.Contains("PrintWindowFullContent = 0x00000002", StringComparison.Ordinal) &&
+                    Regex.IsMatch(
+                        uncommentedSnapshot,
+                        @"PrintWindow\s*\(\s*shellDesktop\s*,\s*printedDc\s*,\s*PrintWindowFullContent\s*\)") &&
+                    !Regex.IsMatch(
+                        uncommentedSnapshot,
+                        @"PrintWindow\s*\([^;]*,\s*0\s*\)") &&
                     snapshot.Contains("GetDC", StringComparison.Ordinal) &&
                     snapshot.Contains("CreateCompatibleDC", StringComparison.Ordinal) &&
                     snapshot.Contains("CreateDIBSection", StringComparison.Ordinal) &&
@@ -96,9 +143,15 @@ namespace FrigoTab.AcceptanceTests.Support {
                     snapshot.Contains("ReleaseDC", StringComparison.Ordinal) &&
                     snapshot.Contains("DeleteDC", StringComparison.Ordinal) &&
                     snapshot.Contains("DeleteObject", StringComparison.Ordinal) &&
+                    !Regex.IsMatch(uncommentedSnapshot, @"GetDC\s*\(\s*(?:IntPtr\.Zero|null|NULL)\s*\)") &&
+                    !snapshot.Contains("GetWindowDC", StringComparison.Ordinal) &&
+                    !snapshot.Contains("EnumWindows", StringComparison.Ordinal) &&
+                    !snapshot.Contains("DwmRegisterThumbnail", StringComparison.Ordinal) &&
+                    !snapshot.Contains("ApplicationWindows", StringComparison.Ordinal) &&
                     !Regex.IsMatch(snapshot, @"\bCopyFromScreen\s*\(") &&
                     !Regex.IsMatch(snapshot, @"\bDrawImage(?:Unscaled)?\s*\(") &&
-                    !File.Exists(Path.Combine(repositoryRoot, "FrigoTab", "BackgroundWindows.cs"));
+                    !File.Exists(Path.Combine(repositoryRoot, "FrigoTab", "BackgroundWindows.cs")) &&
+                    !File.Exists(Path.Combine(repositoryRoot, "FrigoTab", "DesktopSnapshot.cs"));
             }
         }
 
@@ -251,16 +304,16 @@ namespace FrigoTab.AcceptanceTests.Support {
         public bool DeterministicNativeDisposal {
             get {
                 string applicationWindow = ReadSource("FrigoTab", "ApplicationWindow.cs");
-                string desktopSnapshot = ReadSource("FrigoTab", "DesktopSnapshot.cs");
+                string desktopSnapshot = ReadSource("FrigoTab", "ShellDesktopSnapshot.cs");
                 bool fontsDisposed = Regex.Matches(applicationWindow, @"new\s+Font\s*\(").Count ==
                     Regex.Matches(applicationWindow, @"using\s*\(\s*Font\b").Count;
                 bool constructorsAreTransactional =
                     Regex.IsMatch(applicationWindow, @"public\s+ApplicationWindow[\s\S]*?catch\s*\{") &&
-                    Regex.IsMatch(desktopSnapshot, @"public\s+GdiDesktopSnapshotFrame[\s\S]*?catch\s*\{") &&
+                    Regex.IsMatch(desktopSnapshot, @"public\s+GdiShellDesktopSnapshotFrame[\s\S]*?catch\s*\{") &&
                     desktopSnapshot.Contains("Release(ref newMemoryDc", StringComparison.Ordinal);
                 bool backdropIsDisposable =
-                    typeof(IDisposable).IsAssignableFrom(typeof(DesktopSnapshot)) &&
-                    typeof(IDisposable).IsAssignableFrom(typeof(GdiDesktopSnapshotFrame));
+                    typeof(IDisposable).IsAssignableFrom(typeof(ShellDesktopSnapshot)) &&
+                    typeof(IDisposable).IsAssignableFrom(typeof(GdiShellDesktopSnapshotFrame));
                 return fontsDisposed && constructorsAreTransactional && backdropIsDisposable &&
                     typeof(IDisposable).IsAssignableFrom(typeof(WindowIcon));
             }
