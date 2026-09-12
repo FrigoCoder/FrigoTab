@@ -69,31 +69,36 @@ namespace FrigoTab.AcceptanceTests.Support {
             }
         }
 
-        public bool DesktopBackgroundUsesLiveDwmGlassWithoutPixelCapture {
+        public bool DesktopBackgroundUsesOpaqueNativeSnapshot {
             get {
                 string session = ReadSource("FrigoTab", "SessionForm.cs");
-                string glass = ReadSource("FrigoTab", "DwmGlassBackdrop.cs");
-                string backdrop = ReadSource("FrigoTab", "DwmDesktopBackdrop.cs");
-                string handle = ReadSource("FrigoTab", "WindowHandle.cs");
-                string finder = ReadSource("FrigoTab", "WindowFinder.cs");
-                int glassRegistration = session.IndexOf("new DwmGlassBackdrop", StringComparison.Ordinal);
-                int fallbackRegistration = session.IndexOf("new DwmDesktopBackdrop", StringComparison.Ordinal);
+                string snapshot = ReadSource("FrigoTab", "DesktopSnapshot.cs");
+                int snapshotRegistration = session.IndexOf("new DesktopSnapshot", StringComparison.Ordinal);
+                int applicationsRegistration = session.IndexOf("new ApplicationWindows", StringComparison.Ordinal);
                 int show = session.IndexOf("Visible = true", StringComparison.Ordinal);
-                return glassRegistration >= 0 &&
-                    fallbackRegistration > glassRegistration &&
-                    show > fallbackRegistration &&
-                    session.Contains("WindowExStyles.NoRedirectionBitmap", StringComparison.Ordinal) &&
-                    session.Contains("WindowMessages.EraseBackground", StringComparison.Ordinal) &&
-                    session.Contains("currentDesktopBackdrop?.Dispose", StringComparison.Ordinal) &&
-                    glass.Contains("DwmExtendFrameIntoClientArea", StringComparison.Ordinal) &&
-                    glass.Contains("DwmMargins.EntireWindow", StringComparison.Ordinal) &&
-                    backdrop.Contains("GetShellWindow()", StringComparison.Ordinal) &&
-                    handle.Contains("NoRedirectionBitmap = 0x200000", StringComparison.Ordinal) &&
-                    !glass.Contains("CopyFromScreen", StringComparison.Ordinal) &&
-                    !backdrop.Contains("CopyFromScreen", StringComparison.Ordinal) &&
-                    !finder.Contains("ToolWindows", StringComparison.Ordinal) &&
-                    !File.Exists(Path.Combine(repositoryRoot, "FrigoTab", "BackgroundWindows.cs")) &&
-                    !File.Exists(Path.Combine(repositoryRoot, "FrigoTab", "DesktopSnapshot.cs"));
+                return snapshotRegistration >= 0 &&
+                    applicationsRegistration > snapshotRegistration &&
+                    show > applicationsRegistration &&
+                    session.Contains("currentSnapshot.Draw", StringComparison.Ordinal) &&
+                    !session.Contains("DwmGlassBackdrop", StringComparison.Ordinal) &&
+                    !session.Contains("DwmDesktopBackdrop", StringComparison.Ordinal) &&
+                    !session.Contains("NoRedirectionBitmap", StringComparison.Ordinal) &&
+                    snapshot.Contains("IDesktopSnapshotApi", StringComparison.Ordinal) &&
+                    snapshot.Contains("IDesktopSnapshotFrame", StringComparison.Ordinal) &&
+                    snapshot.Contains("GdiDesktopSnapshotApi", StringComparison.Ordinal) &&
+                    snapshot.Contains("GetDC", StringComparison.Ordinal) &&
+                    snapshot.Contains("CreateCompatibleDC", StringComparison.Ordinal) &&
+                    snapshot.Contains("CreateDIBSection", StringComparison.Ordinal) &&
+                    snapshot.Contains("SelectObject", StringComparison.Ordinal) &&
+                    snapshot.Contains("BitBlt", StringComparison.Ordinal) &&
+                    snapshot.Contains("StretchBlt", StringComparison.Ordinal) &&
+                    snapshot.Contains("destinationBounds.Size == Size", StringComparison.Ordinal) &&
+                    snapshot.Contains("ReleaseDC", StringComparison.Ordinal) &&
+                    snapshot.Contains("DeleteDC", StringComparison.Ordinal) &&
+                    snapshot.Contains("DeleteObject", StringComparison.Ordinal) &&
+                    !Regex.IsMatch(snapshot, @"\bCopyFromScreen\s*\(") &&
+                    !Regex.IsMatch(snapshot, @"\bDrawImage(?:Unscaled)?\s*\(") &&
+                    !File.Exists(Path.Combine(repositoryRoot, "FrigoTab", "BackgroundWindows.cs"));
             }
         }
 
@@ -246,14 +251,18 @@ namespace FrigoTab.AcceptanceTests.Support {
         public bool DeterministicNativeDisposal {
             get {
                 string applicationWindow = ReadSource("FrigoTab", "ApplicationWindow.cs");
-                string desktopBackdrop = ReadSource("FrigoTab", "DwmDesktopBackdrop.cs");
+                string desktopSnapshot = ReadSource("FrigoTab", "DesktopSnapshot.cs");
                 bool fontsDisposed = Regex.Matches(applicationWindow, @"new\s+Font\s*\(").Count ==
                     Regex.Matches(applicationWindow, @"using\s*\(\s*Font\b").Count;
                 bool constructorsAreTransactional =
                     Regex.IsMatch(applicationWindow, @"public\s+ApplicationWindow[\s\S]*?catch\s*\{") &&
-                    Regex.IsMatch(desktopBackdrop, @"private\s+void\s+TryRegister[\s\S]*?finally\s*\{");
-                bool backdropIsDisposable = typeof(IDisposable).IsAssignableFrom(typeof(DwmDesktopBackdrop));
-                return fontsDisposed && constructorsAreTransactional && backdropIsDisposable && typeof(IDisposable).IsAssignableFrom(typeof(WindowIcon));
+                    Regex.IsMatch(desktopSnapshot, @"public\s+GdiDesktopSnapshotFrame[\s\S]*?catch\s*\{") &&
+                    desktopSnapshot.Contains("Release(ref newMemoryDc", StringComparison.Ordinal);
+                bool backdropIsDisposable =
+                    typeof(IDisposable).IsAssignableFrom(typeof(DesktopSnapshot)) &&
+                    typeof(IDisposable).IsAssignableFrom(typeof(GdiDesktopSnapshotFrame));
+                return fontsDisposed && constructorsAreTransactional && backdropIsDisposable &&
+                    typeof(IDisposable).IsAssignableFrom(typeof(WindowIcon));
             }
         }
 

@@ -46,12 +46,12 @@ namespace FrigoTab.AcceptanceTests {
         }
 
         [TestMethod]
-        public void BackgroundUsesLiveDwmGlassWithoutCapturingPixels () {
+        public void BackgroundUsesOneOpaqueNativeSnapshotWithoutPerPaintCapture () {
             CurrentWin32Capabilities capabilities = new CurrentWin32Capabilities();
 
             Assert.IsTrue(
-                capabilities.DesktopBackgroundUsesLiveDwmGlassWithoutPixelCapture,
-                "let DWM expose the live desktop; do not capture pixels or rebuild it from application windows.");
+                capabilities.DesktopBackgroundUsesOpaqueNativeSnapshot,
+                "capture the desktop once into an opaque native frame before showing the owner, then reuse it without per-paint GDI+ capture or scaling.");
         }
 
         [TestMethod]

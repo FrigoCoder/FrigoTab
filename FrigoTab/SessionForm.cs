@@ -9,8 +9,7 @@ namespace FrigoTab {
     public class SessionForm : FrigoForm, ISwitcherSessionPort {
 
         private readonly SwitcherApplication controller;
-        private DwmGlassBackdrop glassBackdrop;
-        private DwmDesktopBackdrop desktopBackdrop;
+        private DesktopSnapshot desktopSnapshot;
         private ApplicationWindows applications;
         private bool disposed;
         private bool reportedSessionVisibility;
@@ -20,12 +19,7 @@ namespace FrigoTab {
 
         public bool IsSessionVisible => controller.State == SwitcherState.Visible;
 
-        public SessionForm () {
-            // DWM owns the live glass pixels. Avoid allocating a second full
-            // redirected surface for this virtual-desktop-sized owner.
-            ExStyle |= WindowExStyles.NoRedirectionBitmap;
-            controller = new SwitcherApplication(this);
-        }
+        public SessionForm () => controller = new SwitcherApplication(this);
 
         public void HandleKeyEvents (KeyHookEventArgs e) {
             if( disposed || e == null ) {
@@ -44,35 +38,16 @@ namespace FrigoTab {
         }
 
         protected override void OnPaint (PaintEventArgs e) {
-            DwmGlassBackdrop currentGlass = glassBackdrop;
-            if( currentGlass != null && currentGlass.IsAvailable ) {
-                // Alpha-zero/no-paint client pixels let the DWM frame expose
-                // the live desktop. DWM application thumbnails are composed
-                // into this same non-layered owner at full opacity.
-                return;
-            }
-
-            DwmDesktopBackdrop currentBackdrop = desktopBackdrop;
-            if( currentBackdrop == null || !currentBackdrop.IsAvailable ) {
+            DesktopSnapshot currentSnapshot = desktopSnapshot;
+            if( currentSnapshot == null ) {
                 e.Graphics.Clear(Color.Black);
                 return;
             }
-            // The DWM thumbnail is composited directly into this owner HWND.
-            // Painting a solid base keeps the fallback deterministic without
-            // copying or scaling a full virtual-desktop bitmap on the UI
-            // thread.
-            currentBackdrop.DrawFallback(e.Graphics);
+            currentSnapshot.Draw(e.Graphics, ClientRectangle);
         }
 
         protected override void WndProc (ref Message m) {
             WindowMessages wm = (WindowMessages) m.Msg;
-            if( wm == WindowMessages.EraseBackground &&
-                glassBackdrop != null && glassBackdrop.IsAvailable ) {
-                // Prevent WinForms/GDI from replacing the transparent glass
-                // client with its default opaque background.
-                m.Result = new IntPtr(1);
-                return;
-            }
             switch( wm ) {
                 case WindowMessages.BeginSession:
                     // Keep the private message as a compatibility path for
@@ -162,8 +137,7 @@ namespace FrigoTab {
 
             CloseSessionResources();
 
-            DwmGlassBackdrop newGlassBackdrop = null;
-            DwmDesktopBackdrop newDesktopBackdrop = null;
+            DesktopSnapshot newDesktopSnapshot = null;
             ApplicationWindows newApplications = null;
             try {
                 WindowFinder finder = new WindowFinder();
@@ -177,14 +151,10 @@ namespace FrigoTab {
                 }
                 Bounds = bounds;
 
-                // The non-layered DWM glass owner exposes the actual live
-                // desktop without a GDI readback or per-window reconstruction.
-                // A shell thumbnail remains a cheap fallback when frame
-                // extension is unavailable.
-                newGlassBackdrop = new DwmGlassBackdrop(WindowHandle);
-                if( !newGlassBackdrop.IsAvailable ) {
-                    newDesktopBackdrop = new DwmDesktopBackdrop(WindowHandle, bounds);
-                }
+                // Capture once while the switcher and its tiles are hidden.
+                // DesktopSnapshot retains a native DIB/DC, so repainting is
+                // one exact-size BitBlt rather than GDI+ conversion/scaling.
+                newDesktopSnapshot = new DesktopSnapshot(bounds);
 
                 // Keep the resource graph local until every constructor has
                 // succeeded. Only a complete session is published to the
@@ -192,16 +162,13 @@ namespace FrigoTab {
                 newApplications = new ApplicationWindows(this, finder);
                 if( newApplications.Count == 0 ) {
                     newApplications.Dispose();
-                    newDesktopBackdrop?.Dispose();
-                    newGlassBackdrop.Dispose();
+                    newDesktopSnapshot.Dispose();
                     return false;
                 }
 
-                glassBackdrop = newGlassBackdrop;
-                desktopBackdrop = newDesktopBackdrop;
+                desktopSnapshot = newDesktopSnapshot;
                 applications = newApplications;
-                newGlassBackdrop = null;
-                newDesktopBackdrop = null;
+                newDesktopSnapshot = null;
                 newApplications = null;
 
                 Visible = true;
@@ -226,13 +193,7 @@ namespace FrigoTab {
                     // Best-effort cleanup; preserve fail-open behavior.
                 }
                 try {
-                    newDesktopBackdrop?.Dispose();
-                }
-                catch {
-                    // Best-effort cleanup; preserve fail-open behavior.
-                }
-                try {
-                    newGlassBackdrop?.Dispose();
+                    newDesktopSnapshot?.Dispose();
                 }
                 catch {
                     // Best-effort cleanup; preserve fail-open behavior.
@@ -245,11 +206,9 @@ namespace FrigoTab {
 
         private void CloseSessionResources () {
             ApplicationWindows currentApplications = applications;
-            DwmGlassBackdrop currentGlassBackdrop = glassBackdrop;
-            DwmDesktopBackdrop currentDesktopBackdrop = desktopBackdrop;
+            DesktopSnapshot currentDesktopSnapshot = desktopSnapshot;
             applications = null;
-            glassBackdrop = null;
-            desktopBackdrop = null;
+            desktopSnapshot = null;
 
             try {
                 if( currentApplications != null ) {
@@ -274,16 +233,10 @@ namespace FrigoTab {
                 // Application teardown is intentionally idempotent/best effort.
             }
             try {
-                currentDesktopBackdrop?.Dispose();
+                currentDesktopSnapshot?.Dispose();
             }
             catch {
                 // Application teardown is intentionally idempotent/best effort.
-            }
-            try {
-                currentGlassBackdrop?.Dispose();
-            }
-            catch {
-                // Restore ordinary owner margins even if other teardown fails.
             }
         }
 

@@ -16,14 +16,14 @@ The tests are acceptance/contract tests even where a fake or source probe is use
 | Grid layout (`_031`) | 5 | Pure geometry contract | Near-square grids, aspect ratio, margins, negative monitor origins, and invalid dimensions. |
 | Observable property (`_036`) | 1 | State contract | Equal assignment is silent; changed assignment notifies once. |
 | Production composition (`_037`) | 1 | Reflection contract | `SessionForm` implements `ISwitcherSessionPort`, owns `SwitcherApplication`, and exposes the hook entry point. |
-| Win32 integration (`_038`) | 9 | Source/metadata contract | No display reset or synthetic activation, tray-only startup, rooted Debug safety timer, hook-install diagnostics, live no-capture DWM backdrop, best-effort foreground denial, dedicated hook message loop, subscriber isolation, and visual-tile pointer routing. |
+| Win32 integration (`_038`) | 9 | Source/metadata contract | No display reset or synthetic activation, tray-only startup, rooted Debug safety timer, hook-install diagnostics, opaque one-shot desktop snapshot, best-effort foreground denial, dedicated hook message loop, subscriber isolation, and visual-tile pointer routing. |
 | Gesture balance (`_041`) | 4 | In-memory session port | Consumed Tab, digit, Escape, and F4 key-downs consume their matching key-up events. |
 | Win32 remediation (`_045`) | 10 | Reflection/source contract | Visible thumbnails, stale-window handling, restored-monitor selection, hook deferral, event-driven modifiers, DWM fallback, Unicode, pointer-sized declarations, disposal, and process admission. |
 | Keyboard infrastructure (`_055`) | 20 | Event/queue policy | Event-derived Alt/Shift state, injected input, balanced suppression, auto-repeat, deferred delivery, bounded-queue fail-open, token-bound admission recovery, a reserved session-ending slot, reset-generation invalidation, complete forward/reverse replay with direction preserved across Shift changes, native `INPUT` structure size, dual-Shift tracking, native-Alt recovery, pending-admission abort, failed-post recovery, and dedicated hook-thread ownership. |
 | DWM thumbnails (`_062`) | 5 | Fake native adapter | Visible opaque destination/source updates, returned-handle cleanup after registration failure, surfaced update failure with disposal, and unregister-failure diagnostics. |
 | Single instance (`_065`) | 1 | Real named-mutex contract | A competing thread cannot acquire the application mutex. |
 | Test naming convention (`_067`) | 1 | Repository contract | Timestamped class/file family names are unique and methods remain descriptive plain C# names. |
-| DWM desktop backdrop (`_077`) | 7 | Fake native adapters | All-client-area glass margins, failure/recovery, missing destination, one `GetShellWindow` fallback thumbnail, black fallback for a missing source, registration-failure handle release, and idempotent fallback disposal. |
+| Desktop snapshot backdrop (`_077`) | 7 | Fake native capture adapters | Native capture setup, exact-size paint, invalid bounds, black fallback, partial-resource cleanup, captured-frame ownership, and idempotent snapshot disposal. |
 | **Total** | **95** |  | **All automated tests are green.** |
 
 The source and metadata probes protect production invariants; they do not prove that every native call succeeds on every Windows desktop. The manual matrix below remains part of release evidence.
@@ -49,11 +49,11 @@ The Debug executable intentionally retains the legacy `StartQuitTimer` 10-second
 | Pointer hover/click and outside movement | Selection follows the pointer, clears outside tiles, keyboard selection recovers, and click activates exactly the intended target. Verify separate layered/transparent tile forms. |
 | Minimized/maximized and stale targets | Restored placement chooses the correct monitor; closed targets do not crash the session; activation failure remains recoverable. |
 | Mixed monitor/DPI topology | Negative origins, portrait layouts, DPI changes, resolution/orientation changes, and monitor add/remove close or rebuild safely without stale/off-screen UI. |
-| Live DWM glass backdrop | The actual desktop, applications, taskbars, and live motion remain visible through the no-redirection owner; application thumbnails stay opaque and pointer input continues to reach the session. No `CopyFromScreen`, bitmap scaling, or per-window background reconstruction occurs. |
-| Glass unavailable, DWM disabled, RDP, protected, and missing shell source | Failed glass uses one `GetShellWindow` shell thumbnail; if that also fails, the backdrop is black where supported; application thumbnails use the icon/title fallback and the session remains usable. |
+| Opaque desktop snapshot | The pre-overlay native `BitBlt` capture matches the visible virtual desktop at gesture start, remains opaque behind the application thumbnails, and paints at native size without per-window reconstruction. The hook remains responsive while the UI performs the bounded capture. |
+| Capture unavailable, DWM disabled, RDP, and protected surfaces | A failed or protected capture releases partial native resources, paints the documented black fallback, and leaves the session usable; application thumbnails use their normal DWM or icon/title fallback. |
 | Native resource stability | Repeated sessions, failed construction, DWM updates/unregister, and tray exit leave bounded GDI/native handle counts. |
 | Lock/unlock and secure-desktop transition | The active session and keyboard state reset; the next Alt+Tab works normally. |
-| Fullscreen or borderless exclusive applications | No display-mode reset, double draw, permanent active state, or unexpected live/fallback backdrop behavior. |
+| Fullscreen or borderless exclusive applications | No display-mode reset, double draw, permanent active state, or unexpected stale/black backdrop behavior. |
 | Candidate classification | UWP/packaged apps, shell/start menu, toolbars, and multiple windows match the intended eligible-window policy. |
 
 ## Local commands
