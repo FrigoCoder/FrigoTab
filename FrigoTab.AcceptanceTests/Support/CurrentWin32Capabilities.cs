@@ -59,6 +59,28 @@ namespace FrigoTab.AcceptanceTests.Support {
             }
         }
 
+        public bool DesktopBackgroundUsesSingleSnapshot {
+            get {
+                string session = ReadSource("FrigoTab", "SessionForm.cs");
+                string finder = ReadSource("FrigoTab", "WindowFinder.cs");
+                int capture = session.IndexOf("new DesktopSnapshot", StringComparison.Ordinal);
+                int show = session.IndexOf("Visible = true", StringComparison.Ordinal);
+                return capture >= 0 && show > capture &&
+                    session.Contains("currentDesktopSnapshot?.Dispose", StringComparison.Ordinal) &&
+                    !finder.Contains("ToolWindows", StringComparison.Ordinal) &&
+                    !File.Exists(Path.Combine(repositoryRoot, "FrigoTab", "BackgroundWindows.cs"));
+            }
+        }
+
+        public bool OverlayTilesRoutePointerInputToSession {
+            get {
+                string window = ReadSource("FrigoTab", "ApplicationWindow.cs");
+                return window.Contains("NonClientHitTestMessage", StringComparison.Ordinal) &&
+                    window.Contains("TransparentHitTest", StringComparison.Ordinal) &&
+                    window.Contains("WindowExStyles.NoActivate", StringComparison.Ordinal);
+            }
+        }
+
         public bool StaleWindowsSkipped {
             get {
                 string handle = ReadSource("FrigoTab", "WindowHandle.cs");
@@ -81,9 +103,9 @@ namespace FrigoTab.AcceptanceTests.Support {
         public bool HookWorkIsDeferred {
             get {
                 string hook = ReadSource("FrigoTab", "KeyHook.cs");
-                string session = ReadSource("FrigoTab", "SessionForm.cs");
-                return !hook.Contains("KeyEvent?.Invoke(e)", StringComparison.Ordinal) ||
-                    Regex.IsMatch(session, @"HandleKeyEvents[^}]*?(BeginInvoke|PostMessage)");
+                return hook.Contains("DeferredKeyboardDispatcher", StringComparison.Ordinal) &&
+                    hook.Contains("BeginInvoke(action)", StringComparison.Ordinal) &&
+                    Regex.IsMatch(hook, @"private\s+void\s+DispatchOnUiThread[\s\S]*?KeyEvent\?\.Invoke");
             }
         }
 
@@ -96,11 +118,12 @@ namespace FrigoTab.AcceptanceTests.Support {
 
         public bool DwmFailureFallbackAvailable {
             get {
-                string source = ReadSource("FrigoTab", "Thumbnail.cs");
-                bool checksNativeResult = source.Contains("ThrowExceptionForHR", StringComparison.Ordinal) ||
-                    Regex.IsMatch(source, @"(?:int|HRESULT)\s+\w+\s*=\s*Dwm(?:Register|Update)Thumbnail");
-                bool hasFallback = source.Contains("Fallback", StringComparison.OrdinalIgnoreCase) ||
-                    source.Contains("IThumbnail", StringComparison.Ordinal);
+                string thumbnail = ReadSource("FrigoTab", "Thumbnail.cs");
+                string applicationWindow = ReadSource("FrigoTab", "ApplicationWindow.cs");
+                bool checksNativeResult = thumbnail.Contains("ThrowExceptionForHR", StringComparison.Ordinal) &&
+                    thumbnail.Contains("IDwmThumbnailApi", StringComparison.Ordinal);
+                bool hasFallback = applicationWindow.Contains("TryCreateThumbnail", StringComparison.Ordinal) &&
+                    applicationWindow.Contains("fallback", StringComparison.OrdinalIgnoreCase);
                 return checksNativeResult && hasFallback;
             }
         }
@@ -124,32 +147,35 @@ namespace FrigoTab.AcceptanceTests.Support {
             get {
                 Type keyboardData = typeof(KeyHook).GetNestedType("LowLevelKeyStruct", BindingFlags.NonPublic);
                 FieldInfo extraInfo = keyboardData?.GetField("DwExtraInfo", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                MethodInfo keybdEvent = NativeMethods().Single(method => method.DeclaringType == typeof(WindowHandle) && method.Name == "keybd_event");
                 MethodInfo sendMessage = NativeMethods().Single(method => method.DeclaringType == typeof(WindowIcon) && method.Name == "SendMessageCallback");
+                bool deprecatedSyntheticInputRemoved = !NativeMethods().Any(
+                    method => method.DeclaringType == typeof(WindowHandle) && method.Name == "keybd_event");
                 return IsPointer(extraInfo?.FieldType) &&
-                    IsPointer(ParameterType(keybdEvent, "dwExtraInfo")) &&
-                    IsPointer(ParameterType(sendMessage, "wParam"));
+                    deprecatedSyntheticInputRemoved &&
+                    IsPointer(ParameterType(sendMessage, "wParam")) &&
+                    IsPointer(ParameterType(sendMessage, "dwData"));
             }
         }
 
         public bool DeterministicNativeDisposal {
             get {
                 string applicationWindow = ReadSource("FrigoTab", "ApplicationWindow.cs");
-                string backgroundWindow = ReadSource("FrigoTab", "BackgroundWindow.cs");
+                string desktopSnapshot = ReadSource("FrigoTab", "DesktopSnapshot.cs");
                 bool fontsDisposed = Regex.Matches(applicationWindow, @"new\s+Font\s*\(").Count ==
                     Regex.Matches(applicationWindow, @"using\s*\(\s*Font\b").Count;
                 bool constructorsAreTransactional =
                     Regex.IsMatch(applicationWindow, @"public\s+ApplicationWindow[\s\S]*?catch\s*\{") &&
-                    Regex.IsMatch(backgroundWindow, @"public\s+BackgroundWindow[\s\S]*?catch\s*\{");
-                return fontsDisposed && constructorsAreTransactional && typeof(IDisposable).IsAssignableFrom(typeof(WindowIcon));
+                    Regex.IsMatch(desktopSnapshot, @"private\s+void\s+Capture[\s\S]*?finally\s*\{");
+                bool backdropIsDisposable = typeof(IDisposable).IsAssignableFrom(typeof(DesktopSnapshot));
+                return fontsDisposed && constructorsAreTransactional && backdropIsDisposable && typeof(IDisposable).IsAssignableFrom(typeof(WindowIcon));
             }
         }
 
         public bool SingleInstanceGuardPresent {
             get {
-                string source = ReadSource("FrigoTab", "Program.cs");
-                return source.Contains("Mutex", StringComparison.Ordinal) ||
-                    source.Contains("CreateMutex", StringComparison.Ordinal);
+                string program = ReadSource("FrigoTab", "Program.cs");
+                return typeof(IDisposable).IsAssignableFrom(typeof(SingleInstanceGuard)) &&
+                    program.Contains("SingleInstanceGuard.TryAcquire", StringComparison.Ordinal);
             }
         }
 

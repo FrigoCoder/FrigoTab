@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -20,10 +21,49 @@ namespace FrigoTab {
 
         public LayerUpdater (Form form) {
             this.form = form;
-            screenDc = GetDC(IntPtr.Zero);
-            memDc = CreateCompatibleDC(screenDc);
-            hBitmap = CreateCompatibleBitmap(screenDc, form.Bounds.Width, form.Bounds.Height);
-            hOldBitmap = SelectObject(memDc, hBitmap);
+
+            IntPtr newScreenDc = IntPtr.Zero;
+            IntPtr newMemDc = IntPtr.Zero;
+            IntPtr newBitmap = IntPtr.Zero;
+            IntPtr newOldBitmap = IntPtr.Zero;
+            try {
+                newScreenDc = GetDC(IntPtr.Zero);
+                if( newScreenDc == IntPtr.Zero ) {
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "GetDC failed.");
+                }
+                newMemDc = CreateCompatibleDC(newScreenDc);
+                if( newMemDc == IntPtr.Zero ) {
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateCompatibleDC failed.");
+                }
+                newBitmap = CreateCompatibleBitmap(newScreenDc, form.Bounds.Width, form.Bounds.Height);
+                if( newBitmap == IntPtr.Zero ) {
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateCompatibleBitmap failed.");
+                }
+                newOldBitmap = SelectObject(newMemDc, newBitmap);
+                if( newOldBitmap == IntPtr.Zero || newOldBitmap == new IntPtr(-1) ) {
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "SelectObject failed.");
+                }
+
+                screenDc = newScreenDc;
+                memDc = newMemDc;
+                hBitmap = newBitmap;
+                hOldBitmap = newOldBitmap;
+            }
+            catch {
+                if( newOldBitmap != IntPtr.Zero && newOldBitmap != new IntPtr(-1) ) {
+                    SelectObject(newMemDc, newOldBitmap);
+                }
+                if( newBitmap != IntPtr.Zero ) {
+                    DeleteObject(newBitmap);
+                }
+                if( newMemDc != IntPtr.Zero ) {
+                    DeleteDC(newMemDc);
+                }
+                if( newScreenDc != IntPtr.Zero ) {
+                    ReleaseDC(IntPtr.Zero, newScreenDc);
+                }
+                throw;
+            }
         }
 
         ~LayerUpdater () => Dispose();
@@ -32,10 +72,18 @@ namespace FrigoTab {
             if( disposed ) {
                 return;
             }
-            SelectObject(memDc, hOldBitmap);
-            DeleteDC(memDc);
-            DeleteObject(hBitmap);
-            ReleaseDC(IntPtr.Zero, screenDc);
+            if( memDc != IntPtr.Zero && hOldBitmap != IntPtr.Zero && hOldBitmap != new IntPtr(-1) ) {
+                SelectObject(memDc, hOldBitmap);
+            }
+            if( memDc != IntPtr.Zero ) {
+                DeleteDC(memDc);
+            }
+            if( hBitmap != IntPtr.Zero ) {
+                DeleteObject(hBitmap);
+            }
+            if( screenDc != IntPtr.Zero ) {
+                ReleaseDC(IntPtr.Zero, screenDc);
+            }
             disposed = true;
             GC.SuppressFinalize(this);
         }
@@ -61,7 +109,9 @@ namespace FrigoTab {
                 SourceConstantAlpha = 0xff,
                 AlphaFormat = AlphaFormat.SourceAlpha
             };
-            UpdateLayeredWindow(form.Handle, IntPtr.Zero, ref pptDst, ref pSize, memDc, ref pptSrc, 0, ref pblend, UpdateLayeredWindowFlags.Alpha);
+            if( !UpdateLayeredWindow(form.Handle, IntPtr.Zero, ref pptDst, ref pSize, memDc, ref pptSrc, 0, ref pblend, UpdateLayeredWindowFlags.Alpha) ) {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "UpdateLayeredWindow failed.");
+            }
         }
 
         private struct BlendFunction {

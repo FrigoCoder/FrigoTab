@@ -2,70 +2,52 @@
 
 This document is the behavior inventory for acceptance-test-driven development. The work is isolated on `codex/gpt-atdd-stabilization`; it must not be treated as a change directly on `master`.
 
-## Test-suite vocabulary
+## Test policy
 
-- **Normal** — deterministic acceptance/specification tests that must be green in the default verification run.
-- **KnownIssue** — an intentionally red regression/contract probe for a defect that is still open. It is run separately so the default suite remains meaningful.
-- **ManualWindows** — a real interactive Windows scenario requiring HWNDs, keyboard hooks, DWM, focus, monitor topology, DPI, or user input. It is part of release evidence, not a replacement for a deterministic test.
+The repository contains 76 green plain C# MSTest methods. There is no Reqnroll/Gherkin layer, no `.feature` file, and no intentionally-red test lane or task. Every test method starts with `TYYYYMMDDTHHMMSSZ_NNN`: an immutable UTC introduction timestamp followed by a stable sequence suffix; the current sequence reaches `_076`. A naming-convention acceptance test enforces this rule, and existing timestamps are not changed during refactoring.
 
-The current automated result is 40 green acceptance tests and 14 intentionally red `KnownIssue` tests. Four red tests are behavioral fake-port input-balance scenarios; the other ten are native contract probes that inspect production linkage/source/metadata and do not simulate a complete desktop.
+The tests are split by evidence, not by pass/fail status:
 
-## Current intended features
+- **Behavioral acceptance tests** use `SwitcherApplication` with an in-memory session port. They protect externally visible interaction without creating HWNDs or installing hooks.
+- **Production contract tests** inspect the executable's composition, source-level Win32 declarations, and resource seams, and use fakes for DWM/error paths. They protect architecture and failure handling but cannot prove every native call on every desktop.
+- **ManualWindows checks** use real hooks, HWNDs, DWM, focus, monitor/DPI changes, lock/unlock, protected surfaces, and pointer input. They are release evidence, not a substitute for deterministic tests.
 
-| ID | Suite | Acceptance behavior | Current coverage |
+## Current behaviors
+
+| Area | Requirement | Automated evidence | Manual evidence |
 | --- | --- | --- | --- |
-| FT-START-001 | Normal contract; ManualWindows runtime | Startup runs a form-less WinForms message loop, shows a tray icon, has no taskbar button, and keeps the switcher hidden until a gesture. | `Win32Regressions.feature`; verify on real Windows. |
-| FT-EXIT-001 | ManualWindows | Tray Exit closes any active session, disposes the hook/tray resources, and exits. | Manual release matrix. |
-| FT-HOOK-001 | ManualWindows plus adapter review | A non-injected global keyboard notification carries the virtual key/modifiers, and an unhandled event reaches the next hook. | `KeyHook.cs`; native hook test still required. |
-| FT-HOOK-002 | ManualWindows | Alt+Tab opens the switcher and leaves the shell available when opening cannot succeed. | Policy fail-open scenarios are green; real hook timing is manual. |
-| FT-ENUM-001 | ManualWindows only | Window enumeration excludes invisible/disabled/cloaked/no-activate candidates, keeps app windows selectable, and places tool windows behind them. | No automated enumeration test exists yet; extract an `IWindowCatalog` seam before adding one. |
-| FT-LAYOUT-001 | Normal | Each candidate receives a numbered, aspect-preserving tile inside its monitor's working area; independent monitors retain their own origins and margins. | `GridLayout.feature` and production `Layout.cs` linkage. |
-| FT-UI-001 | ManualWindows | An eligible tile shows its DWM preview, title, icon, number, and selection highlight. | Manual release matrix; thumbnail visibility remains open. |
-| FT-UI-002 | ManualWindows | Tool-window thumbnails render behind selectable application tiles in reverse enumeration order. | Manual release matrix. |
-| FT-SELECT-001 | Normal; ManualWindows | Pointer hover selects the tile under the pointer; moving outside clears selection without activation. | Fake-port behavior scenarios plus native pointer regression check. |
-| FT-SELECT-002 | Normal; ManualWindows | Clicking a selected tile restores the target when needed, activates it, and closes the session after successful activation. | Fake-port policy scenarios plus native focus check. |
-| FT-KEY-001 | Normal; ManualWindows | D1..D9 select/activate the corresponding candidate. | Fake-port behavior scenarios plus native keyboard check. |
-| FT-CANCEL-001 | Normal; ManualWindows | Escape cancels without activation and releases session resources. | Fake-port behavior scenarios plus native check. |
-| FT-CANCEL-002 | Normal; ManualWindows | Alt+F4 cancels the session without terminating the tray process. | Green policy scenario plus native check. |
-| FT-ACTIVATE-001 | Normal; ManualWindows | Minimized candidates use their restored placement for layout and are restored before foreground activation. | Activation policy is tested; restored-rectangle monitor selection remains open. |
-| FT-PROP-001 | Normal | Equal property assignment is silent; a changed assignment emits one synchronous old/new notification. | `Property.feature`. |
+| Startup | Start a form-less WinForms message loop, acquire the per-user single-instance mutex, show a tray icon, avoid a taskbar button, and keep the switcher hidden until a gesture. | Composition/source contract tests and mutex test. | Start a Release build on a real desktop and launch a second copy. |
+| Tray exit | Exit closes any active session, disposes the hook/tray/mutex resources, and ends the process. | Policy cleanup coverage. | Tray Exit and process-lifetime check. |
+| Keyboard observation | A non-injected low-level keyboard event is normalized with key transition and modifier state; injected events do not alter physical state. Left/right modifiers remain correct when one side is released, and a native Alt flag can recover a missed transition until Alt-up. Unhandled input reaches the next hook. | Keyboard infrastructure acceptance tests. | Real hook from ordinary and elevated applications. |
+| Hook responsiveness and replay | The native callback performs bounded admission/suppression only; enumeration, DWM setup, rendering, and activation run later on the UI thread through a bounded queue. If opening is rejected after Alt is released, a complete injected Alt+Tab or Alt+Shift+Tab gesture is replayed using the native `INPUT` structure; the captured forward/reverse direction is preserved even if Shift changes before dispatch. | Deferred-dispatch, replay, structure-size, and full-queue tests. | Large candidate set, rapid repeats, failed-open recovery, direction changes, and shell responsiveness. |
+| First gesture | A successful Alt+Tab opens the overlay and selects the first candidate. Empty or failed opening passes the gesture through and cleans up. | Switcher interaction acceptance tests. | Explorer, console, elevated, and ordinary applications. |
+| Repeated gesture | Repeated Alt+Tab advances and wraps; Shift+Alt+Tab moves backward and wraps. | Switcher interaction acceptance tests. | Physical Alt/Shift transitions, including missed-release recovery. |
+| Gesture balancing | Every consumed key-down has its matching physical key-up consumed, including Tab, digits, Escape, and F4 after the session closes. | Keyboard suppression and switcher acceptance tests. | Verify no foreground application receives an unmatched key-up. |
+| Number selection | D1..D9 and NumPad1..NumPad9 select the same one-based candidates; invalid digits leave the current selection unchanged. | Switcher interaction acceptance tests. | Number input on supported keyboard layouts. |
+| Cancellation | Escape and Alt+F4 close only the overlay, do not activate a target, and do not terminate the tray process. | Switcher interaction acceptance tests. | Physical Escape and Alt+F4 sequences. |
+| Pointer selection and routing | Hover selects the tile under the pointer; moving outside clears selection; keyboard selection can take control again; visual tile forms route pointer input to the session surface. | Switcher interaction and production pointer-routing contract tests. | Layered/transparent tile hit-testing on supported Windows versions. |
+| Pointer activation | Clicking a tile activates exactly the target under the pointer and closes after successful activation. | Switcher interaction acceptance tests. | Focus/foreground behavior, including elevated targets. |
+| Window candidates | Enumerate eligible visible application windows while excluding cloaked, disabled, invisible, no-activate, and tool-window candidates. | Production source/contract coverage for the current classifier. | Packaged apps, shell/start menu, toolbars, and multiple windows. |
+| Stale windows | A candidate that disappears between enumeration, layout, and activation is skipped or fails recoverably without aborting other candidates. | Production source/contract coverage and failure-path tests. | Close targets during enumeration and immediately before activation. |
+| Monitor layout | Use the restored rectangle to choose a monitor for minimized candidates; preserve negative monitor origins, working-area margins, stable numbering, and source aspect ratios. | Grid and layout acceptance tests plus production contract coverage. | Mixed-DPI, portrait, negative-origin, and monitor-add/remove configurations. |
+| Static backdrop | Capture the composed virtual desktop once while the overlay is hidden and paint that image behind the tiles. Do not reconstruct the background from tool-window thumbnails. | Production snapshot contract test. | Protected surfaces, secure desktop, unavailable capture, and desktop changes during a session. |
+| DWM preview | Request visible opaque DWM thumbnails for both destination and source updates; unregister handles deterministically and diagnose unregister failures; surface HRESULT failures and use the icon/title overlay fallback when DWM is unavailable. | Thumbnail acceptance tests and native contract coverage. | DWM disabled, RDP, protected windows, and repeated sessions. |
+| Selection rendering | Show title, icon, number, and selected highlight for each tile; dispose fonts, icons, layered DCs, bitmaps, thumbnails, and forms deterministically, including partial construction. | Resource and thumbnail contract tests. | Repeat sessions while watching native/GDI handle counts. |
+| Activation | Restore minimized targets, attempt foreground activation, and keep the session recoverable when activation fails. | Switcher policy tests. | Focus-stealing restrictions, elevated targets, and stale HWNDs. |
+| Interruption | Lock/unlock, desktop deactivation, tray exit, display change, and DPI change reset or safely close the current session and input state. | Interruption/relayout policy tests. | Secure desktop, resolution/orientation/DPI changes, and fullscreen applications. |
+| Observable property | Equal assignment is silent; a changed assignment emits one synchronous old/new notification. | Property acceptance test. | Not required. |
 
-The green switcher feature also protects repeated Alt+Tab wrapping, Shift reverse selection, injected/key-up pass-through, empty/exceptional opens, pointer selection recovery after a clear, invalid hit-test handling, activation failure/exception recovery, interruption, cleanup failure, display-change relayout, and reopening after a close. These scenarios use `SwitcherApplication` with `FakeSwitcherSessionPort`; they do not claim that every native adapter is correct.
+## Defects addressed by the current green suite
 
-## Corrective work completed on this branch
+The current branch protects the selected stabilization fixes and their adjacent regressions: fail-open admission, balanced key suppression, event-derived and dual-side modifiers, native-Alt recovery, deferred hook work, complete forward/reverse failed-open replay with direction preserved across Shift changes, pointer-sized `INPUT` layout, startup without a stack-trace visibility hack, no display-mode reset or fabricated activation message, transactional construction/cleanup, stale-window skipping, restored-rectangle monitor selection, visible DWM destination/source thumbnail properties and unregister diagnostics, controlled DWM fallback, Unicode and pointer-sized declarations, deterministic native/GDI disposal, single-instance admission, visual-tile pointer routing, and the one-snapshot desktop backdrop.
 
-The following issues were converted into green behavior or production contract checks and are no longer part of the red work queue:
+These are green executable specifications, not a promise that a protected or unusual Windows surface behaves identically to an ordinary desktop. The manual matrix is intentionally retained for those cases.
 
-| ID | Current result |
-| --- | --- |
-| KI-FAILOPEN-001 | Open/initial-selection failure passes the key through, closes the partial session, and leaves the policy idle. |
-| KI-HOTKEY-001 | Key-down/up/repeat and Shift are represented; repeated Alt+Tab advances deterministically. |
-| KI-KEY-001 | Alt+F4 cancels only the switcher. |
-| KI-KEY-002 | NumPad1..NumPad9 map to the same candidates as D1..D9. |
-| KI-DISPLAY-001 | Session startup no longer resets display modes or sends a fabricated `WM_ACTIVATEAPP`. |
-| KI-LIFECYCLE-001 | Session open/close is transactional at the policy boundary and cleanup cannot leave the controller active. |
-| KI-ACTIVATE-001 | Activation failure leaves the session available for retry/cancel instead of closing unconditionally. |
-| KI-HOOK-STARTUP-001 | Hook-install failure has a user-facing diagnostic path. |
-| Startup/selection recovery | Startup uses a form-less `ApplicationContext`, and a pointer clear does not permanently disable keyboard selection. |
+## Explicit design caveats
 
-These fixes still need native Windows validation where the requirement has a `ManualWindows` row.
-
-## Open requirements and KnownIssue probes
-
-The native rows below each have one intentionally red contract probe in `Win32KnownIssues.feature`. The separate behavioral `KI-KEY-BALANCE-001` examples are in `SwitcherKnownIssues.feature`. Fixes should first make each probe green, then move the requirement into the normal acceptance/release suite.
-
-| ID | Priority | Current gap | Expected behavior |
-| --- | --- | --- | --- |
-| KI-THUMB-001 | P0 | DWM thumbnail updates do not request visibility. | A successful session shows live previews, or a controlled fallback is reported when DWM is unavailable. |
-| KI-KEY-BALANCE-001 | P1 | Consumed Tab, digit, Escape, and F4 key-downs currently let their matching key-ups through, including after the session closes. | Consume both halves of every consumed gesture so another application cannot receive an unmatched key-up. |
-| KI-STALE-001 | P1 | A window can disappear between enumeration, layout, and activation; stale native results are not consistently handled. | Stale candidates are skipped/removed, native failures are reported, and the overlay remains recoverable. |
-| KI-LAYOUT-MONITOR-001 | P1 | Layout takes restored dimensions from `GetRect`, but chooses the monitor separately with `Screen.FromHandle`; that can disagree for a minimized window. | A minimized candidate is assigned to the monitor containing its restored placement. |
-| KI-HOOK-LATENCY-001 | P1 | Expensive session construction is reachable from the low-level hook callback. | The callback returns quickly; session work is posted/deferred and failure still preserves shell pass-through. |
-| KI-HOOK-MODIFIER-001 | P1 | `LowLevelKeyboardProc` calls `GetAsyncKeyState`, although Windows invokes the callback before asynchronous key state is updated. | Modifier state is derived from the hook event stream and reset explicitly across desktop/session interruptions. |
-| KI-DWM-FAILURE-001 | P1 | DWM registration/update failures have no controlled renderer fallback. | DWM failure is detected, diagnosed, and rendered through a documented fallback or safe close. |
-| KI-INTEROP-UNICODE | P1 | Text-related P/Invokes are not consistently explicit Unicode. | All text Win32 entry points use Unicode declarations and preserve non-ASCII titles/classes. |
-| KI-INTEROP-POINTER | P1 | Remaining native parameters still use non-pointer-sized declarations. | `LPARAM`, `WPARAM`, callback data, and `ULONG_PTR` values use `IntPtr`/`UIntPtr` as appropriate on x64. |
-| KI-RESOURCE-001 | P2 | Fonts, icons, DWM/GDI handles, and partial construction are not all deterministically disposed on the UI thread. | Repeated sessions have bounded native/GDI handles, including when a constructor fails halfway through. |
-| KI-INSTANCE-001 | P2 | There is no process-wide single-instance guard. | A second launch exits cleanly or focuses the existing tray/session instance. |
-
-The pointer-routing question is deliberately **not** a confirmed defect. Separate layered/transparent application forms have a history of fragility, so pointer hit-testing remains a `ManualWindows` regression risk until it is verified on supported Windows configurations.
+- The desktop backdrop is static for one session. A desktop change behind the overlay is not continuously reflected.
+- Protected, secure, or unavailable capture surfaces may render as a black backdrop; opening remains fail-open.
+- A live display/DPI topology change currently closes the session safely rather than rebuilding every native tile in place.
+- DWM failure falls back to the icon/title overlay; that fallback is intentionally less informative than a live thumbnail.
+- Pointer routing through separate layered/transparent tile forms has a history of fragility and must be verified on supported Windows configurations; it is not currently documented as a reproducibly confirmed click-through bug.
+- Future work can extract narrower keyboard, window-catalog, display-topology, activator, view, and clock ports when a new acceptance behavior requires stronger isolation.

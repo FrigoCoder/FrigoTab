@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Clean', 'Restore', 'Build', 'Test', 'Verify', 'TestKnownIssues', 'Publish')]
+    [ValidateSet('Clean', 'Restore', 'Build', 'Test', 'Verify', 'Publish', 'PublishPortable')]
     [string] $Task = 'Verify',
 
     [ValidateSet('Debug', 'Release')]
@@ -14,7 +14,8 @@ $repositoryRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $solutionPath = Join-Path $repositoryRoot 'FrigoTab.sln'
 $applicationProjectPath = Join-Path $repositoryRoot 'FrigoTab\FrigoTab.csproj'
 $acceptanceProjectPath = Join-Path $repositoryRoot 'FrigoTab.AcceptanceTests\FrigoTab.AcceptanceTests.csproj'
-$publishPath = Join-Path $repositoryRoot 'artifacts\publish\win-x64'
+$leanPublishPath = Join-Path $repositoryRoot 'artifacts\publish\lean-win-x64'
+$portablePublishPath = Join-Path $repositoryRoot 'artifacts\publish\portable-win-x64'
 
 $dotnetCommand = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue
 if ($null -eq $dotnetCommand) {
@@ -92,24 +93,7 @@ function Invoke-GreenTests {
         '--no-restore',
         '--nologo',
         '-p:Platform=x64',
-        '--filter', 'TestCategory=Acceptance&TestCategory!=KnownIssue'
-    )
-}
-
-function Invoke-KnownIssueTests {
-    Ensure-Restore
-    if (-not $script:buildComplete) {
-        Invoke-Build
-    }
-
-    Invoke-Dotnet @(
-        'test', $acceptanceProjectPath,
-        '--configuration', $Configuration,
-        '--no-build',
-        '--no-restore',
-        '--nologo',
-        '-p:Platform=x64',
-        '--filter', 'TestCategory=KnownIssue'
+        '--filter', 'TestCategory=Acceptance'
     )
 }
 
@@ -149,7 +133,7 @@ function Invoke-Clean {
     }
 }
 
-function Invoke-Publish {
+function Invoke-ReleaseGate {
     # Publishing is release-gated: it first performs the same green build and
     # acceptance suite as Verify, but with Release binaries.
     Invoke-Dotnet @('restore', $solutionPath, '--nologo')
@@ -167,19 +151,55 @@ function Invoke-Publish {
         '--no-restore',
         '--nologo',
         '-p:Platform=x64',
-        '--filter', 'TestCategory=Acceptance&TestCategory!=KnownIssue'
+        '--filter', 'TestCategory=Acceptance'
     )
 
-    # Restore the application with its RID so the self-contained runtime pack
-    # is present before publishing with --no-restore.
-    Invoke-Dotnet @('restore', $applicationProjectPath, '--runtime', 'win-x64', '--nologo')
+}
 
-    if (Test-Path -LiteralPath $publishPath) {
-        Assert-RepositoryChildPath $publishPath
-        Remove-Item -LiteralPath $publishPath -Recurse -Force
+function Reset-PublishDirectory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    if (Test-Path -LiteralPath $Path) {
+        Assert-RepositoryChildPath $Path
+        Remove-Item -LiteralPath $Path -Recurse -Force
     }
-    New-Item -ItemType Directory -Path $publishPath -Force | Out-Null
+    New-Item -ItemType Directory -Path $Path -Force | Out-Null
+}
 
+function Invoke-Publish {
+    Invoke-ReleaseGate
+
+    # The default artifact is deliberately lean. It is a single application
+    # file and relies on the .NET 10 Windows Desktop Runtime on the target PC.
+    Invoke-Dotnet @('restore', $applicationProjectPath, '--runtime', 'win-x64', '--nologo')
+    Reset-PublishDirectory $leanPublishPath
+
+    Invoke-Dotnet @(
+        'publish', $applicationProjectPath,
+        '--configuration', 'Release',
+        '--runtime', 'win-x64',
+        '--self-contained', 'false',
+        '--no-restore',
+        '--nologo',
+        '-p:Platform=x64',
+        '-p:PublishSingleFile=true',
+        '-p:DebugType=None',
+        '-p:DebugSymbols=false',
+        '--output', $leanPublishPath
+    )
+}
+
+function Invoke-PublishPortable {
+    Invoke-ReleaseGate
+
+    # This fallback carries the entire Windows Desktop runtime for machines
+    # without .NET. Compression cuts the old 117 MiB / 273-file output to one
+    # roughly 47 MiB executable without unsupported WinForms trimming.
+    Invoke-Dotnet @('restore', $applicationProjectPath, '--runtime', 'win-x64', '--nologo')
+    Reset-PublishDirectory $portablePublishPath
     Invoke-Dotnet @(
         'publish', $applicationProjectPath,
         '--configuration', 'Release',
@@ -188,8 +208,13 @@ function Invoke-Publish {
         '--no-restore',
         '--nologo',
         '-p:Platform=x64',
-        '-p:PublishSingleFile=false',
-        '--output', $publishPath
+        '-p:PublishSingleFile=true',
+        '-p:EnableCompressionInSingleFile=true',
+        '-p:IncludeNativeLibrariesForSelfExtract=true',
+        '-p:PublishReadyToRun=false',
+        '-p:DebugType=None',
+        '-p:DebugSymbols=false',
+        '--output', $portablePublishPath
     )
 }
 
@@ -216,13 +241,12 @@ switch ($Task) {
         Invoke-GreenTests
         break
     }
-    'TestKnownIssues' {
-        Invoke-Build
-        Invoke-KnownIssueTests
-        break
-    }
     'Publish' {
         Invoke-Publish
+        break
+    }
+    'PublishPortable' {
+        Invoke-PublishPortable
         break
     }
 }

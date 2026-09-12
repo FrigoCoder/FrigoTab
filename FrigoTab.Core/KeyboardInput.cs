@@ -8,6 +8,7 @@ namespace FrigoTab.Core {
 
         Unknown,
         Alt,
+        Shift,
         Tab,
         Escape,
         F4,
@@ -39,6 +40,23 @@ namespace FrigoTab.Core {
 
         Down,
         Up
+
+    }
+
+    /// <summary>
+    /// Identifies the physical modifier whose transition produced an event.
+    /// Keeping left and right keys distinct prevents releasing one key from
+    /// clearing the state of the other.
+    /// </summary>
+    public enum KeyboardModifierKey {
+
+        None,
+        Alt,
+        LeftAlt,
+        RightAlt,
+        Shift,
+        LeftShift,
+        RightShift
 
     }
 

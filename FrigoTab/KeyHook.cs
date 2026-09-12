@@ -90,16 +90,31 @@ namespace FrigoTab {
     public class KeyHook : IDisposable {
 
         private const int LowLevelKeyboardHook = 13;
+        private const int MaxPendingKeyboardEvents = 64;
 
         public event Action<KeyHookEventArgs> KeyEvent;
 
         [SuppressMessage("ReSharper", "PrivateFieldCanBeConvertedToLocalVariable")]
         private readonly LowLevelKeyProc hookProc;
-
+        private readonly Control dispatcherControl;
+        private readonly KeyboardModifierState modifiers = new KeyboardModifierState();
+        private readonly KeyboardSuppressionState suppression = new KeyboardSuppressionState();
+        private readonly DeferredKeyboardDispatcher deferredDispatcher;
         private readonly IntPtr hookId;
         private bool disposed;
 
-        public KeyHook () {
+        public KeyHook (Control dispatcherControl) {
+            if( dispatcherControl == null ) {
+                throw new ArgumentNullException(nameof(dispatcherControl));
+            }
+            if( !dispatcherControl.IsHandleCreated ) {
+                throw new InvalidOperationException("The keyboard dispatcher must have a native handle before installing the hook.");
+            }
+            this.dispatcherControl = dispatcherControl;
+            deferredDispatcher = new DeferredKeyboardDispatcher(
+                PostToUiThread,
+                DispatchOnUiThread,
+                MaxPendingKeyboardEvents);
             hookProc = HookProc;
             IntPtr moduleHandle = IntPtr.Zero;
             try {
@@ -135,6 +150,8 @@ namespace FrigoTab {
             }
 
             disposed = true;
+            suppression.Reset();
+            modifiers.Reset();
             if( hookId != IntPtr.Zero ) {
                 UnhookWindowsHookEx(hookId);
             }
@@ -168,31 +185,86 @@ namespace FrigoTab {
             }
 
             Keys keyCode = lParam.VkCode & Keys.KeyCode;
-            bool keyIsAlt = IsAltKey(keyCode);
-            bool keyIsShift = IsShiftKey(keyCode);
-            bool alt = lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown) ||
-                IsModifierDown(Keys.Menu) || (keyIsAlt && transition == KeyTransition.Down);
-            bool shift = IsModifierDown(Keys.ShiftKey) || (keyIsShift && transition == KeyTransition.Down);
             bool injected = lParam.Flags.HasFlag(LowLevelKeyFlags.Injected) ||
                 lParam.Flags.HasFlag(LowLevelKeyFlags.LowerIntegrityInjected);
             SwitcherKey key = MapKey(keyCode);
+            if( key == SwitcherKey.Unknown || injected ) {
+                return false;
+            }
 
-            // Report modifier state before applying this transition so Alt-up
-            // remains a recognizable commit gesture.
-            KeyboardInput input = new KeyboardInput(key, transition, alt, shift, injected);
-            Keys legacyKey = alt ? keyCode | Keys.Alt : keyCode;
+            KeyboardInput input = modifiers.CreateInput(
+                key,
+                transition,
+                lParam.Flags.HasFlag(LowLevelKeyFlags.AltDown),
+                false,
+                MapModifierKey(keyCode));
+
+            // BeginInvoke only posts a Windows message.  Window enumeration,
+            // DWM setup, rendering, and activation run later on the UI thread,
+            // after LowLevelKeyboardProc has returned.
+            if( !deferredDispatcher.TryDispatch(input) ) {
+                return false;
+            }
+            return suppression.ShouldConsume(input);
+        }
+
+        public void SetSessionVisible (bool visible) => suppression.SetSessionVisible(visible);
+
+        public void ResetInputState () {
+            modifiers.Reset();
+            suppression.Reset();
+        }
+
+        private bool PostToUiThread (Action action) {
+            if( disposed || dispatcherControl.IsDisposed || dispatcherControl.Disposing ) {
+                return false;
+            }
+            dispatcherControl.BeginInvoke(action);
+            return true;
+        }
+
+        private void DispatchOnUiThread (KeyboardInput input) {
+            if( disposed ) {
+                return;
+            }
+
+            Keys keyCode = MapLegacyKey(input.Key);
+            Keys legacyKey = input.Alt ? keyCode | Keys.Alt : keyCode;
             KeyHookEventArgs e = new KeyHookEventArgs(legacyKey, input);
-
             try {
                 KeyEvent?.Invoke(e);
             }
             catch( Exception exception ) {
-                // Subscriber failures must not disable the global hook or block
-                // input in another application.
+                // Subscriber failures are contained on the managed UI thread.
                 Debug.WriteLine(exception);
-                return false;
             }
-            return e.Handled;
+
+            if( !e.Handled && input.IsDown && input.Key == SwitcherKey.Tab && input.Alt ) {
+                try {
+                    ReplayNativeAltTab(modifiers.AltDown, input.Shift, modifiers.ShiftDown);
+                }
+                catch( Exception exception ) {
+                    // Recovery is best effort; a missing User32 entry point or
+                    // marshaling failure must not terminate the message loop.
+                    Debug.WriteLine(exception);
+                }
+            }
+        }
+
+        private static void ReplayNativeAltTab (bool altStillDown, bool reverse, bool shiftStillDown) {
+            KeyboardInput[] recovery = AltTabRecoveryPlan.Create(altStillDown, reverse, shiftStillDown);
+            NativeInput[] inputs = new NativeInput[recovery.Length];
+            for( int index = 0; index < recovery.Length; index++ ) {
+                KeyboardInput input = recovery[index];
+                inputs[index] = NativeInput.Keyboard(
+                    (ushort) MapLegacyKey(input.Key),
+                    input.IsUp ? KeyboardEventFlags.KeyUp : 0);
+            }
+            uint sent = SendInput((uint) inputs.Length, inputs, Marshal.SizeOf<NativeInput>());
+            if( sent != (uint) inputs.Length ) {
+                Debug.WriteLine("Unable to replay Alt+Tab after switcher admission failed. Win32 error: " +
+                    Marshal.GetLastWin32Error());
+            }
         }
 
         private static bool TryGetTransition (WindowMessages message, out KeyTransition transition) {
@@ -211,15 +283,6 @@ namespace FrigoTab {
             }
         }
 
-        private static bool IsAltKey (Keys key) =>
-            key == Keys.Menu || key == Keys.LMenu || key == Keys.RMenu;
-
-        private static bool IsShiftKey (Keys key) =>
-            key == Keys.ShiftKey || key == Keys.LShiftKey || key == Keys.RShiftKey;
-
-        private static bool IsModifierDown (Keys key) =>
-            (GetAsyncKeyState((int) key) & 0x8000) != 0;
-
         private static SwitcherKey MapKey (Keys key) {
             switch( key ) {
                 case Keys.Tab:
@@ -232,6 +295,10 @@ namespace FrigoTab {
                 case Keys.LMenu:
                 case Keys.RMenu:
                     return SwitcherKey.Alt;
+                case Keys.ShiftKey:
+                case Keys.LShiftKey:
+                case Keys.RShiftKey:
+                    return SwitcherKey.Shift;
                 case Keys.D1:
                     return SwitcherKey.D1;
                 case Keys.D2:
@@ -273,6 +340,62 @@ namespace FrigoTab {
             }
         }
 
+        private static Keys MapLegacyKey (SwitcherKey key) {
+            switch( key ) {
+                case SwitcherKey.Alt:
+                    return Keys.Menu;
+                case SwitcherKey.Shift:
+                    return Keys.ShiftKey;
+                case SwitcherKey.Tab:
+                    return Keys.Tab;
+                case SwitcherKey.Escape:
+                    return Keys.Escape;
+                case SwitcherKey.F4:
+                    return Keys.F4;
+                case SwitcherKey.D1:
+                case SwitcherKey.D2:
+                case SwitcherKey.D3:
+                case SwitcherKey.D4:
+                case SwitcherKey.D5:
+                case SwitcherKey.D6:
+                case SwitcherKey.D7:
+                case SwitcherKey.D8:
+                case SwitcherKey.D9:
+                    return (Keys) ((int) Keys.D1 + (int) key - (int) SwitcherKey.D1);
+                case SwitcherKey.NumPad1:
+                case SwitcherKey.NumPad2:
+                case SwitcherKey.NumPad3:
+                case SwitcherKey.NumPad4:
+                case SwitcherKey.NumPad5:
+                case SwitcherKey.NumPad6:
+                case SwitcherKey.NumPad7:
+                case SwitcherKey.NumPad8:
+                case SwitcherKey.NumPad9:
+                    return (Keys) ((int) Keys.NumPad1 + (int) key - (int) SwitcherKey.NumPad1);
+                default:
+                    return Keys.None;
+            }
+        }
+
+        private static KeyboardModifierKey MapModifierKey (Keys key) {
+            switch( key ) {
+                case Keys.Menu:
+                    return KeyboardModifierKey.Alt;
+                case Keys.LMenu:
+                    return KeyboardModifierKey.LeftAlt;
+                case Keys.RMenu:
+                    return KeyboardModifierKey.RightAlt;
+                case Keys.ShiftKey:
+                    return KeyboardModifierKey.Shift;
+                case Keys.LShiftKey:
+                    return KeyboardModifierKey.LeftShift;
+                case Keys.RShiftKey:
+                    return KeyboardModifierKey.RightShift;
+                default:
+                    return KeyboardModifierKey.None;
+            }
+        }
+
         [StructLayout(LayoutKind.Sequential)]
         private struct LowLevelKeyStruct {
 
@@ -294,6 +417,80 @@ namespace FrigoTab {
 
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeInput {
+
+            public uint Type;
+            public NativeInputUnion Data;
+
+            public static NativeInput Keyboard (ushort virtualKey, KeyboardEventFlags flags) => new NativeInput {
+                Type = 1,
+                Data = new NativeInputUnion {
+                    Keyboard = new NativeKeyboardInput {
+                        VirtualKey = virtualKey,
+                        Flags = flags
+                    }
+                }
+            };
+
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct NativeInputUnion {
+
+            [FieldOffset(0)]
+            public NativeKeyboardInput Keyboard;
+
+            // INPUT's native union is sized by MOUSEINPUT, not KEYBDINPUT.
+            // These unused members keep cbSize correct (40 bytes on x64 and
+            // 28 on x86), which SendInput validates strictly.
+            [FieldOffset(0)]
+            public NativeMouseInput Mouse;
+
+            [FieldOffset(0)]
+            public NativeHardwareInput Hardware;
+
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeMouseInput {
+
+            public int X;
+            public int Y;
+            public uint MouseData;
+            public uint Flags;
+            public uint Time;
+            public UIntPtr ExtraInfo;
+
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeHardwareInput {
+
+            public uint Message;
+            public ushort ParameterLow;
+            public ushort ParameterHigh;
+
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeKeyboardInput {
+
+            public ushort VirtualKey;
+            public ushort ScanCode;
+            public KeyboardEventFlags Flags;
+            public uint Time;
+            public UIntPtr ExtraInfo;
+
+        }
+
+        [Flags]
+        private enum KeyboardEventFlags : uint {
+
+            KeyUp = 0x0002
+
+        }
+
         [UnmanagedFunctionPointer(CallingConvention.Winapi)]
         private delegate IntPtr LowLevelKeyProc (int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam);
 
@@ -310,8 +507,8 @@ namespace FrigoTab {
         [DllImport("user32.dll")]
         private static extern IntPtr CallNextHookEx (IntPtr hhk, int nCode, IntPtr wParam, ref LowLevelKeyStruct lParam);
 
-        [DllImport("user32.dll")]
-        private static extern short GetAsyncKeyState (int vKey);
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint SendInput (uint inputCount, NativeInput[] inputs, int inputSize);
 
     }
 

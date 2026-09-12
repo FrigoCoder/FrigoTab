@@ -49,7 +49,6 @@ namespace FrigoTab {
             if( GetWindowStyles().HasFlag(WindowStyles.Minimize) ) {
                 ShowWindow(this, ShowWindowCommand.Restore);
             }
-            keybd_event(0, 0, 0, 0);
             return SetForegroundWindow(this);
         }
 
@@ -60,24 +59,46 @@ namespace FrigoTab {
         }
 
         public Rect GetRect () {
-            WindowPlacement placement = GetWindowPlacement();
+            Rectangle rectangle;
+            if( !TryGetRect(out rectangle) ) {
+                throw new ArgumentException("The window handle no longer has valid screen geometry.", nameof(handle));
+            }
+            return new Rect(rectangle);
+        }
+
+        /// <summary>
+        /// Gets the restored/current screen rectangle for a window.
+        ///
+        /// A window can disappear between enumeration and layout. Native BOOL
+        /// results are checked and invalid geometry is reported to the caller
+        /// instead of being converted into a partially valid candidate.
+        /// </summary>
+        public bool TryGetRect (out Rectangle rectangle) {
+            rectangle = Rectangle.Empty;
+            WindowPlacement placement = new WindowPlacement {
+                Length = Marshal.SizeOf<WindowPlacement>()
+            };
+            if( !GetWindowPlacement(this, ref placement) ) {
+                return false;
+            }
+
+            NativeRect nativeRect;
             switch( placement.ShowCmd ) {
                 case ShowWindowCommand.ShowNormal:
                 case ShowWindowCommand.ShowMinimized:
-                    return placement.NormalPosition;
+                    nativeRect = placement.NormalPosition;
+                    break;
                 case ShowWindowCommand.ShowMaximized:
-                    GetWindowRect(this, out Rect rect);
-                    return rect;
+                    if( !GetWindowRect(this, out nativeRect) ) {
+                        return false;
+                    }
+                    break;
                 default:
-                    throw new ArgumentException();
+                    return false;
             }
-        }
 
-        private WindowPlacement GetWindowPlacement () {
-            WindowPlacement placement = new WindowPlacement();
-            placement.Length = Marshal.SizeOf(placement);
-            GetWindowPlacement(this, ref placement);
-            return placement;
+            rectangle = nativeRect.ToRectangle();
+            return rectangle.Width > 0 && rectangle.Height > 0;
         }
 
         private struct WindowPlacement {
@@ -87,7 +108,19 @@ namespace FrigoTab {
             public ShowWindowCommand ShowCmd;
             public Point MinPosition;
             public Point MaxPosition;
-            public Rect NormalPosition;
+            public NativeRect NormalPosition;
+
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeRect {
+
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+
+            public Rectangle ToRectangle () => Rectangle.FromLTRB(Left, Top, Right, Bottom);
 
         }
 
@@ -107,13 +140,16 @@ namespace FrigoTab {
 
         }
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", EntryPoint = "GetWindowTextLengthW", CharSet = CharSet.Unicode,
+            ExactSpelling = true, SetLastError = true)]
         private static extern int GetWindowTextLength (WindowHandle hWnd);
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", EntryPoint = "GetWindowTextW", CharSet = CharSet.Unicode,
+            ExactSpelling = true, SetLastError = true)]
         private static extern int GetWindowText (WindowHandle hWnd, StringBuilder lpString, int nMaxCount);
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", CharSet = CharSet.Unicode,
+            ExactSpelling = true, SetLastError = true)]
         private static extern IntPtr GetWindowLongPtr (WindowHandle hWnd, WindowLong nIndex);
 
         [DllImport("user32.dll")]
@@ -122,14 +158,12 @@ namespace FrigoTab {
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow (WindowHandle hWnd);
 
-        [DllImport("user32.dll")]
-        private static extern void keybd_event (byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
-
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", EntryPoint = "PostMessageW", CharSet = CharSet.Unicode,
+            ExactSpelling = true, SetLastError = true)]
         private static extern bool PostMessage (WindowHandle hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
 
         [DllImport("user32.dll")]
-        private static extern bool GetWindowRect (WindowHandle hWnd, out Rect rect);
+        private static extern bool GetWindowRect (WindowHandle hWnd, out NativeRect rect);
 
         [DllImport("user32.dll")]
         private static extern bool GetWindowPlacement (WindowHandle hWnd, ref WindowPlacement lpwndpl);

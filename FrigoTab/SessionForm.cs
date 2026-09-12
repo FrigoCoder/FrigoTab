@@ -8,9 +8,14 @@ namespace FrigoTab {
     public class SessionForm : FrigoForm, ISwitcherSessionPort {
 
         private readonly SwitcherApplication controller;
-        private BackgroundWindows backgrounds;
+        private DesktopSnapshot desktopSnapshot;
         private ApplicationWindows applications;
         private bool disposed;
+
+        public event Action<bool> SessionVisibilityChanged;
+        public event Action InputResetRequested;
+
+        public bool IsSessionVisible => controller.State == SwitcherState.Visible;
 
         public SessionForm () {
             controller = new SwitcherApplication(this);
@@ -21,6 +26,7 @@ namespace FrigoTab {
                 return;
             }
             e.Handled = controller.HandleKeyboard(e.Input) == KeyHandling.Consume;
+            NotifySessionVisibility();
         }
 
         protected override void Dispose (bool disposing) {
@@ -31,27 +37,42 @@ namespace FrigoTab {
             base.Dispose(disposing);
         }
 
+        protected override void OnPaint (PaintEventArgs e) {
+            DesktopSnapshot currentSnapshot = desktopSnapshot;
+            if( currentSnapshot == null ) {
+                e.Graphics.Clear(Color.Black);
+                return;
+            }
+            currentSnapshot.Draw(e.Graphics, ClientRectangle);
+        }
+
         protected override void WndProc (ref Message m) {
             WindowMessages wm = (WindowMessages) m.Msg;
             switch( wm ) {
                 case WindowMessages.BeginSession:
                     // Keep the private message as a compatibility path for
-                    // older callers, while the hook now opens synchronously.
+                    // older callers; the native hook now posts equivalent work
+                    // to the UI message queue.
                     HandleKeyEvents(new KeyHookEventArgs(Keys.Alt | Keys.Tab));
                     break;
                 case WindowMessages.EndSession:
                 case WindowMessages.EndSessionNative:
                 case WindowMessages.QueryEndSession:
                     controller.Interrupt();
+                    InputResetRequested?.Invoke();
+                    NotifySessionVisibility();
                     break;
                 case WindowMessages.ActivateApp:
                     if( m.WParam == IntPtr.Zero && controller.State == SwitcherState.Visible ) {
                         controller.Interrupt();
+                        InputResetRequested?.Invoke();
+                        NotifySessionVisibility();
                     }
                     break;
                 case WindowMessages.DisplayChange:
                 case WindowMessages.DpiChanged:
                     controller.Relayout();
+                    NotifySessionVisibility();
                     break;
             }
             base.WndProc(ref m);
@@ -60,11 +81,13 @@ namespace FrigoTab {
         protected override void OnMouseMove (MouseEventArgs e) {
             Point point = e.Location.ClientToScreen(WindowHandle);
             controller.HandleMouseMove(new ScreenPoint(point.X, point.Y));
+            NotifySessionVisibility();
         }
 
         protected override void OnMouseDown (MouseEventArgs e) {
             Point point = e.Location.ClientToScreen(WindowHandle);
             controller.HandleMouseClick(new ScreenPoint(point.X, point.Y));
+            NotifySessionVisibility();
         }
 
         bool ISwitcherSessionPort.TryOpen (out int candidateCount) => TryOpen(out candidateCount);
@@ -105,7 +128,7 @@ namespace FrigoTab {
 
             CloseSessionResources();
 
-            BackgroundWindows newBackgrounds = null;
+            DesktopSnapshot newDesktopSnapshot = null;
             ApplicationWindows newApplications = null;
             try {
                 WindowFinder finder = new WindowFinder();
@@ -119,20 +142,26 @@ namespace FrigoTab {
                 }
                 Bounds = bounds;
 
-                // Keep both resource graphs local until every constructor has
-                // succeeded.  Only a complete session is published to the
+                // Capture the desktop while the switcher is still hidden. The
+                // snapshot replaces the old per-tool-window DWM thumbnails and
+                // preserves exactly what was visible when the gesture began.
+                // Capture failure is intentionally non-fatal; DesktopSnapshot
+                // then renders the solid fallback background.
+                newDesktopSnapshot = new DesktopSnapshot(bounds);
+
+                // Keep the resource graph local until every constructor has
+                // succeeded. Only a complete session is published to the
                 // controller; any failure releases already-created objects.
-                newBackgrounds = new BackgroundWindows(this, finder);
                 newApplications = new ApplicationWindows(this, finder);
                 if( newApplications.Count == 0 ) {
                     newApplications.Dispose();
-                    newBackgrounds.Dispose();
+                    newDesktopSnapshot.Dispose();
                     return false;
                 }
 
-                backgrounds = newBackgrounds;
+                desktopSnapshot = newDesktopSnapshot;
                 applications = newApplications;
-                newBackgrounds = null;
+                newDesktopSnapshot = null;
                 newApplications = null;
 
                 Visible = true;
@@ -153,7 +182,7 @@ namespace FrigoTab {
                     // Best-effort cleanup; preserve fail-open behavior.
                 }
                 try {
-                    newBackgrounds?.Dispose();
+                    newDesktopSnapshot?.Dispose();
                 }
                 catch {
                     // Best-effort cleanup; preserve fail-open behavior.
@@ -166,9 +195,9 @@ namespace FrigoTab {
 
         private void CloseSessionResources () {
             ApplicationWindows currentApplications = applications;
-            BackgroundWindows currentBackgrounds = backgrounds;
+            DesktopSnapshot currentDesktopSnapshot = desktopSnapshot;
             applications = null;
-            backgrounds = null;
+            desktopSnapshot = null;
 
             try {
                 if( currentApplications != null ) {
@@ -193,7 +222,7 @@ namespace FrigoTab {
                 // Application teardown is intentionally idempotent/best effort.
             }
             try {
-                currentBackgrounds?.Dispose();
+                currentDesktopSnapshot?.Dispose();
             }
             catch {
                 // Application teardown is intentionally idempotent/best effort.
@@ -212,6 +241,9 @@ namespace FrigoTab {
             }
             return found && bounds.Width > 0 && bounds.Height > 0;
         }
+
+        private void NotifySessionVisibility () =>
+            SessionVisibilityChanged?.Invoke(controller.State == SwitcherState.Visible);
 
     }
 

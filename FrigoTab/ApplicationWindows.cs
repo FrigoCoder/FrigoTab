@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Linq;
 
 namespace FrigoTab {
@@ -38,7 +41,17 @@ namespace FrigoTab {
                         // publishing a partially valid session.
                         continue;
                     }
-                    windows.Add(new ApplicationWindow(owner, handle, windows.Count, bounds));
+                    try {
+                        windows.Add(new ApplicationWindow(owner, handle, windows.Count, bounds));
+                    }
+                    catch( Exception exception ) when(
+                        exception is ArgumentException ||
+                        exception is ExternalException ||
+                        exception is Win32Exception ) {
+                        // A candidate can disappear after layout, or one native
+                        // preview can fail independently. Keep the valid windows.
+                        Trace.WriteLine("Skipping an unavailable application window: " + exception);
+                    }
                 }
             }
             catch {

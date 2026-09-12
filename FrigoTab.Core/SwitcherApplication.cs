@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace FrigoTab.Core {
 
@@ -13,6 +14,7 @@ namespace FrigoTab.Core {
     public sealed class SwitcherApplication {
 
         private readonly ISwitcherSessionPort port;
+        private readonly HashSet<SwitcherKey> consumedKeys = new HashSet<SwitcherKey>();
         private SwitcherState state;
         private int candidateCount;
         private int? selectedIndex;
@@ -39,7 +41,22 @@ namespace FrigoTab.Core {
                 return KeyHandling.PassThrough;
             }
 
-            return state == SwitcherState.Idle ? HandleIdleKeyboard(input) : HandleVisibleKeyboard(input);
+            // A global hook must consume both halves of a gesture.  Several
+            // actions close the session on key-down, so this ledger deliberately
+            // survives ResetState until the physical key is released.
+            if( input.IsUp && consumedKeys.Remove(input.Key) ) {
+                return KeyHandling.Consume;
+            }
+
+            KeyHandling handling = state == SwitcherState.Idle
+                ? HandleIdleKeyboard(input)
+                : HandleVisibleKeyboard(input);
+            if( input.IsDown && handling == KeyHandling.Consume ) {
+                // Auto-repeat produces multiple downs followed by one up; a set
+                // models that physical-key lifetime without requiring a count.
+                consumedKeys.Add(input.Key);
+            }
+            return handling;
         }
 
         /// <summary>
@@ -122,7 +139,10 @@ namespace FrigoTab.Core {
         /// Handles workstation lock, desktop interruption, or another event
         /// that makes the current overlay unusable.
         /// </summary>
-        public void Interrupt () => Close();
+        public void Interrupt () {
+            Close();
+            consumedKeys.Clear();
+        }
 
         /// <summary>
         /// Recalculates the visible session after a display/DPI topology change.

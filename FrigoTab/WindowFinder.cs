@@ -7,7 +7,6 @@ namespace FrigoTab {
     public class WindowFinder {
 
         public readonly IList<WindowHandle> Windows = new List<WindowHandle>();
-        public readonly IList<WindowHandle> ToolWindows = new List<WindowHandle>();
 
         public WindowFinder () => EnumWindows(EnumWindowCallback, IntPtr.Zero);
 
@@ -15,9 +14,6 @@ namespace FrigoTab {
             switch( GetWindowType(handle) ) {
                 case WindowType.AppWindow:
                     Windows.Add(handle);
-                    break;
-                case WindowType.ToolWindow:
-                    ToolWindows.Add(handle);
                     break;
                 case WindowType.Hidden:
                     break;
@@ -30,8 +26,7 @@ namespace FrigoTab {
         private enum WindowType {
 
             Hidden,
-            AppWindow,
-            ToolWindow
+            AppWindow
 
         }
 
@@ -64,7 +59,7 @@ namespace FrigoTab {
                 return WindowType.AppWindow;
             }
             if( ex.HasFlag(WindowExStyles.ToolWindow) ) {
-                return WindowType.ToolWindow;
+                return WindowType.Hidden;
             }
 
             return IsAltTabWindow(handle) ? WindowType.AppWindow : WindowType.Hidden;

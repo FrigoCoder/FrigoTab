@@ -20,13 +20,24 @@ namespace FrigoTab {
             var candidates = new List<FrigoTab.Core.LayoutWindow>();
             for( int index = 0; index < windows.Count; index++ ) {
                 WindowHandle window = windows[index];
-                Size size = window.GetRect().Size();
+                Rectangle restoredRectangle;
+                if( !window.TryGetRect(out restoredRectangle) ) {
+                    // HWNDs can be destroyed between EnumWindows and layout.
+                    // Omit only that candidate; keep the remaining session.
+                    continue;
+                }
+
+                Screen monitor = Screen.FromRectangle(restoredRectangle);
+                if( monitor == null ) {
+                    continue;
+                }
+
                 string id = index.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 ids.Add(id, window);
                 candidates.Add(new FrigoTab.Core.LayoutWindow(
                     id,
-                    window.GetScreen().DeviceName,
-                    new FrigoTab.Core.ScreenRectangle(0, 0, size.Width, size.Height)));
+                    monitor.DeviceName,
+                    new FrigoTab.Core.ScreenRectangle(0, 0, restoredRectangle.Width, restoredRectangle.Height)));
             }
 
             IDictionary<string, FrigoTab.Core.ScreenRectangle> arranged =
