@@ -1,64 +1,50 @@
 # FrigoTab acceptance test matrix
 
-The matrix keeps deterministic acceptance tests separate from native-desktop validation while keeping every automated test green. It is intentionally small enough to use during each acceptance-test-driven development cycle.
+The matrix separates deterministic acceptance tests from native-desktop checks that require a physical keyboard or a particular Windows shell state. It is the gate used during acceptance-test-driven development.
 
-## Automated suite policy
+## Automated suite
 
-The automated suite is plain C# MSTest only. There is no Reqnroll/Gherkin layer, no `.feature` file, no intentionally-red lane, and no separate command for known failures. The current baseline is 98 passing tests.
-
-Each `[TestClass]` and matching source file begins with `TYYYYMMDDTHHMMSSZ_NNN_DescriptiveFamilyName`. The timestamp is an immutable UTC family record, the suffix is stable, and the current set contains 12 families ending at `_077`. Test methods use descriptive plain C# names. A naming-convention acceptance test scans the class/file convention and uniqueness.
-
-The tests are acceptance/contract tests even where a fake or source probe is used:
+The suite is plain C# MSTest. All 28 tests execute against real application objects, native Windows resources, or the launched executable. There is no Reqnroll/Gherkin layer, `.feature` file, or intentionally-red lane.
 
 | Timestamped family | Count | Evidence boundary | Coverage |
 | --- | ---: | --- | --- |
-| Switcher interaction (`_001`) | 31 | In-memory session port | First/failed/repeated/reverse Alt+Tab, sticky Alt release, pass-through, number and pointer selection, cancellation, activation recovery, interruption, cleanup, relayout, reopening, and admission recovery. |
-| Grid layout (`_031`) | 5 | Pure geometry contract | Near-square grids, aspect ratio, margins, negative monitor origins, and invalid dimensions. |
-| Observable property (`_036`) | 1 | State contract | Equal assignment is silent; changed assignment notifies once. |
-| Production composition (`_037`) | 1 | Reflection contract | `SessionForm` implements `ISwitcherSessionPort`, owns `SwitcherApplication`, and exposes the hook entry point. |
-| Win32 integration (`_038`) | 12 | Source/metadata contract | No display reset or synthetic activation, tray-only startup, rooted Debug safety timer, hook-install diagnostics, shell wallpaper/icon snapshot without application capture, first-frame paint-before-preview ordering, historical foreground nudge without thread joining, intentional activation without interruption reset, best-effort foreground denial, dedicated hook message loop, subscriber isolation, and visual-tile pointer routing. |
-| Gesture balance (`_041`) | 4 | In-memory session port | Consumed Tab, digit, Escape, and F4 key-downs consume their matching key-up events. |
-| Win32 remediation (`_045`) | 10 | Reflection/source contract | Explicit staged thumbnail visibility, stale-window handling, restored-monitor selection, hook deferral, event-driven modifiers, DWM fallback, Unicode, pointer-sized declarations, disposal, and process admission. |
-| Keyboard infrastructure (`_055`) | 20 | Event/queue policy | Event-derived Alt/Shift state, injected input, balanced suppression, auto-repeat, deferred delivery, bounded-queue fail-open, token-bound admission recovery, a reserved session-ending slot, reset-generation invalidation, complete forward/reverse replay with direction preserved across Shift changes, native `INPUT` structure size, dual-Shift tracking, native-Alt recovery, pending-admission abort, failed-post recovery, and dedicated hook-thread ownership. |
-| DWM thumbnails (`_062`) | 5 | Fake native adapter | Opaque destination/source geometry that remains hidden until explicit show, explicit hide, returned-handle cleanup after registration failure, surfaced update failure with disposal, and unregister-failure diagnostics. |
-| Single instance (`_065`) | 1 | Real named-mutex contract | A competing thread cannot acquire the application mutex. |
-| Test naming convention (`_067`) | 1 | Repository contract | Timestamped class/file family names are unique and methods remain descriptive plain C# names. |
-| Shell desktop snapshot backdrop (`_077`) | 7 | Fake native capture adapters | Exact shell bounds, one capture reused across paints, destination forwarding, invalid bounds, capture/null-frame black fallback, captured-frame ownership, and idempotent snapshot disposal. |
-| **Total** | **98** |  | **All automated tests are green.** |
+| `T20260914T211700Z_001_RealSwitcherAcceptanceTests` | 15 | Real WinForms objects and HWNDs | Opening, sticky Alt release, forward/reverse wrapping, number and pointer selection, cancellation, stale targets, activation recovery, key-up balancing, pass-through, cleanup, and reopening. |
+| `T20260914T212400Z_002_RealWindowAndBackdropAcceptanceTests` | 7 | Real window, DWM, GDI, and shell objects | Candidate classification, Unicode titles, restored geometry, stale HWND layout, shell wallpaper/icon snapshot, staged DWM visibility, and repeated thumbnail disposal. |
+| `T20260914T212400Z_003_RealProcessAcceptanceTests` | 6 | Launched `FrigoTab.exe` | Hidden/resident startup, single-instance exit, real session HWND, full desktop session, pointer activation, and first-frame shell backdrop ordering. |
+| **Total** | **28** |  | **All automated tests pass before a publish is accepted.** |
 
-The source and metadata probes protect production invariants; they do not prove that every native call succeeds on every Windows desktop. The manual matrix below remains part of release evidence.
+The class and file prefixes are UTC timestamps recording when a family was introduced. Keep the prefix when refactoring a family; methods remain descriptive plain C# names. The process tests accept `FRIGOTAB_EXE` when a different built executable is being compared with the current C# baseline.
 
 ## Manual Windows release matrix
 
-Run these checks on each supported Windows configuration. Record the OS build, x64 architecture, DPI scale, monitor arrangement, DWM status, whether the target process is elevated, and the artifact used.
+Run these checks on each supported Windows configuration. Record the OS build, x64 architecture, DPI scale, monitor arrangement, DWM status, target elevation, and artifact used. The production hook ignores injected keyboard events, so these physical-hook cases are intentionally not replaced by synthetic input.
 
-The Debug executable intentionally retains the legacy `StartQuitTimer` 10-second safety timer. It is a development safeguard, not release behavior. Use the Release artifact for sustained interactive testing:
+The Debug executable retains the historical ten-second `StartQuitTimer` safety timer. Use a Release artifact for sustained testing:
 
-- `artifacts/publish/lean-win-x64/FrigoTab.exe` is a framework-dependent single file and requires the .NET 10 Windows Desktop Runtime.
-- `artifacts/publish/portable-win-x64/FrigoTab.exe` is a compressed self-contained single file and requires no preinstalled runtime, but extracts native/runtime components and uses its extraction cache.
+- `artifacts/publish/lean-win-x64/FrigoTab.exe` is framework-dependent and requires the .NET 10 Windows Desktop Runtime.
+- `artifacts/publish/portable-win-x64/FrigoTab.exe` is a compressed self-contained executable and carries its runtime.
 
 | Scenario | Pass condition |
 | --- | --- |
-| Tray startup, second launch, and tray Exit | No taskbar button; one instance owns the tray/hook; a second launch exits cleanly; Exit releases resources and the process. |
-| Dedicated hook thread | The hook installs and pumps on its own native message loop; UI rendering/construction does not time out the hook; shutdown uninstalls it cleanly. |
-| Alt+Tab from ordinary, console, and elevated applications | The overlay opens once, repeats and reverses correctly, remains responsive, and does not leave the shell or foreground app with a swallowed key state. A quick Alt release and a held-then-released Alt both leave the overlay open for an explicit choice. |
-| Key-up balancing and failed-open replay | Consumed Tab/digit/Escape/F4 gestures do not deliver unmatched key-up events; failed forward/reverse admission replays the correct complete native gesture. |
-| UIPI/elevation and foreground denial | Hook admission, `SendInput` replay, and the no-`AttachThreadInput` foreground nudge are verified across ordinary/elevated boundaries; successful switches do not flash taskbar buttons, and foreground denial leaves the overlay usable without replaying native Alt+Tab merely because focus was denied. |
-| Number selection | D1..D9 and NumPad1..NumPad9 select and foreground the intended tile on the supported keyboard layouts without intermittent refusal or taskbar notification flashing. |
-| Escape and Alt+F4 | The overlay closes without activation; the tray process remains alive. |
-| Pointer hover/click and outside movement | Selection follows the pointer, clears outside tiles, keyboard selection recovers, and click activates exactly the intended target. Verify separate layered/transparent tile forms. |
+| Tray startup, second launch, and Exit | No taskbar button; one instance owns the tray/hook; a second launch exits; Exit releases resources and the process. |
+| Physical Alt+Tab | The overlay opens once, repeats and reverses correctly, remains responsive, and does not leave the foreground application with a swallowed key state. Immediate Alt release and held-then-released Alt both leave the overlay open for an explicit choice. |
+| Key-up balance | Consumed Tab, digit, Escape, and F4 gestures do not deliver unmatched key-ups. |
+| UIPI/elevation and focus denial | Ordinary/elevated boundaries do not join input queues; successful switches do not flash taskbar buttons; denied foreground activation leaves the overlay usable. |
+| Number selection | D1..D9 and NumPad1..NumPad9 choose the intended tile on supported keyboard layouts without intermittent refusal. |
+| Escape and Alt+F4 | The overlay closes without activating a target; the tray process stays alive. |
+| Pointer hover/click/outside | Selection follows the pointer, clears outside tiles, keyboard navigation can recover selection, and a click activates exactly the intended target. |
 | Minimized/maximized and stale targets | Restored placement chooses the correct monitor; closed targets do not crash the session; activation failure remains recoverable. |
 | Mixed monitor/DPI topology | Negative origins, portrait layouts, DPI changes, resolution/orientation changes, and monitor add/remove close or rebuild safely without stale/off-screen UI. |
-| Shell desktop wallpaper and icons | Explorer's `Progman`/`WorkerW` host is rendered with `PW_RENDERFULLCONTENT` while FrigoTab is starting or idle. The very first visible owner frame shows wallpaper and icons before any application preview is revealed, never includes ordinary application pixels, and opens without performing a shell render in the Alt+Tab path. |
-| Shell render unavailable, DWM disabled, RDP, and protected surfaces | A missing shell host or failed/protected render releases partial native resources, preserves a prior matching frame when possible, otherwise paints black, and leaves the session usable; application thumbnails use their normal DWM or icon/title fallback. |
-| Native resource stability | Repeated sessions, failed construction, DWM updates/unregister, and tray exit leave bounded GDI/native handle counts. |
-| Lock/unlock and secure-desktop transition | The active session and keyboard state reset; the next Alt+Tab works normally. |
-| Fullscreen or borderless exclusive applications | No display-mode reset, double draw, permanent active state, or unexpected stale/black backdrop behavior. |
-| Candidate classification | UWP/packaged apps, shell/start menu, toolbars, and multiple windows match the intended eligible-window policy. |
+| Shell desktop wallpaper/icons | The first visible owner frame shows the shell wallpaper and icons before any application preview and never shows ordinary application pixels. Opening does not perform a slow shell render in the Alt+Tab path. |
+| Shell unavailable, DWM disabled, RDP, protected surfaces | Partial native resources are released; a matching prior shell frame or black fallback is used; the session remains usable. |
+| Native-resource stability | Repeated sessions, failed construction, DWM teardown, and tray Exit leave bounded GDI/native handle counts. |
+| Lock/unlock and secure desktop | The active session and keyboard state reset; the next Alt+Tab works normally. |
+| Fullscreen/borderless applications | No display-mode reset, permanent active state, unexpected stale/black backdrop, or double draw. |
+| Candidate classification | Packaged apps, shell/start menu, toolbars, and multiple windows match the intended eligible-window policy. |
 
 ## Local commands
 
-`build.ps1` is the canonical local build entry point. Run from the repository root:
+`build.ps1` is the canonical local entry point:
 
 ```powershell
 .\build.ps1 -Task Restore
@@ -70,4 +56,4 @@ The Debug executable intentionally retains the legacy `StartQuitTimer` 10-second
 .\build.ps1 -Task Clean
 ```
 
-`Verify` and `Test` run the complete 98-test green suite. `Publish` and `PublishPortable` enforce a Release build and green test run before producing their respective single-file artifacts. `Clean` removes generated `bin`, `obj`, and `artifacts` outputs. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point. No CI/CD service is required by this local workflow yet.
+`Verify` and `Test` run all 28 acceptance tests. `Publish` and `PublishPortable` repeat the Release build and green test gate before producing artifacts. `Clean` removes generated `bin`, `obj`, and `artifacts` output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point. No CI/CD service is required by this local workflow.

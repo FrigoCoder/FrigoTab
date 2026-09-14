@@ -1,71 +1,50 @@
 # FrigoTab architecture and test boundaries
 
-FrigoTab is a WinForms shell around Win32 and DWM adapters. The current branch has a real policy boundary: `SwitcherApplication` owns deterministic switcher behavior, while `SessionForm` implements `ISwitcherSessionPort` for the native UI. The acceptance suite can therefore exercise the interaction contract without installing a global hook, creating HWNDs, or changing display modes.
+FrigoTab is a small WinForms shell around Win32 window enumeration, DWM thumbnails, and the Explorer desktop surface. The application has one UI message loop. The low-level keyboard hook does only bounded event handling and posts session work to that loop; enumeration, form construction, painting, and native preview setup do not run inside the hook callback.
 
 ## Current component map
 
-| Boundary | Current responsibility | Source |
+| Component | Responsibility | Source |
 | --- | --- | --- |
-| Composition root | Starts a form-less WinForms `ApplicationContext`, owns lifetime, and wires the hook, tray, and single-instance guard | `FrigoTab/Program.cs`, `FrigoTab/SingleInstanceGuard.cs` |
-| Tray adapter | Creates the visible `NotifyIcon` and Exit command | `FrigoTab/SysTrayIcon.cs` |
-| Keyboard adapter | Installs `WH_KEYBOARD_LL` on a dedicated native message-loop thread, performs bounded synchronous suppression admission, and posts managed work to the UI thread | `FrigoTab/KeyHook.cs`, `FrigoTab.Core/KeyboardModifierState.cs`, `KeyboardSuppressionState.cs`, `DeferredKeyboardDispatcher.cs` |
-| Switcher policy | Opens, selects, cancels, commits, balances key suppression, and safely closes a session | `FrigoTab.Core/SwitcherApplication.cs` |
-| Production session port | Enumerates candidates, reuses the prepared opaque shell-desktop snapshot, creates native tiles, maps pointer/layout events, and attempts foreground activation | `FrigoTab/SessionForm.cs`, `FrigoTab/ShellDesktopSnapshot.cs`, `FrigoTab.Core/ISwitcherSessionPort.cs` |
-| Window catalog | Enumerates and classifies eligible top-level application HWNDs | `FrigoTab/WindowFinder.cs` |
-| Window adapter | Reads title/style/placement, skips stale candidates, restores, and attempts foreground activation | `FrigoTab/WindowHandle.cs` |
-| Geometry | Assigns monitor-local grid rectangles using restored window rectangles | `FrigoTab.Core/GridLayout.cs`, `FrigoTab/Layout.cs`, `FrigoTab/LayoutScreen.cs` |
-| Preview/tiles | Registers DWM thumbnails hidden, configures opaque geometry, reveals them only after the owner backdrop is painted, diagnoses native failures, and falls back to icon/title overlays when DWM is unavailable | `FrigoTab/Thumbnail.cs`, `FrigoTab/DwmThumbnailApi.cs`, `ApplicationWindow.cs`, `LayerUpdater.cs`, `WindowIcon.cs` |
-| Desktop backdrop | Prepares Explorer's full-content wallpaper/icon render while no gesture is in flight, retains the opaque native image across sessions, refreshes it while idle, and paints it at native size with a black fallback | `FrigoTab/ShellDesktopSnapshot.cs`, `FrigoTab/SessionForm.cs` |
-| Observable state | Publishes legacy selected/visible changes | `FrigoTab/Property.cs`, `ApplicationWindows.cs` |
-| Acceptance boundary | Runs the same policy and native contracts through plain C# MSTest classes | `FrigoTab.AcceptanceTests/*.cs` |
+| Composition root | Starts the form-less WinForms loop, owns lifetime, and connects the tray, hook, and single-instance guard. | `FrigoTab/Program.cs`, `FrigoTab/SingleInstanceGuard.cs` |
+| Tray | Creates the `NotifyIcon` and Exit command. | `FrigoTab/SysTrayIcon.cs` |
+| Keyboard hook | Installs `WH_KEYBOARD_LL`, tracks physical modifier transitions, forwards bounded input events, and keeps the native callback exception-safe. | `FrigoTab/KeyHook.cs` |
+| Switcher controller | Opens, navigates, cancels, commits, and closes one session while keeping consumed keyboard gestures balanced. | `FrigoTab.Core/SwitcherApplication.cs` |
+| Session view | Owns the actual overlay form, tile forms, pointer routing, selection rendering, shell backdrop, and activation calls. | `FrigoTab/SessionForm.cs`, `FrigoTab/ApplicationWindow.cs` |
+| Window catalog | Enumerates and classifies eligible top-level application HWNDs. | `FrigoTab/WindowFinder.cs` |
+| Window/layout | Reads titles, icons, styles, placement, monitor geometry, and activation state; assigns stable tile rectangles. | `FrigoTab/WindowHandle.cs`, `FrigoTab/Layout.cs`, `FrigoTab/GridLayout.cs` |
+| DWM preview | Registers hidden thumbnails, applies source/destination geometry, reveals them after the owner backdrop is painted, and disposes handles on close. | `FrigoTab/Thumbnail.cs`, `FrigoTab/DwmThumbnailApi.cs` |
+| Shell backdrop | Captures Explorer's wallpaper-and-icons surface into a retained native bitmap and paints it behind the previews. | `FrigoTab/ShellDesktopSnapshot.cs` |
+| Observable state | Publishes selected/visible changes used by the view. | `FrigoTab/Property.cs`, `FrigoTab/ApplicationWindows.cs` |
+| Acceptance boundary | Runs the same production forms, HWNDs, shell/DWM calls, and executable used by the application. | `FrigoTab.AcceptanceTests/*.cs` |
 
-The application still creates one `ApplicationWindow` form per selectable candidate. The old unified-overlay experiment documented by GitHub issue #26 and commits `81d1cd2`, `4332e82`, and `5a05167` is not an implemented architectural guarantee.
+The application creates one `ApplicationWindow` form per selectable candidate. The backdrop is not composed from those application windows.
 
-## Opaque shell desktop snapshot model
+## Session and input flow
 
-`ShellDesktopSnapshot` locates Explorer's top-level desktop host (`Progman`, or the `WorkerW` host containing `SHELLDLL_DefView` and `SysListView32`) and invokes `PrintWindow` with `PW_RENDERFULLCONTENT` into an off-screen compatible bitmap. The result is copied into a retained top-down DIB. This render path is deliberate: a screen DC, an ordinary window-DC copy, and a DWM thumbnail can all include the applications covering the desktop. The initial frame is prepared before hook installation, and `SessionForm` requests the next frame on an idle worker after a session closes. `TryOpen` never calls Explorer or waits for backdrop capture. It first shows the owner with all DWM previews explicitly hidden, synchronously paints the retained DIB into the owner's redirection surface, and only then reveals previews and tile overlays. `OnPaint` uses an exact-size native copy when the client and cached bounds match; scaling is only a fallback for an unusual DPI mismatch, and the owner clears to black when no matching frame is ready.
+1. The hook observes a non-injected Alt+Tab transition and posts the bounded event to the UI loop.
+2. The controller asks the session view to enumerate eligible windows and build the overlay.
+3. The view lays out real candidate HWNDs, paints the retained shell snapshot, and keeps DWM thumbnails hidden while the first owner frame is being shown.
+4. Once that frame is painted, previews and tile overlays are revealed. Tab/Shift+Tab, numbers, and pointer movement update the selected candidate.
+5. Releasing Alt does not commit the first candidate. The session remains sticky until an explicit number/pointer activation or Escape/Alt+F4 cancellation.
+6. Activation restores a minimized target and attempts `SetForegroundWindow` after the historical input nudge. The controller then closes and disposes the session.
 
-The background is deliberately static for the lifetime of a session. It represents the latest wallpaper/icon frame prepared while FrigoTab was idle, while individual application previews remain opaque DWM thumbnails layered above it. No full-screen screen capture, per-window background thumbnails, z-order search, or manual application reconstruction is performed. A missing shell host, protected, secure, unavailable, or failed render produces a solid black background when no prior matching frame exists, and the switcher remains fail-open. Display/DPI topology changes close the session and request a correctly sized replacement. Visual fidelity and native shell behavior still require the manual Windows matrix.
+The handoff intentionally does not use `AttachThreadInput`; joining input queues can corrupt focus and key-state isolation. Windows may still deny foreground activation, in which case the overlay remains usable.
 
-## Test organization and naming
+## Shell desktop snapshot
 
-There are 98 green plain C# MSTest methods in 12 timestamped test families. Each `[TestClass]` and matching file follows `TYYYYMMDDTHHMMSSZ_NNN_DescriptiveFamilyName`; the family suffix is stable and the current families end at `_077`. Methods inside a family use descriptive C# names. A naming-convention acceptance test enforces the class/file family convention and uniqueness; refactoring must not rewrite an existing family timestamp.
+`ShellDesktopSnapshot` locates Explorer's desktop host (`Progman`, or the `WorkerW` containing `SHELLDLL_DefView`/`SysListView32`) and calls `PrintWindow` with `PW_RENDERFULLCONTENT` into an off-screen compatible bitmap. The resulting top-down DIB is retained while the application is idle and reused when a session opens. This avoids a screen capture and avoids searching/filtering/composing the background from application windows.
 
-The automated tests cover three boundaries:
+If the shell host or render is unavailable, the most recent matching frame is used when possible; otherwise the owner paints black. Partially created HDCs, HBITMAPs, and managed wrappers are released on every failure path. A display/DPI topology change can close the current session and request a correctly sized replacement.
 
-1. **Behavioral fake-port acceptance tests** exercise the observable `SwitcherApplication` policy without native desktop state: fail-open, timing-independent sticky Alt release, repeated and reverse Alt+Tab, key-up balancing, cancellation, number and pointer selection, selection recovery, activation failure, interruption, cleanup, relayout, reopening, and input-admission recovery.
-2. **Production linkage and native contract probes** use reflection, source inspection, and fakes to protect the composition root, shell-surface snapshot capture/paint, first-frame owner/preview ordering and black fallback, startup/display behavior, dedicated hook thread, synchronous suppression admission, subscriber-failure containment, UI-thread deferral, failed-open replay direction, native `INPUT` layout, dual-modifier/native-Alt recovery, staged DWM geometry/visibility and unregister/update diagnostics, stale-window handling, restored-monitor selection, Unicode and pointer-sized declarations, resource cleanup, single-instance guard, best-effort foreground activation with no thread-input attachment, intentional activation/deactivation re-entrancy, and visual-tile pointer routing. They are executable specifications, not proof that every native call succeeds on every desktop.
-3. **Manual Windows scenarios** exercise real hooks, HWND races, DWM, focus, DPI, monitor topology, protected surfaces, lock/unlock, UIPI/elevation, and pointer routing. They remain part of release evidence because no deterministic test process can reproduce all shell conditions.
+## DWM and resource lifetime
 
-There is no Reqnroll/Gherkin layer, no `.feature` file, and no separate intentionally-red test lane or task. Defects selected for this stabilization pass and their adjacent regressions are represented by green tests; native desktop validation remains the final confidence step.
+Each preview registers a DWM thumbnail against the visible owner. Destination and source rectangles are set explicitly, and the thumbnail is not made visible until the owner has painted the shell backdrop. Teardown hides and unregisters the thumbnail and releases its native resources. When DWM is unavailable, the tile retains its icon/title fallback.
 
-## Current boundary and future extraction targets
+Forms, icons, fonts, layered DCs, bitmaps, thumbnails, hook handles, the tray icon, and the single-instance guard have explicit ownership and are disposed during normal close, failed construction, tray Exit, and process shutdown.
 
-`ISwitcherSessionPort`/`SwitcherApplication` is implemented today. The following narrower ports remain useful architectural targets if future changes need stronger isolation; their first adapters may continue to call the existing Win32 APIs:
+## Acceptance boundary
 
-| Port | Intended production adapter | Acceptance-test fake |
-| --- | --- | --- |
-| `IKeyboardSource` | Dedicated low-level keyboard hook thread | Deterministic key-down/up/repeat stream |
-| `IWindowCatalog` | `EnumWindows` plus DWM/style queries | Immutable candidate snapshots, including stale/closed candidates |
-| `IDisplayTopology` | `Screen.AllScreens`, DPI/display notifications | Fixed monitor arrangements and topology changes |
-| `IWindowActivator` | Restore and `SetForegroundWindow` | Success/failure and target-disappeared outcomes |
-| `ISessionView` | WinForms/layered/DWM renderer | Recorded commands or an in-memory view |
-| `IClock` | Development safety timer and other time-based behavior | Controlled time and timeout scenarios |
+The automated gate has 28 tests in three timestamped plain C# MSTest classes. The tests use real forms and HWNDs, real DWM/GDI and shell objects, and a launched executable. They verify observable behavior such as sticky release, navigation, selection, stale-window recovery, first-frame backdrop ordering, DWM visibility, process lifetime, and cleanup.
 
-Extracting these ports should be driven by a new acceptance requirement, not by adding abstraction without a behavior to protect.
-
-## Lifetime, input, and threading rules
-
-- The dedicated hook thread owns hook installation, the native message loop, and synchronous bounded suppression admission; it must not perform enumeration, shell capture, DWM setup, rendering, or form construction. One reserved queue slot ensures session-ending input is not displaced by Tab auto-repeat.
-- The UI thread owns session forms, selection state, deferred input dispatch, and deterministic disposal.
-- A session publishes its complete resource graph only after construction succeeds; partial construction is disposed immediately.
-- DWM thumbnail handles, shell-capture HDCs/HBITMAPs, fonts, icons, hook handles, mutexes, and `NotifyIcon` ownership are explicit and idempotent.
-- Reverse P/Invoke callbacks must not let managed exceptions cross the native boundary.
-- Native coordinates, DPI units, and monitor topology are represented at one boundary and converted deliberately.
-- `WindowHandle.SetForeground` restores minimized targets and applies the historical dummy input nudge immediately before `SetForegroundWindow`. It must never use `AttachThreadInput`, which joins input queues and corrupts focus/key-state isolation. Foreground activation remains best effort; a denial is logged while the admitted overlay remains usable and is not by itself a reason to replay native Alt+Tab.
-- The synchronous `WM_ACTIVATEAPP(FALSE)` caused by intentionally foregrounding a selected target is part of a normal handoff. It must not run the external-interruption reset path or clear the hook's consumed-key ledger; the normal controller close occurs after `SetForegroundWindow` returns.
-- A session close is safe after cancellation, target disappearance, lock/unlock, display change, DWM failure, or tray exit.
-
-## Native validation caveats
-
-The green contract probes protect source-level invariants, but they do not replace manual testing. In particular, validate the dedicated hook thread under load, synchronous suppression and replay under UIPI/elevated boundaries, foreground activation denial, stale HWND races, native shell-surface capture and exact-size painting, black fallback behavior, mixed-DPI and negative-origin monitors, Explorer restart, resource counts over repeated sessions, protected surfaces, and second-launch behavior. Pointer routing through separate layered/transparent tile forms is covered by a source contract but still requires visual verification on supported Windows configurations.
+The global hook ignores injected events by design. Therefore physical Alt/Tab transitions, focus/UIPI restrictions, Explorer restart, protected surfaces, lock/unlock, mixed-DPI monitor topology, and long-running native handle behavior remain manual release checks. The automated results are necessary evidence, not a claim that every Windows desktop configuration is identical.

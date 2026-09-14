@@ -1,22 +1,26 @@
 # FrigoTab
 
-FrigoTab is an experimental Windows Alt-Tab replacement. It presents eligible application windows as a numbered, thumbnail-based switcher and keeps a tray icon for its lifetime.
+FrigoTab is an experimental Windows Alt-Tab replacement. It shows eligible application windows as numbered previews, keeps a tray icon while it runs, and leaves the native desktop untouched behind its overlay.
 
-The stabilization work is isolated on the `codex/gpt-atdd-stabilization` branch; `master` is not used for this work. The historical WinForms/Win32 prototype now has an SDK-style solution, a testable switcher policy, and a local acceptance-test-driven development loop. Native Windows behavior is still a separate release gate.
+The current implementation is a small WinForms/Win32 application. The behavior baseline is maintained with plain C# MSTest acceptance tests that create real forms and HWNDs, exercise the real DWM and shell APIs, and launch the real executable. There are no Cucumber/Reqnroll feature files in this gate.
 
 ## Development loop
 
-The acceptance requirements and test policy are documented in:
+The behavior inventory, test boundary, and native validation checklist are documented in:
 
 - [Requirements and acceptance behaviors](docs/requirements.md)
 - [Acceptance test matrix](docs/test-matrix.md)
 - [Architecture and test boundaries](docs/architecture.md)
 
-The suite is plain C# MSTest. Reqnroll, Gherkin, `.feature` files, and a separate intentionally-red test lane are no longer used. There are currently 98 green acceptance/contract tests.
+There are 28 automated acceptance tests in three timestamped test families:
 
-Each `[TestClass]` and its matching source file begins with `TYYYYMMDDTHHMMSSZ_NNN_DescriptiveFamilyName`. The timestamp is an immutable UTC record of when that test family was introduced; the family suffix is stable, and the current set has 12 families ending at `_077`. Test methods use descriptive plain C# names. Do not rewrite an existing family timestamp when tests are refactored; the naming-convention test enforces this policy.
+- 15 real switcher/session tests using actual WinForms controls, HWNDs, window enumeration, layout, DWM, and activation.
+- 7 real window, DWM, and shell-backdrop tests using native desktop objects.
+- 6 black-box tests that start the published-style executable and inspect its real process and session window.
 
-`build.ps1` is the local build entry point; no CI/CD service is assumed yet:
+Each `[TestClass]` and matching source file begins with `TYYYYMMDDTHHMMSSZ_NNN_DescriptiveFamilyName`. The timestamp records when that family was introduced; the suffix is stable. Test methods use descriptive plain C# names. Keep the class/file timestamp when refactoring a family.
+
+`build.ps1` is the local build entry point; no CI/CD service is assumed:
 
 ```powershell
 .\build.ps1 -Task Restore
@@ -28,21 +32,23 @@ Each `[TestClass]` and its matching source file begins with `TYYYYMMDDTHHMMSSZ_N
 .\build.ps1 -Task Clean
 ```
 
-`Verify` and `Test` run the complete green MSTest suite. `Publish` and `PublishPortable` repeat the Release build and green test gate before producing their artifacts. `Clean` removes generated `bin`, `obj`, and `artifacts` outputs. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
+`Verify` and `Test` build the solution and run all 28 acceptance tests. `Publish` and `PublishPortable` run the Release build and the same green acceptance gate before producing artifacts. `Clean` removes generated `bin`, `obj`, and `artifacts` directories. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
 
-The Debug executable retains the historical `StartQuitTimer` 10-second safety timer for development. It is not release behavior; use a Release publish for sustained interactive testing. The hook owns a dedicated native message-loop thread: suppression admission is synchronous and bounded in the hook callback, while expensive enumeration/rendering/construction is deferred to the UI thread. Releasing Alt deliberately leaves FrigoTab open; choose a numbered application or click a tile, or cancel with Escape/Alt+F4. Foreground activation uses the project's historical input nudge and never joins another application's input queue with `AttachThreadInput`; the native Windows checks in the matrix still cover real HWNDs, hooks, DWM, focus, monitor/DPI changes, lock/unlock, UIPI/elevation, and pointer input.
+The Debug executable retains the historical ten-second `StartQuitTimer` safety timer. It is for development only; use a Release publish for sustained interactive testing. Releasing Alt deliberately leaves the switcher open (sticky mode): the user can then use Tab/Shift+Tab, a number, or the mouse, and can cancel with Escape or Alt+F4. An immediate Alt release has the same sticky behavior. Foreground activation uses the historical input nudge and does not join another application's input queue with `AttachThreadInput`.
 
-The backdrop is an opaque snapshot of the Windows shell desktop surface. FrigoTab locates Explorer's desktop host (`Progman`, or its `WorkerW` fallback, containing `SHELLDLL_DefView`/`SysListView32`) and asks it to render its full wallpaper-and-icons content into an off-screen native bitmap. The first frame is prepared before the keyboard hook is installed; after a session closes, an idle worker refreshes it for the next gesture. Alt+Tab therefore only reuses the retained DIB and paints it at native size—it never waits for Explorer, captures the screen, or reconstructs a background by enumerating application windows. DWM previews stay hidden until the visible owner has synchronously painted that retained frame, preventing stale application pixels from appearing first. A missing shell host or failed render uses a solid black fallback and keeps the gesture fail-open. Multi-monitor, RDP, protected-surface, Explorer-restart, and supported-version behavior remains in the manual release matrix.
+The backdrop is a retained snapshot of the Windows shell desktop, including wallpaper and desktop icons. FrigoTab asks Explorer's desktop host (`Progman`, or the matching `WorkerW`) to render into an off-screen native bitmap. It does not capture the screen or reconstruct a background by searching and composing application windows. The first owner frame is painted from that snapshot before DWM previews are made visible; if shell rendering is unavailable, the overlay uses a black fallback and remains usable.
 
 ## Runtime and distribution
 
-The original project targeted .NET Framework 4.7.1. The current SDK-style projects target `net10.0-windows`. Developers need the .NET 10 SDK selected by `global.json`; end users need one of the following packages:
+The current SDK-style projects target `net10.0-windows` and build an x64 WinForms executable. Developers need the .NET 10 SDK selected by `global.json`.
 
 | Command | Artifact | Target-machine requirement |
 | --- | --- | --- |
-| `Publish` | Lean single-file framework-dependent `win-x64`, approximately 0.22 MiB | .NET 10 Windows Desktop Runtime for x64 |
-| `PublishPortable` | Compressed self-contained single-file `win-x64`, approximately 46.85 MiB | No preinstalled .NET runtime; the executable extracts native/runtime components and uses its extraction cache |
+| `Publish` | Lean single-file `win-x64` executable | .NET 10 Windows Desktop Runtime |
+| `PublishPortable` | Compressed self-contained single-file `win-x64` executable | No preinstalled .NET runtime; native/runtime components are carried by the executable |
 
-The publish configuration uses invariant globalization and keeps only the `en` satellite-resource policy because the application has no localized resource set. It deliberately does not enable trimming or Native AOT; WinForms/Win32 reflection and native-resource behavior should remain predictable while the project is stabilized.
+The project has no localized UI resources and enables invariant globalization for the publish. Trimming and Native AOT remain disabled while the WinForms/Win32 behavior is being stabilized. Authenticode signing and installer decisions are release work, separate from the local acceptance gate.
 
-A plain native Win32/C++ rewrite is possible, but it would be a second implementation of the tray UI, global hook, DWM thumbnails, window enumeration, DPI/monitor logic, resource lifetime, and test seams. Retaining C# and offering the portable self-contained package avoids a runtime prerequisite without taking on that rewrite. Packaging and Authenticode signing remain before release.
+## Native validation
+
+Injected keyboard input is intentionally ignored by the production low-level hook, so an automated test cannot impersonate every physical Alt/Tab transition. The automated suite covers the real HWND and executable behavior that can be made deterministic; the manual matrix records the remaining physical-hook checks: ordinary and elevated applications, modifier transitions, UIPI, focus denial, mixed-DPI monitors, Explorer restart, protected surfaces, lock/unlock, and repeated resource cleanup.
