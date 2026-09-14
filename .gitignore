@@ -13,6 +13,9 @@ artifacts/
 TestResults/
 coverage/
 
+# Rust build outputs
+rust/target/
+
 # NuGet and local tooling caches
 packages/
 *.nupkg

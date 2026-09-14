@@ -1,0 +1,26 @@
+[workspace]
+members = [
+    "frigo-tab-core",
+    "frigo-tab-spike",
+    "frigo-tab-win32",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+license = "GPL-3.0-only"
+repository = "https://github.com/FrigoCoder/FrigoTab"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+panic = "abort"
+strip = "symbols"

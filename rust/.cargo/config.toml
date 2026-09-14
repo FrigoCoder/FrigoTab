@@ -1,0 +1,12 @@
+# The GNU Rust distribution includes rust-lld, so the dependency-free core
+# tests do not need a separately installed MinGW linker. Building windows-sys
+# still requires GNU import-library tooling; the full native gate below uses
+# the MSVC Rust toolchain instead.
+[target.x86_64-pc-windows-gnu]
+linker = "rust-lld"
+
+# rust-lld also lets the spike use the installed MSVC Rust toolchain without
+# relying on whichever `link.exe` happens to be first on PATH. A release build
+# will still be validated with the Visual Studio toolchain before shipping.
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld"

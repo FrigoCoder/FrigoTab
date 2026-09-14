@@ -1,10 +1,18 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Clean', 'Restore', 'Build', 'Test', 'Verify', 'Publish', 'PublishPortable')]
+    [ValidateSet(
+        'Clean', 'Restore', 'Build', 'Test', 'Verify', 'Publish', 'PublishPortable',
+        'RustRestore', 'RustCoreTest', 'RustCoreVerify', 'RustCheck', 'RustBuild',
+        'RustTest', 'RustVerify', 'RustNativeSmoke', 'RustClean'
+    )]
     [string] $Task = 'Verify',
 
     [ValidateSet('Debug', 'Release')]
-    [string] $Configuration = 'Debug'
+    [string] $Configuration = 'Debug',
+
+    [string] $RustTarget = '',
+
+    [string] $RustToolchain = ''
 )
 
 Set-StrictMode -Version Latest
@@ -14,22 +22,43 @@ $repositoryRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $solutionPath = Join-Path $repositoryRoot 'FrigoTab.sln'
 $applicationProjectPath = Join-Path $repositoryRoot 'FrigoTab\FrigoTab.csproj'
 $acceptanceProjectPath = Join-Path $repositoryRoot 'FrigoTab.AcceptanceTests\FrigoTab.AcceptanceTests.csproj'
+$rustWorkspacePath = Join-Path $repositoryRoot 'rust\Cargo.toml'
 $leanPublishPath = Join-Path $repositoryRoot 'artifacts\publish\lean-win-x64'
 $portablePublishPath = Join-Path $repositoryRoot 'artifacts\publish\portable-win-x64'
 
-$dotnetCommand = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue
-if ($null -eq $dotnetCommand) {
-    Write-Error @"
+$script:dotnetPath = $null
+$script:cargoPath = $null
+$script:restoreComplete = $false
+$script:buildComplete = $false
+
+function Get-DotnetPath {
+    if( $null -eq $script:dotnetPath ) {
+        $dotnetCommand = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue
+        if( $null -eq $dotnetCommand ) {
+            throw @"
 The dotnet CLI was not found on PATH. Install the .NET 10 SDK (10.0.100 or later)
 from https://dotnet.microsoft.com/download/dotnet/10.0, then run this command again.
 No software was installed automatically.
 "@
-    exit 1
+        }
+        $script:dotnetPath = $dotnetCommand.Source
+    }
+    return $script:dotnetPath
 }
 
-$dotnetPath = $dotnetCommand.Source
-$script:restoreComplete = $false
-$script:buildComplete = $false
+function Get-CargoPath {
+    if( $null -eq $script:cargoPath ) {
+        $cargoCommand = Get-Command cargo -CommandType Application -ErrorAction SilentlyContinue
+        if( $null -eq $cargoCommand ) {
+            throw @"
+The cargo CLI was not found on PATH. Install a stable Rust toolchain from
+https://rustup.rs/, then run this command again. No software was installed automatically.
+"@
+        }
+        $script:cargoPath = $cargoCommand.Source
+    }
+    return $script:cargoPath
+}
 
 function Invoke-Dotnet {
     param(
@@ -37,11 +66,152 @@ function Invoke-Dotnet {
         [string[]] $Arguments
     )
 
+    $dotnetPath = Get-DotnetPath
     Write-Host ("> dotnet " + ($Arguments -join ' '))
     & $dotnetPath @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet command failed with exit code $LASTEXITCODE."
     }
+}
+
+function Invoke-Cargo {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]] $Arguments
+    )
+
+    if( -not (Test-Path -LiteralPath $rustWorkspacePath) ) {
+        throw "The Rust workspace was not found at $rustWorkspacePath."
+    }
+
+    $cargoPath = Get-CargoPath
+    $effectiveArguments = [System.Collections.Generic.List[string]]::new()
+    if( -not [string]::IsNullOrWhiteSpace($RustToolchain) ) {
+        $effectiveArguments.Add("+$RustToolchain")
+    }
+    $effectiveArguments.AddRange($Arguments)
+
+    Write-Host ("> cargo " + ($effectiveArguments -join ' '))
+    Push-Location (Split-Path -Parent $rustWorkspacePath)
+    try {
+        & $cargoPath @effectiveArguments
+        if( $LASTEXITCODE -ne 0 ) {
+            throw "cargo command failed with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Add-RustBuildArguments {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Collections.Generic.List[string]] $Arguments
+    )
+
+    if( $Configuration -eq 'Release' ) {
+        $Arguments.Add('--release')
+    }
+    if( -not [string]::IsNullOrWhiteSpace($RustTarget) ) {
+        $Arguments.Add('--target')
+        $Arguments.Add($RustTarget)
+    }
+}
+
+function Invoke-RustRestore {
+    Invoke-Cargo @('fetch', '--locked')
+}
+
+function Invoke-RustCoreTests {
+    $arguments = [System.Collections.Generic.List[string]]::new()
+    $arguments.Add('test')
+    $arguments.Add('--package')
+    $arguments.Add('frigo-tab-core')
+    $arguments.Add('--all-targets')
+    $arguments.Add('--locked')
+    Add-RustBuildArguments $arguments
+    Invoke-Cargo -Arguments ($arguments.ToArray())
+}
+
+function Invoke-RustCoreVerify {
+    Invoke-Cargo @('fmt', '--all', '--check')
+    $arguments = [System.Collections.Generic.List[string]]::new()
+    $arguments.Add('clippy')
+    $arguments.Add('--package')
+    $arguments.Add('frigo-tab-core')
+    $arguments.Add('--all-targets')
+    $arguments.Add('--locked')
+    Add-RustBuildArguments $arguments
+    $arguments.Add('--')
+    $arguments.Add('-D')
+    $arguments.Add('warnings')
+    Invoke-Cargo -Arguments ($arguments.ToArray())
+    Invoke-RustCoreTests
+}
+
+function Invoke-RustCheck {
+    $arguments = [System.Collections.Generic.List[string]]::new()
+    $arguments.Add('check')
+    $arguments.Add('--workspace')
+    $arguments.Add('--all-targets')
+    $arguments.Add('--locked')
+    Add-RustBuildArguments $arguments
+    Invoke-Cargo -Arguments ($arguments.ToArray())
+}
+
+function Invoke-RustBuild {
+    $arguments = [System.Collections.Generic.List[string]]::new()
+    $arguments.Add('build')
+    $arguments.Add('--workspace')
+    $arguments.Add('--locked')
+    Add-RustBuildArguments $arguments
+    Invoke-Cargo -Arguments ($arguments.ToArray())
+}
+
+function Invoke-RustTests {
+    $arguments = [System.Collections.Generic.List[string]]::new()
+    $arguments.Add('test')
+    $arguments.Add('--workspace')
+    $arguments.Add('--all-targets')
+    $arguments.Add('--locked')
+    Add-RustBuildArguments $arguments
+    Invoke-Cargo -Arguments ($arguments.ToArray())
+}
+
+function Invoke-RustVerify {
+    Invoke-Cargo @('fmt', '--all', '--check')
+    Invoke-RustCheck
+
+    $arguments = [System.Collections.Generic.List[string]]::new()
+    $arguments.Add('clippy')
+    $arguments.Add('--workspace')
+    $arguments.Add('--all-targets')
+    $arguments.Add('--locked')
+    Add-RustBuildArguments $arguments
+    $arguments.Add('--')
+    $arguments.Add('-D')
+    $arguments.Add('warnings')
+    Invoke-Cargo -Arguments ($arguments.ToArray())
+
+    Invoke-RustBuild
+    Invoke-RustTests
+}
+
+function Invoke-RustNativeSmoke {
+    $arguments = [System.Collections.Generic.List[string]]::new()
+    $arguments.Add('run')
+    $arguments.Add('--package')
+    $arguments.Add('frigo-tab-spike')
+    $arguments.Add('--locked')
+    Add-RustBuildArguments $arguments
+    $arguments.Add('--')
+    $arguments.Add('--native-smoke')
+    Invoke-Cargo -Arguments ($arguments.ToArray())
+}
+
+function Invoke-RustClean {
+    Invoke-Cargo @('clean')
 }
 
 function Assert-RepositoryChildPath {
@@ -247,6 +417,42 @@ switch ($Task) {
     }
     'PublishPortable' {
         Invoke-PublishPortable
+        break
+    }
+    'RustRestore' {
+        Invoke-RustRestore
+        break
+    }
+    'RustCoreTest' {
+        Invoke-RustCoreTests
+        break
+    }
+    'RustCoreVerify' {
+        Invoke-RustCoreVerify
+        break
+    }
+    'RustCheck' {
+        Invoke-RustCheck
+        break
+    }
+    'RustBuild' {
+        Invoke-RustBuild
+        break
+    }
+    'RustTest' {
+        Invoke-RustTests
+        break
+    }
+    'RustVerify' {
+        Invoke-RustVerify
+        break
+    }
+    'RustNativeSmoke' {
+        Invoke-RustNativeSmoke
+        break
+    }
+    'RustClean' {
+        Invoke-RustClean
         break
     }
 }

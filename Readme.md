@@ -2,7 +2,7 @@
 
 FrigoTab is an experimental Windows Alt-Tab replacement. It presents eligible application windows as a numbered, thumbnail-based switcher and keeps a tray icon for its lifetime.
 
-The stabilization work is isolated on the `codex/gpt-atdd-stabilization` branch; `master` is not used for this work. The historical WinForms/Win32 prototype now has an SDK-style solution, a testable switcher policy, and a local acceptance-test-driven development loop. Native Windows behavior is still a separate release gate.
+The stabilized C# baseline is isolated on the `codex/gpt-atdd-stabilization` branch; `master` is not used for this work. An additive native Rust experiment lives on `codex/rust-spike` and keeps that C# baseline as its executable behavior oracle. The historical WinForms/Win32 prototype now has an SDK-style solution, a testable switcher policy, and a local acceptance-test-driven development loop. Native Windows behavior is still a separate release gate.
 
 ## Development loop
 
@@ -11,6 +11,7 @@ The acceptance requirements and test policy are documented in:
 - [Requirements and acceptance behaviors](docs/requirements.md)
 - [Acceptance test matrix](docs/test-matrix.md)
 - [Architecture and test boundaries](docs/architecture.md)
+- [Rust native spike and portability boundary](docs/rust-spike.md)
 
 The suite is plain C# MSTest. Reqnroll, Gherkin, `.feature` files, and a separate intentionally-red test lane are no longer used. There are currently 98 green acceptance/contract tests.
 
@@ -27,6 +28,19 @@ Each `[TestClass]` and its matching source file begins with `TYYYYMMDDTHHMMSSZ_N
 .\build.ps1 -Task PublishPortable -Configuration Release
 .\build.ps1 -Task Clean
 ```
+
+The additive Rust workspace has independent build gates, so contributors can
+exercise its platform-neutral core without a .NET SDK or native Windows linker:
+
+```powershell
+.\build.ps1 -Task RustCoreVerify
+.\build.ps1 -Task RustVerify -RustToolchain stable-x86_64-pc-windows-msvc
+.\build.ps1 -Task RustNativeSmoke -RustToolchain stable-x86_64-pc-windows-msvc
+.\build.ps1 -Task RustBuild -Configuration Release -RustToolchain stable-x86_64-pc-windows-msvc
+```
+
+The C# `Verify` task remains the default until the Rust implementation reaches
+acceptance and manual native parity.
 
 `Verify` and `Test` run the complete green MSTest suite. `Publish` and `PublishPortable` repeat the Release build and green test gate before producing their artifacts. `Clean` removes generated `bin`, `obj`, and `artifacts` outputs. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
 
@@ -45,4 +59,8 @@ The original project targeted .NET Framework 4.7.1. The current SDK-style projec
 
 The publish configuration uses invariant globalization and keeps only the `en` satellite-resource policy because the application has no localized resource set. It deliberately does not enable trimming or Native AOT; WinForms/Win32 reflection and native-resource behavior should remain predictable while the project is stabilized.
 
-A plain native Win32/C++ rewrite is possible, but it would be a second implementation of the tray UI, global hook, DWM thumbnails, window enumeration, DPI/monitor logic, resource lifetime, and test seams. Retaining C# and offering the portable self-contained package avoids a runtime prerequisite without taking on that rewrite. Packaging and Authenticode signing remain before release.
+The Rust spike explores a plain native Win32 implementation without discarding
+the stabilized C# version. It isolates portable policy from a feature-gated
+`windows-sys` adapter and will only become the shipped application after
+automated and manual parity. Packaging and Authenticode signing remain before
+release regardless of implementation language.

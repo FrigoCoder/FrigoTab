@@ -1,0 +1,20 @@
+[package]
+name = "frigo-tab-spike"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "FrigoTab Rust/Win32 capability report and opt-in native smoke probe"
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "frigo-tab-spike"
+path = "src/main.rs"
+
+[dependencies]
+frigo-tab-core = { path = "../frigo-tab-core" }
+frigo-tab-win32 = { path = "../frigo-tab-win32" }
