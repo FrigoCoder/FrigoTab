@@ -101,16 +101,16 @@ impl ApplicationWindows {
         Ok(())
     }
 
-    /// Show or hide every DWM preview, preserving the original event
-    pub fn set_visible(&mut self, value: bool) -> Result<(), String> {
+    /// Show or hide every layered application overlay. The DWM thumbnails are
+    /// already prepared behind the hidden owner during construction.
+    pub fn set_visible(&mut self, value: bool) {
         if self.disposed || self.visible == value {
-            return Ok(());
+            return;
         }
         self.visible = value;
         for window in &mut self.windows {
-            window.set_session_visible(value)?;
+            window.set_session_visible(value);
         }
-        Ok(())
     }
 
     /// Return the first tile containing a screen point.
@@ -142,7 +142,7 @@ impl ApplicationWindows {
         self.disposed = true;
         if self.visible {
             for window in &mut self.windows {
-                let _ = window.set_session_visible(false);
+                window.set_session_visible(false);
             }
         }
         self.visible = false;

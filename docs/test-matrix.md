@@ -4,7 +4,7 @@ The matrix separates deterministic acceptance tests from native-desktop checks t
 
 ## Automated suite
 
-The suite is made up of plain Rust integration tests. All 40 tests execute against real application objects, native Windows resources, or the launched executable. There is no BDD/Gherkin layer, feature file, fake session, or intentionally-red lane.
+The suite is made up of plain Rust integration tests. All 41 tests execute against real application objects, native Windows resources, or the launched executable. There is no BDD/Gherkin layer, feature file, fake session, or intentionally-red lane.
 
 | Timestamped family | Count | Evidence boundary | Coverage |
 | --- | ---: | --- | --- |
@@ -14,7 +14,8 @@ The suite is made up of plain Rust integration tests. All 40 tests execute again
 | `t20260914t223000z_004_real_visual_parity_acceptance_tests` | 3 | Launched `FrigoTab.exe` and real layered preview windows | Owned window topology, DWM tile coverage, selected-tile tint, measured title backing, icon rendering, and centered number rendering. |
 | `t20260915t175100z_005_alt_tab_behavior_acceptance_tests` | 5 | Real switcher/session HWNDs | Default Sticky release, Tap (classic) initial/forward/reverse release activation, and release with no pointer selection. |
 | `t20260915t175100z_006_tray_and_background_acceptance_tests` | 4 | Launched `FrigoTab.exe` and its real tray popup | Default menu checkmarks, tray-only Tap selection, Black rectangle painting, and Background image only painting. |
-| **Total** | **40** |  | **All automated tests pass before a publish is accepted.** |
+| `t20260915t212300z_007_thumbnail_reveal_performance_acceptance_tests` | 1 | Launched `FrigoTab.exe` and the real DWM compositor | A live preview source is present in the first composed owner frame without a delayed placeholder. |
+| **Total** | **41** |  | **All automated tests pass before a publish is accepted.** |
 
 The file prefixes are UTC timestamps recording when a family was introduced. Keep the prefix when refactoring a family; test functions remain descriptive plain Rust names. The process tests accept `FRIGOTAB_EXE` when a different built executable is being compared with the current Rust build.
 
@@ -62,4 +63,4 @@ Both artifacts are native x64 executables and do not require a managed runtime.
 .\build.ps1 -Task Clean
 ```
 
-`Verify` and `Test` run all 40 acceptance tests serially. `Publish` repeats the Release build and green test gate before producing `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point. No CI/CD service is required by this local workflow.
+`Verify` and `Test` run all 41 acceptance tests serially. `Publish` repeats the Release build and green test gate before producing `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point. No CI/CD service is required by this local workflow.

@@ -12,7 +12,7 @@ The behavior inventory, test boundary, and native validation checklist are docum
 - [Acceptance test matrix](docs/test-matrix.md)
 - [Architecture and test boundaries](docs/architecture.md)
 
-There are 40 automated acceptance tests in six timestamped test families:
+There are 41 automated acceptance tests in seven timestamped test families:
 
 - 15 real switcher/session tests using actual HWNDs, window enumeration, layout, DWM, activation, and cleanup.
 - 7 real window, DWM, GDI, and shell-backdrop tests using native desktop objects.
@@ -20,8 +20,9 @@ There are 40 automated acceptance tests in six timestamped test families:
 - 3 real visual-parity tests that inspect the owned layered preview windows and their rendered pixels.
 - 5 real switcher tests covering the selectable Sticky and Tap (classic) Alt-release behavior.
 - 4 black-box tests that open the real tray menu and verify the selectable background modes.
+- 1 real-process compositor test that verifies a live thumbnail is ready in the first published owner frame.
 
-The families are the six timestamped Rust integration-test files:
+The families are the seven timestamped Rust integration-test files:
 
 - `acceptance-tests/tests/t20260914t211700z_001_real_switcher_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260914t212400z_002_real_window_and_backdrop_acceptance_tests.rs`
@@ -29,6 +30,7 @@ The families are the six timestamped Rust integration-test files:
 - `acceptance-tests/tests/t20260914t223000z_004_real_visual_parity_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260915t175100z_005_alt_tab_behavior_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260915t175100z_006_tray_and_background_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260915t212300z_007_thumbnail_reveal_performance_acceptance_tests.rs`
 
 The timestamp and family suffix are stable identifiers. Keep them when refactoring a family; test functions use descriptive plain Rust names.
 
@@ -43,7 +45,7 @@ The timestamp and family suffix are stable identifiers. Keep them when refactori
 .\build.ps1 -Task Clean
 ```
 
-`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 40 acceptance tests serially. `Test` builds and runs the acceptance tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
+`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 41 acceptance tests serially. `Test` builds and runs the acceptance tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
 
 The direct Cargo equivalents are:
 
@@ -56,7 +58,7 @@ cargo test -p frigotab-acceptance --release -- --test-threads=1
 
 The Debug executable retains the historical ten-second `StartQuitTimer` safety timer. It is for development only; use the Release executable for sustained interactive testing. Sticky Alt release is the default: releasing Alt leaves the switcher open so the user can use Tab/Shift+Tab, a number, or the mouse, and can cancel with Escape or Alt+F4. The tray menu can select Tap (classic), which activates the current selection when Alt is released. An immediate Alt release follows the selected mode. These settings are runtime-only, are available from the tray menu only, and reset to their defaults on the next launch. Foreground activation uses the historical input nudge and does not join another application's input queue with `AttachThreadInput`.
 
-The default Full desktop backdrop is a retained snapshot of the Windows shell desktop, including wallpaper and desktop icons. FrigoTab asks Explorer's desktop host (`Progman`, or the matching `WorkerW`) to render into an off-screen native bitmap. The tray menu also offers Background image only (the desktop wallpaper/pattern without icons) and Black rectangle. None of these modes captures the screen or reconstructs a background by searching and composing it from application windows. The selected backdrop is painted before DWM previews are made visible; if shell rendering is unavailable, the overlay uses a black fallback and remains usable.
+The default Full desktop backdrop is a retained snapshot of the Windows shell desktop, including wallpaper and desktop icons. FrigoTab asks Explorer's desktop host (`Progman`, or the matching `WorkerW`) to render into an off-screen native bitmap. The tray menu also offers Background image only (the desktop wallpaper/pattern without icons) and Black rectangle. None of these modes captures the screen or reconstructs a background by searching and composing it from application windows. DWM prepares the preview surfaces behind the hidden owner, then the selected backdrop is painted as the owner is shown; if shell rendering is unavailable, the overlay uses a black fallback and remains usable.
 
 ## Runtime and distribution
 

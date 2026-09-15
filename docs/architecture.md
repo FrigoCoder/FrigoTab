@@ -13,7 +13,7 @@ FrigoTab is a small native Win32 application written in Rust around Win32 window
 | Session view | Owns the actual overlay owner window, preview windows, pointer routing, selection rendering, the selected backdrop mode, shell backdrop, and activation calls. | `src/session_window.rs`, `src/frigo_window.rs`, `src/application_window.rs`, `src/application_windows.rs` |
 | Window catalog | Enumerates and classifies eligible top-level application HWNDs. | `src/window_finder.rs`, `src/window_handle.rs`, `src/window_icon.rs` |
 | Window/layout | Reads titles, icons, styles, placement, monitor geometry, and activation state; assigns stable tile rectangles. | `src/layout.rs`, `src/rect.rs`, `src/points.rs`, `src/screen_point.rs` |
-| DWM preview | Registers hidden thumbnails, applies source/destination geometry, reveals them after the owner backdrop is painted, and disposes handles on close. | `src/thumbnail.rs` |
+| DWM preview | Registers thumbnails, applies destination geometry and visibility while the owner is hidden, and disposes handles on close. | `src/thumbnail.rs` |
 | Layered overlay | Renders the selected tint, title, icon, and number into the owned layered preview windows. | `src/layer_updater.rs`, `src/gdi_plus.rs` |
 | Shell backdrop | Captures Explorer's wallpaper-and-icons surface into a retained native bitmap for Full desktop mode; the session also supports direct image-only and black painting. | `src/shell_desktop_snapshot.rs`, `src/session_window.rs` |
 | Observable state | Publishes selected and visible changes used by the session and controller. | `src/application_windows.rs`, `src/switcher_state.rs` |
@@ -27,8 +27,8 @@ The owner HWND stores one stable context. Mutable application state is protected
 
 1. The hook observes a non-injected Alt+Tab transition and posts the bounded event to the UI loop.
 2. The controller asks the session view to enumerate eligible windows and build the overlay.
-3. The view lays out real candidate HWNDs, paints the selected backdrop (the retained shell snapshot in Full desktop mode), and keeps DWM thumbnails hidden while the first owner frame is being shown.
-4. Once that frame is painted, previews and tile overlays are revealed. Tab/Shift+Tab, numbers, and pointer movement update the selected candidate.
+3. The view lays out real candidate HWNDs and configures their DWM thumbnails while the owner remains hidden, allowing the compositor to prepare the redirected source surfaces off-screen.
+4. The view shows and synchronously paints the owner from the selected backdrop (the retained shell snapshot in Full desktop mode), then shows the already-rendered title/number overlays. Tab/Shift+Tab, numbers, and pointer movement update the selected candidate.
 5. In the default Sticky mode, releasing Alt does not commit the first candidate; the session remains available until an explicit number/pointer activation or Escape/Alt+F4 cancellation. Tray-selected Tap (classic) commits the current selection on Alt release.
 6. Activation restores a minimized target and attempts `SetForegroundWindow` after the historical input nudge. The controller then closes and disposes the session.
 
@@ -42,12 +42,12 @@ If the shell host or render is unavailable in `FullDesktop` mode, the most recen
 
 ## DWM and resource lifetime
 
-Each preview registers a DWM thumbnail against the visible owner. Destination and source rectangles are set explicitly, and the thumbnail is not made visible until the owner has painted the shell backdrop. Teardown hides and unregisters the thumbnail and releases its native resources. When DWM is unavailable, the tile retains its icon/title fallback.
+Each preview registers a DWM thumbnail against the hidden owner. Its destination, opacity, and visibility are set together so DWM can prepare the live source before the owner is exposed; owner visibility still prevents a partial session from appearing. Teardown hides the owner and unregisters each thumbnail with its native resources. When DWM is unavailable, the tile retains its icon/title fallback.
 
 Windows, icons, fonts, layered DCs, bitmaps, thumbnails, hook handles, the tray icon, and the single-instance guard have explicit ownership and are disposed during normal close, failed construction, tray Exit, and process shutdown.
 
 ## Acceptance boundary
 
-The automated gate has 40 tests in six timestamped plain Rust integration-test modules. The tests use real HWNDs and native Windows resources, including DWM/GDI, the Explorer shell surface, the real tray popup, and the launched executable. They verify observable behavior such as Sticky and Tap release, navigation, selection, tray-only runtime settings, all backdrop modes, stale-window recovery, first-frame backdrop ordering, DWM visibility, process lifetime, visual parity, and cleanup.
+The automated gate has 41 tests in seven timestamped plain Rust integration-test modules. The tests use real HWNDs and native Windows resources, including DWM/GDI, the Explorer shell surface, the real tray popup, and the launched executable. They verify observable behavior such as Sticky and Tap release, navigation, selection, tray-only runtime settings, all backdrop modes, stale-window recovery, first-frame backdrop ordering, first-frame thumbnail readiness, DWM visibility, process lifetime, visual parity, and cleanup.
 
 The global hook ignores injected events by design. Therefore physical Alt/Tab transitions, focus/UIPI restrictions, Explorer restart, protected surfaces, lock/unlock, mixed monitor/DPI topology, and long-running native handle behavior remain manual release checks. The automated results are necessary evidence, not a claim that every Windows desktop configuration is identical.

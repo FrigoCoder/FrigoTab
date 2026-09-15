@@ -31,7 +31,7 @@ pub struct ApplicationWindow {
     // matching ApplicationWindow.Dispose (icon, layer, thumbnail, popup).
     window_icon: WindowIcon,
     layer_updater: Rc<RefCell<LayerUpdater>>,
-    thumbnail: Option<DwmThumbnail>,
+    _thumbnail: Option<DwmThumbnail>,
     popup: FrigoWindow,
     application: HWND,
     index: usize,
@@ -44,15 +44,13 @@ impl ApplicationWindow {
     pub fn new(owner: HWND, application: HWND, index: usize, bounds: RECT) -> Result<Self, String> {
         let thumbnail = match DwmThumbnail::register(owner, application) {
             Ok(thumbnail) => {
-                let configured = thumbnail
+                if thumbnail
                     .set_destination_rect(screen_to_client_rect(owner, bounds))
-                    .map_err(|hresult| {
-                        format!("DwmUpdateThumbnailProperties failed (HRESULT 0x{hresult:08x})")
-                    });
-                if configured.is_err() || thumbnail.set_visible(false).is_err() {
-                    None
-                } else {
+                    .is_ok()
+                {
                     Some(thumbnail)
+                } else {
+                    None
                 }
             }
             Err(_) => None,
@@ -87,7 +85,7 @@ impl ApplicationWindow {
             selected_state,
             window_icon,
             layer_updater,
-            thumbnail,
+            _thumbnail: thumbnail,
         };
         result.render_overlay()?;
         Ok(result)
@@ -118,22 +116,11 @@ impl ApplicationWindow {
         self.render_overlay()
     }
 
-    /// Mirrors `ApplicationWindow.SetSessionVisible`: the DWM preview is
-    /// toggled before the overlay popup so the compositor never exposes a
-    /// stale frame between those operations.
-    pub fn set_session_visible(&self, visible: bool) -> Result<(), String> {
-        // Always update the overlay, even when DWM rejects the visibility
-        // update, and report the native error after the popup attempt.
-        let thumbnail_error = self.thumbnail.as_ref().and_then(|thumbnail| {
-            thumbnail.set_visible(visible).err().map(|hresult| {
-                format!("DwmUpdateThumbnailProperties failed (HRESULT 0x{hresult:08x})")
-            })
-        });
+    /// Show or hide the layered title/number overlay. The DWM thumbnail stays
+    /// prepared for this short-lived session; hiding the owner suppresses its
+    /// output until the registration is dropped.
+    pub fn set_session_visible(&self, visible: bool) {
         self.popup.set_visible(visible);
-        if let Some(error) = thumbnail_error {
-            return Err(error);
-        }
-        Ok(())
     }
 
     pub fn try_activate(&self) -> bool {

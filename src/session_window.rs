@@ -2,9 +2,10 @@
 //!
 //! The controller remains unaware of HWNDs and DWM.  This type owns the one
 //! full-desktop owner window, the retained Explorer frame, and the current
-//! `ApplicationWindows` collection.  The order in `try_open` is intentional:
-//! construct hidden previews, show and synchronously complete the owner's
-//! paint cycle, reveal thumbnails, then request foreground activation.
+//! `ApplicationWindows` collection. The order in `try_open` is intentional:
+//! prepare DWM previews behind the hidden owner, show and synchronously complete
+//! the owner's paint cycle, reveal the layered overlays, then request foreground
+//! activation.
 
 use std::cell::RefCell;
 use std::ffi::c_void;
@@ -316,18 +317,15 @@ impl SessionWindow {
             return Ok(0);
         }
 
-        // Publish only after every candidate has been constructed.  All
-        // thumbnails are still hidden at this point.
+        // Publish only after every candidate has been constructed. DWM has
+        // prepared the thumbnails behind this still-hidden owner.
         self.applications = Some(applications);
         unsafe {
             ShowWindow(self.hwnd, SW_SHOW);
         }
         self.paint_owner_synchronously();
-        if let Some(applications) = self.applications.as_mut()
-            && applications.set_visible(true).is_err()
-        {
-            self.close_session_resources();
-            return Err(());
+        if let Some(applications) = self.applications.as_mut() {
+            applications.set_visible(true);
         }
         // Foreground activation is deliberately last; a SetForegroundWindow
         // deactivation is the expected selection handoff, not interruption.
@@ -341,7 +339,7 @@ impl SessionWindow {
     fn close_session_resources(&mut self) {
         let mut applications = self.applications.take();
         if let Some(current) = applications.as_mut() {
-            let _ = current.set_visible(false);
+            current.set_visible(false);
         }
         unsafe {
             ShowWindow(self.hwnd, SW_HIDE);
@@ -475,9 +473,10 @@ impl SessionWindow {
         }
         unsafe {
             // This synchronously validates/publishes the direct first-frame
-            // paint before thumbnails are revealed. A reentrant WM_PAINT uses
-            // the separately shared SessionPainter, never the App or this
-            // mutably borrowed SessionWindow.
+            // backdrop before the prepared previews and layered overlays are
+            // composed. A reentrant WM_PAINT uses the separately shared
+            // SessionPainter, never the App or this mutably borrowed
+            // SessionWindow.
             UpdateWindow(self.hwnd);
         }
     }

@@ -1,9 +1,10 @@
 //! Native DWM thumbnail wrapper used by the application.
 //!
-//! A thumbnail is registered hidden. The owner paints its background first,
-//! then calls [`DwmThumbnail::set_visible`] for the completed collection. All
-//! native operations are checked for failed HRESULTs, including the best-effort
-//! unregister performed by `Drop`.
+//! A thumbnail is configured while its owner is hidden. Setting the destination
+//! also makes the registration visible, allowing DWM to prepare the redirected
+//! source before the owner appears instead of starting every source afterward.
+//! All native operations are checked for failed HRESULTs, including the
+//! best-effort unregister performed by `Drop`.
 
 use std::num::NonZeroIsize;
 
@@ -16,10 +17,9 @@ use windows_sys::Win32::System::Diagnostics::Debug::OutputDebugStringW;
 
 /// One DWM thumbnail registration.
 ///
-/// This intentionally mirrors the original `Thumbnail` contract: registration
-/// starts hidden, the destination update sets an opaque thumbnail, and
-/// visibility is a separate update. The handle is owned by this value and is
-/// released when it is dropped.
+/// Registration starts hidden and the destination update makes the opaque
+/// thumbnail visible for off-screen preparation. The handle is owned by this
+/// value and is released when it is dropped.
 pub struct DwmThumbnail {
     handle: NonZeroIsize,
 }
@@ -27,9 +27,8 @@ pub struct DwmThumbnail {
 impl DwmThumbnail {
     /// Register `source` as a thumbnail hosted by `destination`.
     ///
-    /// DWM registrations are hidden by default.  The caller must set the
-    /// destination rectangle and explicitly make the thumbnail visible after
-    /// the owner has painted its backdrop.
+    /// DWM registrations are hidden by default. The destination update makes
+    /// the thumbnail visible while the owner itself is still hidden.
     #[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND values are opaque window identities.
     pub fn register(destination: HWND, source: HWND) -> Result<Self, i32> {
         let mut handle = 0isize;
@@ -58,12 +57,17 @@ impl DwmThumbnail {
         Ok(Self { handle })
     }
 
-    /// Set the destination rectangle in the owner window.
+    /// Set the destination rectangle and prepare the thumbnail for display.
+    ///
+    /// The owner remains hidden while application previews are constructed, so
+    /// this does not expose a partial session. It does give DWM time to prepare
+    /// the source surface before the owner is shown.
     pub fn set_destination_rect(&self, destination: RECT) -> Result<(), i32> {
         let properties = DWM_THUMBNAIL_PROPERTIES {
-            dwFlags: DWM_TNP_RECTDESTINATION | DWM_TNP_OPACITY,
+            dwFlags: DWM_TNP_RECTDESTINATION | DWM_TNP_OPACITY | DWM_TNP_VISIBLE,
             rcDestination: destination,
             opacity: u8::MAX,
+            fVisible: 1,
             ..Default::default()
         };
         self.update(properties)

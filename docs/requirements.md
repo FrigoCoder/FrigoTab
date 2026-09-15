@@ -4,7 +4,7 @@ This is the observable behavior inventory of the current native Rust application
 
 ## Test policy
 
-The automated gate contains 40 green plain Rust integration acceptance tests. They use real application objects and real Windows resources:
+The automated gate contains 41 green plain Rust integration acceptance tests. They use real application objects and real Windows resources:
 
 - 15 tests exercise the actual switcher/session windows, candidate HWNDs, layout, DWM previews, pointer routing, activation, and cleanup.
 - 7 tests exercise real window classification, stale HWND/layout handling, shell desktop capture, DWM visibility, and native resource lifetime.
@@ -12,8 +12,9 @@ The automated gate contains 40 green plain Rust integration acceptance tests. Th
 - 3 tests inspect the real layered preview-window topology and rendered visual details.
 - 5 tests exercise Sticky and Tap (classic) Alt-release behavior on a real session.
 - 4 tests launch the actual executable, open its real tray popup, and verify runtime background-mode selection and painting.
+- 1 test launches the actual executable and verifies that DWM publishes a live preview in the first composed owner frame.
 
-The six timestamped integration-test files are:
+The seven timestamped integration-test files are:
 
 - `acceptance-tests/tests/t20260914t211700z_001_real_switcher_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260914t212400z_002_real_window_and_backdrop_acceptance_tests.rs`
@@ -21,6 +22,7 @@ The six timestamped integration-test files are:
 - `acceptance-tests/tests/t20260914t223000z_004_real_visual_parity_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260915t175100z_005_alt_tab_behavior_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260915t175100z_006_tray_and_background_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260915t212300z_007_thumbnail_reveal_performance_acceptance_tests.rs`
 
 The timestamp and family suffix are stable identifiers; test functions use descriptive plain Rust names.
 
@@ -48,9 +50,9 @@ The global hook deliberately ignores injected keyboard events. Consequently, det
 | Layout | Use restored placement to choose a minimized window's monitor; preserve negative origins, working-area margins, stable numbering, and source aspect ratios. | Real layout acceptance tests; manual mixed-DPI/portrait check. |
 | Full desktop backdrop | In the default Full desktop mode, render Explorer's desktop host (`Progman`, or the matching `WorkerW`) into an off-screen bitmap containing wallpaper and icons. Do not capture the screen or compose the background from application windows. | Real shell-backdrop acceptance tests; manual Explorer/restart/RDP check. |
 | Alternative backdrops | Background image only paints the desktop wallpaper/pattern without icons; Black rectangle paints a black owner background. Both are selectable from the tray and do not require shell capture. | Real tray/background acceptance tests; manual visual check. |
-| First frame | Prepare the selected backdrop before opening, paint the owner from it synchronously, and reveal DWM previews only after that paint. The first visible frame must not show application pixels. Full desktop reuses the shell snapshot; image-only and black modes do not require shell capture. | Real process first-frame and background-mode acceptance tests; manual visual check. |
+| First frame | Prepare the selected backdrop and DWM preview surfaces while the owner is hidden, then paint the owner synchronously as it is shown. The first composed preview frame must contain the live source rather than a delayed placeholder, and the backdrop must not show application pixels. Full desktop reuses the shell snapshot; image-only and black modes do not require shell capture. | Real process first-frame, thumbnail-reveal, and background-mode acceptance tests; manual visual check. |
 | Shell fallback | If the shell host or render is unavailable in Full desktop mode, use the last matching frame when possible or black, release partial resources, and keep opening usable. Image-only and black modes remain independent of the retained shell snapshot. | Real shell-backdrop and background-mode acceptance tests; manual protected/RDP check. |
-| DWM previews | Configure destination/source geometry, keep each thumbnail hidden until the owner backdrop is visible, surface native failures, and unregister/hide deterministically. | Real DWM acceptance tests; manual DWM-disabled/protected-surface check. |
+| DWM previews | Configure destination geometry and make each thumbnail ready while its owner remains hidden, surface native failures, and unregister deterministically. This must not defer per-thumbnail source preparation until after the owner is visible. | Real DWM and thumbnail-reveal acceptance tests; manual DWM-disabled/protected-surface check. |
 | Resource lifetime | Windows, thumbnails, icons, fonts, bitmaps, hook handles, tray resources, and mutexes are released on normal close, failed construction, and process exit. | Real cleanup/resource acceptance tests; manual repeated-session handle check. |
 | Activation handoff | Restore minimized targets and attempt foreground activation without `AttachThreadInput`. The intentional deactivation during handoff is not treated as an external interruption. | Real activation acceptance tests; manual focus/taskbar check. |
 | Interruption | Lock/unlock, desktop deactivation, tray exit, display/DPI change, and DWM composition changes reset or safely close the current session and input state. | Manual Windows matrix; selected real-session cleanup coverage. |
