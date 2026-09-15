@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::sync::Mutex;
 
 use crate::keyboard_input::{KeyTransition, KeyboardInput, KeyboardModifierKey, SwitcherKey};
@@ -15,8 +14,10 @@ pub struct KeyboardModifierState {
 
 #[derive(Default)]
 struct ModifierKeys {
-    alt: HashSet<KeyboardModifierKey>,
-    shift: HashSet<KeyboardModifierKey>,
+    // There are only three physical variants for each modifier.  Keeping
+    // these as masks avoids a HashSet allocation in the low-level hook.
+    alt: u8,
+    shift: u8,
 }
 
 impl KeyboardModifierState {
@@ -29,35 +30,17 @@ impl KeyboardModifierState {
     pub fn alt_down(&self) -> bool {
         self.state
             .lock()
-            .expect("keyboard modifier state lock poisoned")
+            .unwrap_or_else(|error| error.into_inner())
             .alt
-            .len()
-            > 0
+            != 0
     }
 
     pub fn shift_down(&self) -> bool {
         self.state
             .lock()
-            .expect("keyboard modifier state lock poisoned")
+            .unwrap_or_else(|error| error.into_inner())
             .shift
-            .len()
-            > 0
-    }
-
-    pub fn create_input(
-        &self,
-        key: SwitcherKey,
-        transition: KeyTransition,
-        native_alt_down: bool,
-        injected: bool,
-    ) -> KeyboardInput {
-        self.create_input_with_modifier(
-            key,
-            transition,
-            native_alt_down,
-            injected,
-            default_modifier(key),
-        )
+            != 0
     }
 
     pub fn create_input_with_modifier(
@@ -68,14 +51,10 @@ impl KeyboardModifierState {
         injected: bool,
         physical_modifier: KeyboardModifierKey,
     ) -> KeyboardInput {
-        let mut state = self
-            .state
-            .lock()
-            .expect("keyboard modifier state lock poisoned");
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         let is_down = matches!(transition, KeyTransition::Down);
-        let alt =
-            native_alt_down || !state.alt.is_empty() || (is_alt(physical_modifier) && is_down);
-        let shift = !state.shift.is_empty() || (is_shift(physical_modifier) && is_down);
+        let alt = native_alt_down || state.alt != 0 || (is_alt(physical_modifier) && is_down);
+        let shift = state.shift != 0 || (is_shift(physical_modifier) && is_down);
 
         let input = KeyboardInput::new(key, transition, alt, shift, injected);
         if injected {
@@ -86,49 +65,38 @@ impl KeyboardModifierState {
         // still describes the physical state before release.
         if is_alt(physical_modifier) {
             if is_down {
-                state.alt.insert(physical_modifier);
+                state.alt |= modifier_bit(physical_modifier);
             } else {
-                state.alt.remove(&physical_modifier);
+                state.alt &= !modifier_bit(physical_modifier);
                 // The generic Alt entry represents the LLKHF_ALTDOWN recovery
                 // sentinel and is cleared by any physical Alt-up.
-                state.alt.remove(&KeyboardModifierKey::Alt);
+                state.alt &= !modifier_bit(KeyboardModifierKey::Alt);
             }
         } else if is_shift(physical_modifier) {
             if is_down {
-                state.shift.insert(physical_modifier);
+                state.shift |= modifier_bit(physical_modifier);
             } else {
-                state.shift.remove(&physical_modifier);
+                state.shift &= !modifier_bit(physical_modifier);
             }
         }
-        if native_alt_down && state.alt.is_empty() && !is_alt(physical_modifier) {
+        if native_alt_down && state.alt == 0 && !is_alt(physical_modifier) {
             // LLKHF_ALTDOWN belongs to this event; remember it until Alt-up.
-            state.alt.insert(KeyboardModifierKey::Alt);
+            state.alt |= modifier_bit(KeyboardModifierKey::Alt);
         }
 
         input
     }
 
     pub fn reset(&self) {
-        let mut state = self
-            .state
-            .lock()
-            .expect("keyboard modifier state lock poisoned");
-        state.alt.clear();
-        state.shift.clear();
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        state.alt = 0;
+        state.shift = 0;
     }
 }
 
 impl Default for KeyboardModifierState {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-fn default_modifier(key: SwitcherKey) -> KeyboardModifierKey {
-    match key {
-        SwitcherKey::Alt => KeyboardModifierKey::Alt,
-        SwitcherKey::Shift => KeyboardModifierKey::Shift,
-        _ => KeyboardModifierKey::None,
     }
 }
 
@@ -146,4 +114,16 @@ fn is_shift(modifier: KeyboardModifierKey) -> bool {
             | KeyboardModifierKey::LeftShift
             | KeyboardModifierKey::RightShift
     )
+}
+
+fn modifier_bit(modifier: KeyboardModifierKey) -> u8 {
+    match modifier {
+        KeyboardModifierKey::Alt => 1 << 0,
+        KeyboardModifierKey::LeftAlt => 1 << 1,
+        KeyboardModifierKey::RightAlt => 1 << 2,
+        KeyboardModifierKey::Shift => 1 << 0,
+        KeyboardModifierKey::LeftShift => 1 << 1,
+        KeyboardModifierKey::RightShift => 1 << 2,
+        KeyboardModifierKey::None => 0,
+    }
 }

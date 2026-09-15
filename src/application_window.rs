@@ -4,23 +4,20 @@
 //! is registered against the session owner, while this separate owned popup
 //! contains only the transparent/layered GDI+ overlay.
 
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
 };
 
 use windows_sys::Win32::Foundation::{HWND, POINT, RECT};
 use windows_sys::Win32::Graphics::Gdi::ScreenToClient;
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::keybd_event;
-use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GWL_STYLE, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, SW_RESTORE,
-    SetForegroundWindow, ShowWindow, WS_MINIMIZE,
-};
+use windows_sys::Win32::UI::WindowsAndMessaging::{GetWindowTextLengthW, GetWindowTextW};
 
 use crate::frigo_window::FrigoWindow;
 use crate::gdi_plus::Font;
 use crate::layer_updater::LayerUpdater;
 use crate::thumbnail::DwmThumbnail;
+use crate::window_handle::WindowHandle;
 use crate::window_icon::WindowIcon;
 use windows_sys::Win32::Graphics::GdiPlus::{FontStyleBold, FontStyleRegular, RectF};
 
@@ -34,14 +31,14 @@ pub struct ApplicationWindow {
     // Declaration order is intentional: Rust drops fields in this order,
     // matching ApplicationWindow.Dispose (icon, layer, thumbnail, popup).
     window_icon: WindowIcon,
-    layer_updater: Arc<Mutex<LayerUpdater>>,
+    layer_updater: Rc<RefCell<LayerUpdater>>,
     thumbnail: Option<DwmThumbnail>,
     popup: FrigoWindow,
     application: HWND,
     index: usize,
     bounds: RECT,
     selected: bool,
-    selected_state: Arc<AtomicBool>,
+    selected_state: Rc<Cell<bool>>,
 }
 
 impl ApplicationWindow {
@@ -61,26 +58,24 @@ impl ApplicationWindow {
             }
             Err(_) => None,
         };
-        let popup = FrigoWindow::new_with_hit_test(owner, bounds, true)?;
-        let layer_updater = Arc::new(Mutex::new(LayerUpdater::new(popup.hwnd(), bounds)?));
+        let popup = FrigoWindow::new(owner, bounds)?;
+        let layer_updater = Rc::new(RefCell::new(LayerUpdater::new(popup.hwnd(), bounds)?));
         let window_icon = WindowIcon::new(application)?;
         let icon_state = window_icon.weak();
-        let callback_layer = Arc::clone(&layer_updater);
-        let selected_state = Arc::new(AtomicBool::new(false));
-        let callback_selected = Arc::clone(&selected_state);
+        let callback_layer = Rc::clone(&layer_updater);
+        let selected_state = Rc::new(Cell::new(false));
+        let callback_selected = Rc::clone(&selected_state);
         window_icon.on_changed(move || {
             let _ = icon_state.with_icon(|icon, icon_width, icon_height| {
-                if let Ok(mut layer) = callback_layer.lock() {
-                    let _ = render_overlay_with_icon(
-                        &mut layer,
-                        icon,
-                        icon_width,
-                        icon_height,
-                        application,
-                        index,
-                        callback_selected.load(Ordering::Relaxed),
-                    );
-                }
+                let _ = render_overlay_with_icon(
+                    &mut callback_layer.borrow_mut(),
+                    icon,
+                    icon_width,
+                    icon_height,
+                    application,
+                    index,
+                    callback_selected.get(),
+                );
             });
         });
 
@@ -120,7 +115,7 @@ impl ApplicationWindow {
             return Ok(());
         }
         self.selected = selected;
-        self.selected_state.store(selected, Ordering::Relaxed);
+        self.selected_state.set(selected);
         self.render_overlay()
     }
 
@@ -135,10 +130,7 @@ impl ApplicationWindow {
                 format!("DwmUpdateThumbnailProperties failed (HRESULT 0x{hresult:08x})")
             })
         });
-        let popup_error = self.popup.set_visible(visible).err();
-        if let Some(error) = popup_error {
-            return Err(error);
-        }
+        self.popup.set_visible(visible);
         if let Some(error) = thumbnail_error {
             return Err(error);
         }
@@ -146,19 +138,7 @@ impl ApplicationWindow {
     }
 
     pub fn try_activate(&self) -> bool {
-        let style = unsafe { GetWindowLongPtrW(self.application, GWL_STYLE) } as u32;
-        if style & WS_MINIMIZE != 0 {
-            unsafe {
-                ShowWindow(self.application, SW_RESTORE);
-            }
-        }
-        // Keep the input-queue-independent nudge used by the original code;
-        // joining the target thread would recreate the historical key-state
-        // corruption that FrigoTab deliberately avoids.
-        unsafe {
-            keybd_event(0, 0, 0, 0);
-            SetForegroundWindow(self.application) != 0
-        }
+        WindowHandle::new(self.application).set_foreground()
     }
 
     pub fn hit_test(&self, point: POINT) -> bool {
@@ -171,12 +151,8 @@ impl ApplicationWindow {
     fn render_overlay(&mut self) -> Result<(), String> {
         let selected = self.selected;
         let icon_result = self.window_icon.with_icon(|icon, icon_width, icon_height| {
-            let mut layer = self
-                .layer_updater
-                .lock()
-                .map_err(|_| "LayerUpdater lock poisoned".to_string())?;
             render_overlay_with_icon(
-                &mut layer,
+                &mut self.layer_updater.borrow_mut(),
                 icon,
                 icon_width,
                 icon_height,

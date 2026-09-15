@@ -28,6 +28,39 @@ pub enum SwitcherKey {
     NumPad9,
 }
 
+impl SwitcherKey {
+    /// A compact identity used by the two consumed-key ledgers. `Unknown`
+    /// deliberately has no bit because it is never suppressible.
+    pub(crate) const fn bit(self) -> u32 {
+        match self {
+            Self::Unknown => 0,
+            Self::Alt => 1 << 0,
+            Self::Shift => 1 << 1,
+            Self::Tab => 1 << 2,
+            Self::Escape => 1 << 3,
+            Self::F4 => 1 << 4,
+            Self::D1 => 1 << 5,
+            Self::D2 => 1 << 6,
+            Self::D3 => 1 << 7,
+            Self::D4 => 1 << 8,
+            Self::D5 => 1 << 9,
+            Self::D6 => 1 << 10,
+            Self::D7 => 1 << 11,
+            Self::D8 => 1 << 12,
+            Self::D9 => 1 << 13,
+            Self::NumPad1 => 1 << 14,
+            Self::NumPad2 => 1 << 15,
+            Self::NumPad3 => 1 << 16,
+            Self::NumPad4 => 1 << 17,
+            Self::NumPad5 => 1 << 18,
+            Self::NumPad6 => 1 << 19,
+            Self::NumPad7 => 1 << 20,
+            Self::NumPad8 => 1 << 21,
+            Self::NumPad9 => 1 << 22,
+        }
+    }
+}
+
 /// Whether a keyboard event represents a press or a release.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum KeyTransition {

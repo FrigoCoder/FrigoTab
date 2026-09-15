@@ -5,7 +5,7 @@
 //! stale candidate that caused them, and the selection/visibility transitions
 //! are propagated to every native preview in the same order as the original.
 
-use windows_sys::Win32::Foundation::{HWND, RECT};
+use windows_sys::Win32::Foundation::RECT;
 
 use crate::application_window::ApplicationWindow;
 use crate::layout::Layout;
@@ -14,7 +14,6 @@ use crate::window_handle::WindowHandle;
 
 /// The live previews for one switcher owner window.
 pub struct ApplicationWindows {
-    owner: HWND,
     windows: Vec<ApplicationWindow>,
     selected: Option<usize>,
     visible: bool,
@@ -28,7 +27,7 @@ impl ApplicationWindows {
     /// `EnumWindows` order.  A candidate can disappear between enumeration,
     /// layout, and thumbnail registration; that candidate is skipped while
     /// already valid previews remain part of the session.
-    pub fn new(owner: WindowHandle, finder: &WindowFinder) -> Result<Self, String> {
+    pub fn new(owner: WindowHandle, finder: &WindowFinder) -> Self {
         let layout = Layout::new(&finder.windows);
         let mut windows = Vec::new();
         for application in finder.windows.iter().copied() {
@@ -56,17 +55,12 @@ impl ApplicationWindows {
             }
         }
 
-        Ok(Self {
-            owner: owner.raw(),
+        Self {
             windows,
             selected: None,
             visible: false,
             disposed: false,
-        })
-    }
-
-    pub fn owner(&self) -> HWND {
-        self.owner
+        }
     }
 
     pub fn count(&self) -> usize {
@@ -85,10 +79,6 @@ impl ApplicationWindows {
         &self.windows
     }
 
-    pub fn windows_mut(&mut self) -> &mut [ApplicationWindow] {
-        &mut self.windows
-    }
-
     /// Set the selected preview and propagate the visual state transition.
     pub fn select_by_index(&mut self, index: Option<usize>) -> Result<(), String> {
         if self.disposed {
@@ -97,16 +87,16 @@ impl ApplicationWindows {
         if self.selected == index {
             return Ok(());
         }
-        if let Some(old) = self.selected {
-            if let Some(window) = self.windows.get_mut(old) {
-                window.set_selected(false)?;
-            }
+        if let Some(old) = self.selected
+            && let Some(window) = self.windows.get_mut(old)
+        {
+            window.set_selected(false)?;
         }
         self.selected = index.filter(|value| *value < self.windows.len());
-        if let Some(new) = self.selected {
-            if let Some(window) = self.windows.get_mut(new) {
-                window.set_selected(true)?;
-            }
+        if let Some(new) = self.selected
+            && let Some(window) = self.windows.get_mut(new)
+        {
+            window.set_selected(true)?;
         }
         Ok(())
     }
@@ -123,10 +113,6 @@ impl ApplicationWindows {
         Ok(())
     }
 
-    pub fn is_visible(&self) -> bool {
-        self.visible
-    }
-
     /// Return the first tile containing a screen point.
     pub fn hit_test(&self, x: i32, y: i32) -> Option<usize> {
         if self.disposed {
@@ -136,10 +122,6 @@ impl ApplicationWindows {
             let bounds = window.bounds();
             x >= bounds.left && x < bounds.right && y >= bounds.top && y < bounds.bottom
         })
-    }
-
-    pub fn select_by_point(&mut self, x: i32, y: i32) -> Result<(), String> {
-        self.select_by_index(self.hit_test(x, y))
     }
 
     pub fn try_activate_selected(&self) -> bool {
@@ -164,12 +146,10 @@ impl ApplicationWindows {
             }
         }
         self.visible = false;
-        if self.selected.is_some() {
-            if let Some(index) = self.selected {
-                if let Some(window) = self.windows.get_mut(index) {
-                    let _ = window.set_selected(false);
-                }
-            }
+        if let Some(index) = self.selected
+            && let Some(window) = self.windows.get_mut(index)
+        {
+            let _ = window.set_selected(false);
         }
         self.selected = None;
         // Dropping every ApplicationWindow releases its child HWND, layered

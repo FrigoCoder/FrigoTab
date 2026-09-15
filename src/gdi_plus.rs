@@ -4,7 +4,7 @@
 //! calls in one file makes the native renderer use the same path rather than
 //! silently falling back to GDI `TextOut`.
 
-use std::ptr::{null, null_mut};
+use std::ptr::{NonNull, null, null_mut};
 use std::sync::OnceLock;
 
 use windows_sys::Win32::Foundation::{GetLastError, SetLastError};
@@ -88,7 +88,33 @@ pub struct Graphics {
     pub height: f32,
 }
 
+/// Owns a GDI+ solid brush.  Keeping the native handle in a non-null RAII
+/// wrapper makes the temporary brush cleanup unconditional, including when a
+/// drawing operation is extended with an early return later.
+struct SolidBrush(NonNull<GpSolidFill>);
+
+impl SolidBrush {
+    fn new(argb: u32) -> Result<Self> {
+        let mut raw = null_mut();
+        check(unsafe { GdipCreateSolidFill(argb, &mut raw) })?;
+        NonNull::new(raw).map(Self).ok_or(Error(1))
+    }
+
+    fn as_brush(&self) -> *mut GpBrush {
+        self.0.as_ptr().cast()
+    }
+}
+
+impl Drop for SolidBrush {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = GdipDeleteBrush(self.as_brush());
+        }
+    }
+}
+
 impl Graphics {
+    #[allow(clippy::not_unsafe_ptr_arg_deref)] // HDC is an opaque GDI handle.
     pub fn from_hdc(hdc: HDC, width: i32, height: i32) -> Result<Self> {
         ensure_started()?;
         let mut raw = null_mut();
@@ -152,25 +178,17 @@ impl Graphics {
         if points.is_empty() {
             return Ok(());
         }
-        let mut brush: *mut GpSolidFill = null_mut();
-        check(unsafe { GdipCreateSolidFill(argb, &mut brush) })?;
-        if brush.is_null() {
-            return Err(Error(1));
-        }
-        let result = check_drawing(unsafe {
+        let brush = SolidBrush::new(argb)?;
+        check_drawing(unsafe {
             SetLastError(0);
             GdipFillPolygon(
                 self.raw,
-                brush.cast::<GpBrush>(),
+                brush.as_brush(),
                 points.as_ptr(),
                 points.len() as i32,
                 FillModeAlternate,
             )
-        });
-        unsafe {
-            let _ = GdipDeleteBrush(brush.cast::<GpBrush>());
-        }
-        result
+        })
     }
 
     pub fn measure_string(&mut self, text: &str, font: &Font) -> Result<RectF> {
@@ -192,7 +210,7 @@ impl Graphics {
                 self.raw,
                 utf16.as_ptr(),
                 utf16.len() as i32,
-                font.raw,
+                font.raw.as_ptr(),
                 &layout,
                 null(),
                 &mut bounds,
@@ -208,27 +226,19 @@ impl Graphics {
             return Ok(());
         }
         let utf16: Vec<u16> = text.encode_utf16().collect();
-        let mut brush: *mut GpSolidFill = null_mut();
-        check(unsafe { GdipCreateSolidFill(argb, &mut brush) })?;
-        if brush.is_null() {
-            return Err(Error(1));
-        }
-        let result = check_drawing(unsafe {
+        let brush = SolidBrush::new(argb)?;
+        check_drawing(unsafe {
             SetLastError(0);
             GdipDrawString(
                 self.raw,
                 utf16.as_ptr(),
                 utf16.len() as i32,
-                font.raw,
+                font.raw.as_ptr(),
                 &rect,
                 null(),
-                brush.cast::<GpBrush>(),
+                brush.as_brush(),
             )
-        });
-        unsafe {
-            let _ = GdipDeleteBrush(brush.cast::<GpBrush>());
-        }
-        result
+        })
     }
 
     /// Matches the zero-sized layout rectangle used by the point overload.
@@ -256,6 +266,7 @@ impl Graphics {
     /// Draw an icon at integer coordinates through the graphics HDC and
     /// DrawIconEx at the icon's native dimensions; do not convert it to a
     /// GDI+ bitmap.
+    #[allow(clippy::not_unsafe_ptr_arg_deref)] // HICON is an opaque User32 handle.
     pub fn draw_icon(
         &mut self,
         icon: HICON,
@@ -297,52 +308,56 @@ impl Drop for Graphics {
     }
 }
 
-/// A GDI+ font family and font pair.  The family is kept alongside the font
+/// Owns a GDI+ font family. GDI+ fonts borrow their family, so this wrapper is
+/// stored directly in `Font` and dropped after the font itself.
+struct FontFamily(NonNull<GpFontFamily>);
+
+impl FontFamily {
+    fn new(name: &str) -> Result<Self> {
+        let utf16: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
+        let mut raw = null_mut();
+        check(unsafe { GdipCreateFontFamilyFromName(utf16.as_ptr(), null_mut(), &mut raw) })?;
+        NonNull::new(raw).map(Self).ok_or(Error(1))
+    }
+
+    fn as_ptr(&self) -> *mut GpFontFamily {
+        self.0.as_ptr()
+    }
+}
+
+impl Drop for FontFamily {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = GdipDeleteFontFamily(self.as_ptr());
+        }
+    }
+}
+
+/// A GDI+ font family and font pair. The family is kept alongside the font
 /// because GDI+ fonts borrow it.
 pub struct Font {
-    family: *mut GpFontFamily,
-    raw: *mut GpFont,
+    raw: NonNull<GpFont>,
+    _family: FontFamily,
 }
 
 impl Font {
     pub fn new(name: &str, size: f32, style: FontStyle) -> Result<Self> {
         ensure_started()?;
-        let utf16: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
-        let mut family = null_mut();
-        check(unsafe { GdipCreateFontFamilyFromName(utf16.as_ptr(), null_mut(), &mut family) })?;
-        if family.is_null() {
-            return Err(Error(1));
-        }
+        let family = FontFamily::new(name)?;
         let mut raw = null_mut();
-        if let Err(error) =
-            check(unsafe { GdipCreateFont(family, size, style, UnitPoint, &mut raw) })
-        {
-            unsafe {
-                let _ = GdipDeleteFontFamily(family);
-            }
-            return Err(error);
-        }
-        if raw.is_null() {
-            unsafe {
-                let _ = GdipDeleteFontFamily(family);
-            }
-            return Err(Error(1));
-        }
-        Ok(Self { family, raw })
+        check(unsafe { GdipCreateFont(family.as_ptr(), size, style, UnitPoint, &mut raw) })?;
+        let raw = NonNull::new(raw).ok_or(Error(1))?;
+        Ok(Self {
+            raw,
+            _family: family,
+        })
     }
 }
 
 impl Drop for Font {
     fn drop(&mut self) {
         unsafe {
-            if !self.raw.is_null() {
-                let _ = GdipDeleteFont(self.raw);
-            }
-            if !self.family.is_null() {
-                let _ = GdipDeleteFontFamily(self.family);
-            }
+            let _ = GdipDeleteFont(self.raw.as_ptr());
         }
-        self.raw = null_mut();
-        self.family = null_mut();
     }
 }

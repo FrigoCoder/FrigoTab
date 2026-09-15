@@ -39,7 +39,7 @@ The timestamp and family suffix are stable identifiers. Keep them when refactori
 .\build.ps1 -Task Clean
 ```
 
-`Verify` and `Test` build the selected Cargo profile and run all 31 acceptance tests serially. `Publish` runs the Release build and the same green acceptance gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
+`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 31 acceptance tests serially. `Test` builds and runs the acceptance tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
 
 The direct Cargo equivalents are:
 

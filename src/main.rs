@@ -28,7 +28,6 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 const OWNER_CLASS: &str = "FrigoTab.SessionOwner";
 const OWNER_TITLE: &str = "FrigoTab";
 const WM_BEGIN_SESSION: u32 = 0x4001;
-const WM_END_SESSION: u32 = 0x4002;
 #[cfg(debug_assertions)]
 const DEBUG_TIMER_ID: usize = 1;
 
@@ -37,7 +36,6 @@ const DEBUG_TIMER_ID: usize = 1;
 /// `SessionWindow` is separate from `SwitcherApplication` in the original
 /// application.
 struct App {
-    owner: HWND,
     controller: SwitcherApplication,
     session: Option<SessionWindow>,
     hook: Option<KeyHook>,
@@ -48,7 +46,6 @@ struct App {
 impl App {
     fn new() -> Self {
         Self {
-            owner: null_mut(),
             controller: SwitcherApplication::new(),
             session: None,
             hook: None,
@@ -128,19 +125,25 @@ impl App {
             self.controller.close(session);
         }
         self.sync_session_visibility();
-        if let Some(hook) = self.hook.as_ref() {
+        if let Some(hook) = self.hook.take() {
             hook.drain_ui_messages();
+            drop(hook);
         }
+        // Remove the notification-area registration while the owner HWND is
+        // still valid.  This prevents a failed NIM_DELETE from leaving a
+        // stale icon after the owner is destroyed.
+        drop(self.tray.take());
     }
 
     fn relayout(&mut self) {
         let was_visible = self.controller.state() == SwitcherState::Visible;
         if let Some(session) = self.session.as_mut() {
             self.controller.relayout(session);
-            if was_visible && self.controller.state() != SwitcherState::Visible {
-                if let Some(hook) = self.hook.as_ref() {
-                    hook.reset_input_state();
-                }
+            if was_visible
+                && self.controller.state() != SwitcherState::Visible
+                && let Some(hook) = self.hook.as_ref()
+            {
+                hook.reset_input_state();
             }
             session.queue_desktop_snapshot_refresh_current();
         }
@@ -197,7 +200,6 @@ fn main() {
         return;
     }
 
-    app.owner = owner;
     // SessionWindow captures Explorer while this owner remains hidden. This
     // is the same startup ordering as SessionForm's retained desktop frame.
     app.session = Some(SessionWindow::new(owner));
@@ -208,7 +210,6 @@ fn main() {
                 "FrigoTab could not create its tray icon (Win32 error {error})."
             ));
             app.close_for_shutdown();
-            drop(app.hook.take());
             if let Some(session) = app.session.as_mut() {
                 session.dispose();
             }
@@ -225,7 +226,6 @@ fn main() {
                 "FrigoTab could not install its global keyboard hook.\n\n{error}"
             ));
             app.close_for_shutdown();
-            drop(app.hook.take());
             if let Some(session) = app.session.as_mut() {
                 session.dispose();
             }
@@ -261,10 +261,6 @@ fn main() {
     }
 
     app.close_for_shutdown();
-    // Release the hook before an owner HWND that is still alive is explicitly
-    // destroyed. This also joins the hook thread before its posted callbacks
-    // can target a dead window.
-    drop(app.hook.take());
     if let Some(session) = app.session.as_mut() {
         session.dispose();
     }
@@ -332,6 +328,27 @@ unsafe extern "system" fn owner_window_proc(
     if pointer.is_null() {
         return unsafe { DefWindowProcW(hwnd, message, wparam, lparam) };
     }
+
+    // TrackPopupMenu pumps a nested message loop. Keep no Rust reference to
+    // App or its tray owner alive across that call, so a reentrant WM_CLOSE
+    // can safely perform the normal teardown.
+    if message == TRAY_CALLBACK_MESSAGE {
+        // Ignore a callback that was already queued when the tray registration
+        // was removed. This read ends before the modal menu can reenter us.
+        if unsafe { (*pointer).tray.is_none() } {
+            return 0;
+        }
+        let action = SysTrayIcon::handle_callback(hwnd, lparam);
+        if action == Some(TrayAction::Exit) && unsafe { IsWindow(hwnd) } != 0 {
+            let app = unsafe { &mut *pointer };
+            app.close_for_shutdown();
+            unsafe {
+                DestroyWindow(hwnd);
+            }
+        }
+        return 0;
+    }
+
     let app = unsafe { &mut *pointer };
 
     match message {
@@ -353,15 +370,11 @@ unsafe extern "system" fn owner_window_proc(
         WM_ERASEBKGND => 1,
         WM_MOUSEACTIVATE => MA_ACTIVATE as isize,
         WM_MOUSEMOVE => {
-            if let Some(point) = mouse_screen_point(hwnd, lparam) {
-                app.handle_mouse_move(point);
-            }
+            app.handle_mouse_move(mouse_screen_point(hwnd, lparam));
             0
         }
         WM_LBUTTONDOWN => {
-            if let Some(point) = mouse_screen_point(hwnd, lparam) {
-                app.handle_mouse_click(point);
-            }
+            app.handle_mouse_click(mouse_screen_point(hwnd, lparam));
             0
         }
         WM_ACTIVATEAPP => {
@@ -380,7 +393,7 @@ unsafe extern "system" fn owner_window_proc(
             app.relayout();
             0
         }
-        WM_END_SESSION | WM_ENDSESSION => {
+        WM_ENDSESSION => {
             app.interrupt();
             0
         }
@@ -400,21 +413,9 @@ unsafe extern "system" fn owner_window_proc(
             app.dispatch_hook_message(wparam);
             0
         }
-        x if x == TRAY_CALLBACK_MESSAGE => {
-            if let Some(TrayAction::Exit) = app
-                .tray
-                .as_ref()
-                .and_then(|tray| tray.handle_callback(lparam))
-            {
-                app.close_for_shutdown();
-                unsafe {
-                    DestroyWindow(hwnd);
-                }
-            }
-            0
-        }
         #[cfg(debug_assertions)]
         windows_sys::Win32::UI::WindowsAndMessaging::WM_TIMER if wparam == DEBUG_TIMER_ID => {
+            app.close_for_shutdown();
             unsafe {
                 DestroyWindow(hwnd);
             }
@@ -428,6 +429,10 @@ unsafe extern "system" fn owner_window_proc(
             0
         }
         WM_DESTROY => {
+            // WM_DESTROY is also reachable when the owner is destroyed by
+            // another path than WM_CLOSE. Finish the worker/resource teardown
+            // while this HWND cannot yet be reused by another window.
+            app.close_for_shutdown();
             unsafe {
                 PostQuitMessage(0);
             }
@@ -497,7 +502,7 @@ fn wide(value: &str) -> Vec<u16> {
     value.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-fn mouse_screen_point(hwnd: HWND, lparam: LPARAM) -> Option<ScreenPoint> {
+fn mouse_screen_point(hwnd: HWND, lparam: LPARAM) -> ScreenPoint {
     let packed = lparam as u32;
     let mut point = POINT {
         x: (packed as u16 as i16) as i32,
@@ -508,5 +513,5 @@ fn mouse_screen_point(hwnd: HWND, lparam: LPARAM) -> Option<ScreenPoint> {
     unsafe {
         ClientToScreen(hwnd, &mut point);
     }
-    Some(ScreenPoint::new(point.x, point.y))
+    ScreenPoint::new(point.x, point.y)
 }

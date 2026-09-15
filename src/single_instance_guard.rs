@@ -4,10 +4,11 @@
 //! not claim the mutex, a zero-time wait claims it (including an abandoned
 //! mutex), and the claim is held until the guard is dropped.
 
-use std::ptr::null;
+use std::{ptr::NonNull, ptr::null};
 
 use windows_sys::Win32::Foundation::{
-    CloseHandle, GetLastError, HANDLE, WAIT_ABANDONED, WAIT_OBJECT_0, WAIT_TIMEOUT,
+    CloseHandle, ERROR_INVALID_PARAMETER, GetLastError, HANDLE, WAIT_ABANDONED, WAIT_OBJECT_0,
+    WAIT_TIMEOUT,
 };
 use windows_sys::Win32::System::Threading::{CreateMutexW, ReleaseMutex, WaitForSingleObject};
 
@@ -36,8 +37,27 @@ impl std::error::Error for SingleInstanceError {}
 
 /// Owns one successful wait on the application mutex.
 pub struct SingleInstanceGuard {
-    mutex: HANDLE,
-    owns_mutex: bool,
+    mutex: OwnedHandle,
+}
+
+struct OwnedHandle(NonNull<std::ffi::c_void>);
+
+impl OwnedHandle {
+    fn new(handle: HANDLE) -> Option<Self> {
+        NonNull::new(handle).map(Self)
+    }
+
+    fn raw(&self) -> HANDLE {
+        self.0.as_ptr()
+    }
+}
+
+impl Drop for OwnedHandle {
+    fn drop(&mut self) {
+        unsafe {
+            CloseHandle(self.raw());
+        }
+    }
 }
 
 impl SingleInstanceGuard {
@@ -47,37 +67,28 @@ impl SingleInstanceGuard {
     /// abandoned mutex is treated as acquired, just like
     /// the abandoned-mutex condition in the original implementation.
     pub fn try_acquire(name: &str) -> Result<Option<Self>, SingleInstanceError> {
-        if name.trim().is_empty() {
+        if name.trim().is_empty() || name.contains('\0') {
             // Keep the invalid-name path explicit without making the native
             // layer panic.  Callers normally pass APPLICATION_MUTEX_NAME.
-            return Err(SingleInstanceError::Create(87)); // ERROR_INVALID_PARAMETER
+            return Err(SingleInstanceError::Create(ERROR_INVALID_PARAMETER));
         }
 
         let name = wide(name);
-        let mutex = unsafe { CreateMutexW(null(), 0, name.as_ptr()) };
-        if mutex.is_null() {
+        let Some(mutex) = OwnedHandle::new(unsafe { CreateMutexW(null(), 0, name.as_ptr()) })
+        else {
             return Err(SingleInstanceError::Create(unsafe { GetLastError() }));
-        }
+        };
 
-        let wait = unsafe { WaitForSingleObject(mutex, 0) };
+        let wait = unsafe { WaitForSingleObject(mutex.raw(), 0) };
         if wait == WAIT_OBJECT_0 || wait == WAIT_ABANDONED {
-            return Ok(Some(Self {
-                mutex,
-                owns_mutex: true,
-            }));
+            return Ok(Some(Self { mutex }));
         }
 
         if wait == WAIT_TIMEOUT {
-            unsafe {
-                CloseHandle(mutex);
-            }
             return Ok(None);
         }
 
         let error = unsafe { GetLastError() };
-        unsafe {
-            CloseHandle(mutex);
-        }
         Err(SingleInstanceError::Wait(error))
     }
 
@@ -89,22 +100,11 @@ impl SingleInstanceGuard {
 
 impl Drop for SingleInstanceGuard {
     fn drop(&mut self) {
-        if self.mutex.is_null() {
-            return;
-        }
-        if self.owns_mutex {
-            unsafe {
-                // ReleaseMutex can fail only if exceptional teardown has
-                // already lost ownership; CloseHandle still releases the
-                // process's handle in either case.
-                let _ = ReleaseMutex(self.mutex);
-            }
-            self.owns_mutex = false;
-        }
+        // ReleaseMutex can fail only if exceptional teardown has already lost
+        // ownership; OwnedHandle still closes the process handle afterward.
         unsafe {
-            CloseHandle(self.mutex);
+            let _ = ReleaseMutex(self.mutex.raw());
         }
-        self.mutex = std::ptr::null_mut();
     }
 }
 

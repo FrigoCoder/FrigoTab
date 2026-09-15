@@ -3,40 +3,51 @@ use crate::keyboard_input::{KeyTransition, KeyboardInput, SwitcherKey};
 /// Describes the synthetic gesture needed when an initially suppressed Alt+Tab
 /// cannot open the switcher.  The plan remains valid even when the user
 /// released Alt before the UI message queue processed the request.
-pub struct AltTabRecoveryPlan;
+/// A bounded synthetic gesture stored entirely on the stack.
+pub struct AltTabRecoveryPlan {
+    inputs: [Option<KeyboardInput>; 6],
+}
 
 impl AltTabRecoveryPlan {
-    pub fn create(
-        alt_still_down: bool,
-        reverse: bool,
-        shift_still_down: bool,
-    ) -> Vec<KeyboardInput> {
-        let mut result = Vec::new();
+    pub fn create(alt_still_down: bool, reverse: bool, shift_still_down: bool) -> Self {
         let synthetic_alt = !alt_still_down;
         let synthetic_shift = reverse && !shift_still_down;
         let temporarily_release_shift = !reverse && shift_still_down;
 
-        if synthetic_alt {
-            result.push(input(SwitcherKey::Alt, KeyTransition::Down));
-        }
-        if synthetic_shift {
-            result.push(input(SwitcherKey::Shift, KeyTransition::Down));
+        let shift_before = if synthetic_shift {
+            Some(input(SwitcherKey::Shift, KeyTransition::Down))
         } else if temporarily_release_shift {
-            result.push(input(SwitcherKey::Shift, KeyTransition::Up));
-        }
-
-        result.push(input(SwitcherKey::Tab, KeyTransition::Down));
-        result.push(input(SwitcherKey::Tab, KeyTransition::Up));
-
-        if synthetic_shift {
-            result.push(input(SwitcherKey::Shift, KeyTransition::Up));
+            Some(input(SwitcherKey::Shift, KeyTransition::Up))
+        } else {
+            None
+        };
+        let shift_after = if synthetic_shift {
+            Some(input(SwitcherKey::Shift, KeyTransition::Up))
         } else if temporarily_release_shift {
-            result.push(input(SwitcherKey::Shift, KeyTransition::Down));
+            Some(input(SwitcherKey::Shift, KeyTransition::Down))
+        } else {
+            None
+        };
+
+        Self {
+            inputs: [
+                synthetic_alt.then(|| input(SwitcherKey::Alt, KeyTransition::Down)),
+                shift_before,
+                Some(input(SwitcherKey::Tab, KeyTransition::Down)),
+                Some(input(SwitcherKey::Tab, KeyTransition::Up)),
+                shift_after,
+                synthetic_alt.then(|| input(SwitcherKey::Alt, KeyTransition::Up)),
+            ],
         }
-        if synthetic_alt {
-            result.push(input(SwitcherKey::Alt, KeyTransition::Up));
-        }
-        result
+    }
+}
+
+impl IntoIterator for AltTabRecoveryPlan {
+    type Item = KeyboardInput;
+    type IntoIter = std::iter::Flatten<std::array::IntoIter<Option<KeyboardInput>, 6>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inputs.into_iter().flatten()
     }
 }
 

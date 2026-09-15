@@ -5,7 +5,6 @@
 //! `Layout` wrapper at the end performs the Win32 monitor/window discovery
 //! that the original `FrigoTab.Layout` performed through `System.Windows.Forms`.
 
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::ffi::c_void;
 
@@ -165,43 +164,30 @@ pub struct GridLayout;
 impl GridLayout {
     /// Arrange non-empty windows on their corresponding non-empty monitors.
     ///
-    /// The generic `Borrow` bounds allow callers to pass either owned vectors
-    /// (the original enumerable case) or slices/iterators of references.
-    pub fn arrange<WI, MI, W, M>(
+    pub fn arrange(
         &self,
-        windows: WI,
-        monitors: MI,
-    ) -> HashMap<String, ScreenRectangle>
-    where
-        WI: IntoIterator<Item = W>,
-        W: Borrow<LayoutWindow>,
-        MI: IntoIterator<Item = M>,
-        M: Borrow<LayoutMonitor>,
-    {
-        let mut windows_by_monitor: HashMap<String, Vec<LayoutWindow>> = HashMap::new();
-        for borrowed in windows {
-            let window = borrowed.borrow();
+        windows: &[LayoutWindow],
+        monitors: &[LayoutMonitor],
+    ) -> HashMap<String, ScreenRectangle> {
+        let mut windows_by_monitor: HashMap<&str, Vec<&LayoutWindow>> = HashMap::new();
+        for window in windows {
             if window.bounds.is_empty() {
                 continue;
             }
             windows_by_monitor
-                .entry(window.monitor_id.clone())
+                .entry(window.monitor_id.as_str())
                 .or_default()
-                .push(window.clone());
+                .push(window);
         }
 
         let mut result = HashMap::new();
-        for borrowed in monitors {
-            let monitor = borrowed.borrow();
+        for monitor in monitors {
             if monitor.bounds.is_empty() || monitor.working_area.is_empty() {
                 continue;
             }
-            let Some(monitor_windows) = windows_by_monitor.get(&monitor.id) else {
+            let Some(monitor_windows) = windows_by_monitor.get(monitor.id.as_str()) else {
                 continue;
             };
-            if monitor_windows.is_empty() {
-                continue;
-            }
             Self::layout_monitor_windows(monitor, monitor_windows, &mut result);
         }
         result
@@ -209,7 +195,7 @@ impl GridLayout {
 
     fn layout_monitor_windows(
         monitor: &LayoutMonitor,
-        windows: &[LayoutWindow],
+        windows: &[&LayoutWindow],
         result: &mut HashMap<String, ScreenRectangle>,
     ) {
         // The original implementation performs these calculations in double for
@@ -276,23 +262,10 @@ impl GridLayout {
 
 /// Round exactly as `Math.Round(double)`'s default ToEven mode.
 ///
-/// Rust's `f32::round` is ties-away-from-zero, so it cannot be used for the
-/// layout's pixel coordinates. The f32 expression is promoted to double before
-/// rounding; the cast below preserves that exact value.
+/// The layout arithmetic is single precision, then promoted to double for the
+/// same ties-to-even rounding used by the original implementation.
 fn round_to_even(value: f32) -> i32 {
-    let value = value as f64;
-    let lower = value.floor();
-    let fraction = value - lower;
-    let rounded = if fraction < 0.5 {
-        lower
-    } else if fraction > 0.5 {
-        lower + 1.0
-    } else if (lower as i64) % 2 == 0 {
-        lower
-    } else {
-        lower + 1.0
-    };
-    rounded as i32
+    (value as f64).round_ties_even() as i32
 }
 
 /// The monitor-backed layout used by the native UI.

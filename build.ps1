@@ -126,6 +126,10 @@ function Invoke-Verify {
     $arguments = @('check', '--workspace', '--all-targets', '--locked') +
         (Get-ProfileArguments -BuildConfiguration $BuildConfiguration)
     Invoke-Cargo $arguments
+    $clippyArguments = @('clippy', '--workspace', '--all-targets', '--locked') +
+        (Get-ProfileArguments -BuildConfiguration $BuildConfiguration) +
+        @('--', '-D', 'warnings')
+    Invoke-Cargo $clippyArguments
     Invoke-Tests -BuildConfiguration $BuildConfiguration
 }
 

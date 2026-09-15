@@ -469,10 +469,10 @@ where
     let deadline = Instant::now() + timeout;
     loop {
         pump_messages();
-        if let Some(pixel) = pixel_at(point.x, point.y) {
-            if predicate(pixel) {
-                return Some(pixel);
-            }
+        if let Some(pixel) = pixel_at(point.x, point.y)
+            && predicate(pixel)
+        {
+            return Some(pixel);
         }
         if Instant::now() >= deadline {
             return None;

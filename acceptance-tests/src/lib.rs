@@ -468,11 +468,22 @@ impl LiveSession {
     }
 }
 
+impl Default for LiveSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for LiveSession {
     fn drop(&mut self) {
-        self.close();
         if !self.owner.is_null() && unsafe { IsWindow(self.owner) } != 0 {
+            self.close();
+            if let Some(session) = self.state.session.as_mut() {
+                session.dispose();
+            }
             unsafe { DestroyWindow(self.owner) };
+        } else if let Some(session) = self.state.session.as_mut() {
+            session.dispose();
         }
         for fixture in &mut self.fixtures {
             fixture.close();
@@ -565,6 +576,11 @@ unsafe extern "system" fn live_owner_window_proc(
             state
                 .controller
                 .close(state.session.as_mut().expect("live session exists"));
+            state
+                .session
+                .as_mut()
+                .expect("live session exists")
+                .dispose();
             unsafe {
                 DestroyWindow(hwnd);
             }
@@ -597,10 +613,9 @@ impl RunningFrigoTab {
                 return Ok(Self { process, owner });
             }
             if let Some(status) = process.try_wait()? {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("FrigoTab exited before creating its owner window ({status})"),
-                ));
+                return Err(io::Error::other(format!(
+                    "FrigoTab exited before creating its owner window ({status})"
+                )));
             }
             if Instant::now() >= deadline {
                 let _ = process.kill();
@@ -881,6 +896,7 @@ where
     }
 }
 
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND is an opaque test-fixture handle.
 pub fn window_bounds(hwnd: HWND) -> Option<RECT> {
     if hwnd.is_null() || unsafe { IsWindow(hwnd) } == 0 {
         return None;
@@ -895,6 +911,7 @@ pub fn get_window_rect(hwnd: HWND) -> Option<RECT> {
     window_bounds(hwnd)
 }
 
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND is an opaque test-fixture handle.
 pub fn window_title(hwnd: HWND) -> String {
     if hwnd.is_null() {
         return String::new();
@@ -909,15 +926,19 @@ pub fn window_title(hwnd: HWND) -> String {
         String::from_utf16_lossy(&text[..copied.max(0) as usize])
     }
 }
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND is an opaque test-fixture handle.
 pub fn is_window_visible(hwnd: HWND) -> bool {
     !hwnd.is_null() && unsafe { IsWindowVisible(hwnd) != 0 }
 }
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND is an opaque test-fixture handle.
 pub fn window_style(hwnd: HWND) -> u32 {
     unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) as u32 }
 }
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND is an opaque test-fixture handle.
 pub fn window_ex_style(hwnd: HWND) -> u32 {
     unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32 }
 }
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND is an opaque test-fixture handle.
 pub fn window_owner(hwnd: HWND) -> HWND {
     unsafe { GetWindow(hwnd, GW_OWNER) }
 }

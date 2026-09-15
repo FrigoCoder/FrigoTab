@@ -1,6 +1,6 @@
 //! Win32 equivalent of the small borderless `FrigoForm` base class.
 
-use std::ptr::{null, null_mut};
+use std::ptr::{NonNull, null, null_mut};
 use std::sync::OnceLock;
 
 use windows_sys::Win32::Foundation::{
@@ -9,11 +9,10 @@ use windows_sys::Win32::Foundation::{
 use windows_sys::Win32::Graphics::Gdi::{BeginPaint, EndPaint, PAINTSTRUCT};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow, GWLP_USERDATA,
-    HTTRANSPARENT, HWND_TOPMOST, RegisterClassW, SW_HIDE, SW_SHOW, SWP_NOACTIVATE,
-    SWP_NOOWNERZORDER, SWP_SHOWWINDOW, SetWindowLongPtrW, SetWindowPos, ShowWindow, WM_ERASEBKGND,
-    WM_NCHITTEST, WM_PAINT, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow, HTTRANSPARENT,
+    HWND_TOPMOST, RegisterClassW, SW_HIDE, SW_SHOW, SWP_NOACTIVATE, SWP_NOOWNERZORDER,
+    SetWindowPos, ShowWindow, WM_ERASEBKGND, WM_NCHITTEST, WM_PAINT, WNDCLASSW, WS_EX_LAYERED,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
 const CLASS_NAME: &[u16] = &[
@@ -69,24 +68,15 @@ fn register_class() -> Result<(), String> {
         .clone()
 }
 
-/// Borderless, owner-owned popup used for the session and each application
-/// tile.  It has no client painting of its own; a tile's layered surface is
-/// supplied by `LayerUpdater`, just like the original empty `OnPaint` form.
+/// Borderless, owner-owned popup for an application tile. It has no client
+/// painting of its own; `LayerUpdater` supplies the layered surface.
 pub struct FrigoWindow {
-    hwnd: HWND,
-    bounds: RECT,
+    hwnd: NonNull<std::ffi::c_void>,
 }
 
 impl FrigoWindow {
+    #[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND is opaque, never dereferenced as Rust memory.
     pub fn new(owner: HWND, bounds: RECT) -> Result<Self, String> {
-        Self::new_with_hit_test(owner, bounds, false)
-    }
-
-    pub fn new_with_hit_test(
-        owner: HWND,
-        bounds: RECT,
-        transparent_hit_test: bool,
-    ) -> Result<Self, String> {
         register_class()?;
         let instance = unsafe { GetModuleHandleW(null()) };
         if instance.is_null() {
@@ -99,19 +89,9 @@ impl FrigoWindow {
         }
         // FormBorderStyle=None + ShowInTaskbar=false + TopMost=true, plus the
         // exact styles added by ApplicationWindow.CreateParams.
-        let ex_style = WS_EX_TOOLWINDOW
-            | WS_EX_TOPMOST
-            | if transparent_hit_test {
-                WS_EX_TRANSPARENT
-            } else {
-                0
-            }
-            | if transparent_hit_test {
-                WS_EX_LAYERED | WS_EX_NOACTIVATE
-            } else {
-                0
-            };
-        let hwnd = unsafe {
+        let ex_style =
+            WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_NOACTIVATE;
+        let raw = unsafe {
             CreateWindowExW(
                 ex_style,
                 CLASS_NAME.as_ptr(),
@@ -127,19 +107,14 @@ impl FrigoWindow {
                 null(),
             )
         };
-        if hwnd.is_null() {
+        let Some(hwnd) = NonNull::new(raw) else {
             return Err(error("CreateWindowExW"));
-        }
+        };
         unsafe {
-            SetWindowLongPtrW(
-                hwnd,
-                GWLP_USERDATA,
-                if transparent_hit_test { 1 } else { 0 },
-            );
             // HWND_TOPMOST is kept explicit to preserve the original
             // topmost-window behavior through SetWindowPos.
             SetWindowPos(
-                hwnd,
+                hwnd.as_ptr(),
                 HWND_TOPMOST,
                 bounds.left,
                 bounds.top,
@@ -148,77 +123,23 @@ impl FrigoWindow {
                 SWP_NOACTIVATE | SWP_NOOWNERZORDER,
             );
         }
-        Ok(Self { hwnd, bounds })
+        Ok(Self { hwnd })
     }
 
     pub fn hwnd(&self) -> HWND {
-        self.hwnd
+        self.hwnd.as_ptr()
     }
 
-    pub fn bounds(&self) -> RECT {
-        self.bounds
-    }
-
-    pub fn set_bounds(&mut self, bounds: RECT) -> Result<(), String> {
-        let width = bounds.right - bounds.left;
-        let height = bounds.bottom - bounds.top;
-        if width <= 0 || height <= 0 {
-            return Err("FrigoWindow requires positive bounds".to_string());
-        }
-        if unsafe {
-            SetWindowPos(
-                self.hwnd,
-                HWND_TOPMOST,
-                bounds.left,
-                bounds.top,
-                width,
-                height,
-                SWP_NOACTIVATE | SWP_NOOWNERZORDER,
-            )
-        } == 0
-        {
-            return Err(error("SetWindowPos"));
-        }
-        self.bounds = bounds;
-        Ok(())
-    }
-
-    pub fn set_visible(&self, visible: bool) -> Result<(), String> {
+    pub fn set_visible(&self, visible: bool) {
         let command = if visible { SW_SHOW } else { SW_HIDE };
         unsafe {
-            ShowWindow(self.hwnd, command);
+            ShowWindow(self.hwnd(), command);
         }
-        Ok(())
-    }
-
-    pub fn show_no_activate(&self) -> Result<(), String> {
-        if unsafe {
-            SetWindowPos(
-                self.hwnd,
-                HWND_TOPMOST,
-                self.bounds.left,
-                self.bounds.top,
-                self.bounds.right - self.bounds.left,
-                self.bounds.bottom - self.bounds.top,
-                SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW,
-            )
-        } == 0
-        {
-            return Err(error("SetWindowPos"));
-        }
-        Ok(())
-    }
-
-    pub fn close(mut self) {
-        self.destroy();
     }
 
     fn destroy(&mut self) {
-        if !self.hwnd.is_null() {
-            unsafe {
-                DestroyWindow(self.hwnd);
-            }
-            self.hwnd = null_mut();
+        unsafe {
+            DestroyWindow(self.hwnd());
         }
     }
 }
@@ -236,13 +157,7 @@ unsafe extern "system" fn window_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     match message {
-        WM_NCHITTEST
-            if unsafe {
-                windows_sys::Win32::UI::WindowsAndMessaging::GetWindowLongPtrW(hwnd, GWLP_USERDATA)
-            } != 0 =>
-        {
-            HTTRANSPARENT as LRESULT
-        }
+        WM_NCHITTEST => HTTRANSPARENT as LRESULT,
         WM_ERASEBKGND => 1,
         WM_PAINT => {
             let mut paint = PAINTSTRUCT::default();

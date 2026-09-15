@@ -5,20 +5,18 @@
 //! key transition: activation is the historical zero-value `keybd_event`
 //! nudge followed by `SetForegroundWindow`.
 
-use std::ffi::c_void;
 use std::mem::size_of;
 
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::keybd_event;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GWL_EXSTYLE, GWL_STYLE, GetForegroundWindow, GetWindowLongPtrW, GetWindowPlacement,
-    GetWindowRect, GetWindowTextLengthW, GetWindowTextW, PostMessageW, SW_RESTORE,
-    SW_SHOWMAXIMIZED, SW_SHOWMINIMIZED, SW_SHOWNORMAL, SetForegroundWindow, ShowWindow,
-    WINDOWPLACEMENT, WS_DISABLED, WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT, WS_MINIMIZE, WS_VISIBLE,
+    GWL_EXSTYLE, GWL_STYLE, GetWindowLongPtrW, GetWindowPlacement, GetWindowRect,
+    GetWindowTextLengthW, GetWindowTextW, SW_RESTORE, SW_SHOWMAXIMIZED, SW_SHOWMINIMIZED,
+    SW_SHOWNORMAL, SetForegroundWindow, ShowWindow, WINDOWPLACEMENT, WS_DISABLED, WS_EX_APPWINDOW,
+    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT, WS_MINIMIZE, WS_VISIBLE,
 };
 
-use crate::rect::{Rect, Rectangle};
+use crate::rect::Rectangle;
 
 /// The style bits consulted by the window finder.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -65,15 +63,6 @@ impl WindowHandle {
         self.0
     }
 
-    pub const fn is_null(self) -> bool {
-        self.0.is_null()
-    }
-
-    pub fn get_foreground_window() -> Self {
-        // SAFETY: GetForegroundWindow has no pointer arguments.
-        Self(unsafe { GetForegroundWindow() })
-    }
-
     pub fn get_window_styles(self) -> WindowStyles {
         // SAFETY: GetWindowLongPtrW validates the opaque HWND in the same way
         // as the original P/Invoke call.
@@ -82,13 +71,6 @@ impl WindowHandle {
 
     pub fn get_window_ex_styles(self) -> WindowExStyles {
         WindowExStyles(unsafe { GetWindowLongPtrW(self.0, GWL_EXSTYLE) } as i64)
-    }
-
-    /// Post a message and return the native BOOL result.
-    pub fn post_message(self, message: u32, wparam: isize, lparam: isize) -> bool {
-        // SAFETY: Windows copies the scalar parameters before this call
-        // returns; no Rust reference crosses the ABI boundary.
-        unsafe { PostMessageW(self.0, message, wparam as usize, lparam) != 0 }
     }
 
     /// Restore a minimized window and bring it to the foreground.
@@ -182,20 +164,4 @@ impl WindowHandle {
         );
         (rectangle.width > 0 && rectangle.height > 0).then_some(rectangle)
     }
-
-    /// Return a corner-based rectangle, preserving the original `GetRect` shape.
-    pub fn get_rect(self) -> Option<Rect> {
-        self.try_get_rect().map(Rect::from_rectangle)
-    }
 }
-
-// HWND values are process-independent kernel/window-manager identities.  The
-// wrapper carries no borrowed Rust memory and is safe to copy between the
-// small worker/UI threads used by the application.
-unsafe impl Send for WindowHandle {}
-unsafe impl Sync for WindowHandle {}
-
-// Keep this alias private but make the raw type visible to debuggers and to
-// future API additions without changing the value semantics above.
-#[allow(dead_code)]
-type RawHandle = *mut c_void;

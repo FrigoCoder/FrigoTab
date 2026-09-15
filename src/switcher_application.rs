@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::key_handling::KeyHandling;
 use crate::keyboard_input::{KeyboardInput, SwitcherKey};
 use crate::screen_point::ScreenPoint;
@@ -8,6 +6,7 @@ use crate::switcher_state::SwitcherState;
 /// The boundary between the deterministic switcher state machine and the
 /// Win32 implementation.  The implementation owns native windows, thumbnails,
 /// drawing resources, and foreground-window calls.
+#[allow(clippy::result_unit_err)]
 pub trait SwitcherSessionPort {
     /// Attempts to construct and show a session.  `Ok(0)` is equivalent to the
     /// `false` result with no candidates; a non-zero count opens a usable
@@ -42,8 +41,9 @@ pub trait SwitcherSessionPort {
 /// This type deliberately knows nothing about HWNDs, DWM, or drawing. Those
 /// operations are supplied by `SwitcherSessionPort` so the production Win32
 /// adapter and the acceptance executable use the same interaction contract.
+#[derive(Default)]
 pub struct SwitcherApplication {
-    consumed_keys: HashSet<SwitcherKey>,
+    consumed_keys: u32,
     state: SwitcherState,
     candidate_count: usize,
     selected_index: Option<usize>,
@@ -51,12 +51,7 @@ pub struct SwitcherApplication {
 
 impl SwitcherApplication {
     pub fn new() -> Self {
-        Self {
-            consumed_keys: HashSet::new(),
-            state: SwitcherState::Idle,
-            candidate_count: 0,
-            selected_index: None,
-        }
+        Self::default()
     }
 
     pub fn state(&self) -> SwitcherState {
@@ -86,7 +81,9 @@ impl SwitcherApplication {
         // A global hook consumes both halves of a gesture. Several actions
         // close the session on key-down, so this ledger survives reset_state
         // until the physical key is released.
-        if input.is_up() && self.consumed_keys.remove(&input.key) {
+        let key_bit = input.key.bit();
+        if input.is_up() && self.consumed_keys & key_bit != 0 {
+            self.consumed_keys &= !key_bit;
             return KeyHandling::Consume;
         }
 
@@ -96,9 +93,9 @@ impl SwitcherApplication {
             self.handle_visible_keyboard(port, input)
         };
         if input.is_down() && handling == KeyHandling::Consume {
-            // Auto-repeat produces multiple downs followed by one up; a set
+            // Auto-repeat produces multiple downs followed by one up; one bit
             // models that physical-key lifetime without requiring a count.
-            self.consumed_keys.insert(input.key);
+            self.consumed_keys |= key_bit;
         }
         handling
     }
@@ -112,7 +109,7 @@ impl SwitcherApplication {
         let index = match port.hit_test(point) {
             Ok(index) => index,
             Err(()) => {
-                self.close_after_port_failure(port);
+                self.close(port);
                 return;
             }
         };
@@ -120,7 +117,7 @@ impl SwitcherApplication {
             Some(index) if self.is_valid_index(index) => {
                 self.try_select(port, index);
             }
-            Some(_) => self.close_after_port_failure(port),
+            Some(_) => self.close(port),
             None => self.try_clear_selection(port),
         }
     }
@@ -134,7 +131,7 @@ impl SwitcherApplication {
         let index = match port.hit_test(point) {
             Ok(index) => index,
             Err(()) => {
-                self.close_after_port_failure(port);
+                self.close(port);
                 return;
             }
         };
@@ -143,7 +140,7 @@ impl SwitcherApplication {
             return;
         };
         if !self.is_valid_index(index) {
-            self.close_after_port_failure(port);
+            self.close(port);
             return;
         }
         if self.try_select(port, index) {
@@ -162,7 +159,7 @@ impl SwitcherApplication {
     /// makes the current overlay unusable.
     pub fn interrupt<P: SwitcherSessionPort>(&mut self, port: &mut P) {
         self.close(port);
-        self.consumed_keys.clear();
+        self.consumed_keys = 0;
     }
 
     /// Recalculates the visible session after a display/DPI topology change.
@@ -208,16 +205,16 @@ impl SwitcherApplication {
             self.close(port);
             return KeyHandling::Consume;
         }
-        if input.is_down() {
-            if let Some(index) = digit_index(input.key) {
-                // An out-of-range digit is still consumed while visible, but
-                // it must not clear the current selection.
-                if self.is_valid_index(index) {
-                    self.try_select(port, index);
-                    self.try_commit_selection(port);
-                }
-                return KeyHandling::Consume;
+        if input.is_down()
+            && let Some(index) = digit_index(input.key)
+        {
+            // An out-of-range digit is still consumed while visible, but
+            // it must not clear the current selection.
+            if self.is_valid_index(index) {
+                self.try_select(port, index);
+                self.try_commit_selection(port);
             }
+            return KeyHandling::Consume;
         }
         if input.is_up() && input.key == SwitcherKey::Alt {
             // FrigoTab is sticky: releasing Alt does not choose a target; a
@@ -232,7 +229,7 @@ impl SwitcherApplication {
         let count = match port.try_open() {
             Ok(count) if count > 0 => count,
             Ok(_) | Err(()) => {
-                self.close_after_port_failure(port);
+                self.close(port);
                 return false;
             }
         };
@@ -240,7 +237,7 @@ impl SwitcherApplication {
         // Keep state private until the initial selection succeeds; a partially
         // constructed native session is never published.
         if port.select(0).is_err() {
-            self.close_after_port_failure(port);
+            self.close(port);
             return false;
         }
         self.state = SwitcherState::Visible;
@@ -285,7 +282,7 @@ impl SwitcherApplication {
             return false;
         }
         if port.select(index).is_err() {
-            self.close_after_port_failure(port);
+            self.close(port);
             return false;
         }
         self.selected_index = Some(index);
@@ -294,7 +291,7 @@ impl SwitcherApplication {
 
     fn try_clear_selection<P: SwitcherSessionPort>(&mut self, port: &mut P) {
         if port.clear_selection().is_err() {
-            self.close_after_port_failure(port);
+            self.close(port);
             return;
         }
         self.selected_index = None;
@@ -312,11 +309,6 @@ impl SwitcherApplication {
         if activated {
             self.close(port);
         }
-    }
-
-    fn close_after_port_failure<P: SwitcherSessionPort>(&mut self, port: &mut P) {
-        port.close();
-        self.reset_state();
     }
 
     fn is_valid_index(&self, index: usize) -> bool {

@@ -53,21 +53,8 @@ impl ShellDesktopSnapshot {
         Self { frame }
     }
 
-    /// Alias matching the original type's constructor-shaped call site.
-    pub fn new(source_bounds: RECT) -> Self {
-        Self::capture(source_bounds)
-    }
-
     pub fn is_available(&self) -> bool {
         self.frame.is_some()
-    }
-
-    /// Size of the captured virtual desktop, or `(0, 0)` for an unavailable
-    /// snapshot.
-    pub fn size(&self) -> (i32, i32) {
-        self.frame
-            .as_ref()
-            .map_or((0, 0), GdiShellDesktopSnapshotFrame::size)
     }
 
     /// Paint the retained shell image into `destination_dc`.
@@ -95,10 +82,167 @@ impl ShellDesktopSnapshot {
     }
 }
 
-struct GdiShellDesktopSnapshotFrame {
-    memory_dc: HDC,
+/// Owns a memory DC and the bitmap selected into it.
+///
+/// GDI requires the selected bitmap to be restored before it is deleted.  The
+/// guard also owns partially-created surfaces, so every failure after the DC
+/// is created follows the same cleanup path as a successfully published
+/// surface.
+struct GdiMemorySurface {
+    dc: HDC,
     bitmap: HBITMAP,
     previous_bitmap: HGDIOBJ,
+}
+
+impl GdiMemorySurface {
+    fn new_dc(source_dc: HDC, name: &str) -> Result<Self, ()> {
+        let dc = unsafe { CreateCompatibleDC(source_dc) };
+        if dc.is_null() {
+            write_diagnostic(&format!("CreateCompatibleDC failed for the {name}"));
+            return Err(());
+        }
+        Ok(Self {
+            dc,
+            bitmap: null_mut(),
+            previous_bitmap: null_mut(),
+        })
+    }
+
+    fn new_compatible(source_dc: HDC, width: i32, height: i32) -> Result<Self, ()> {
+        let mut surface = Self::new_dc(source_dc, "shell print surface")?;
+        surface.bitmap = unsafe { CreateCompatibleBitmap(source_dc, width, height) };
+        if surface.bitmap.is_null() {
+            write_diagnostic("CreateCompatibleBitmap failed for the shell print surface");
+            return Err(());
+        }
+        surface.select("shell print surface")
+    }
+
+    fn new_dib(source_dc: HDC, source_bounds: RECT) -> Result<Self, ()> {
+        let mut surface = Self::new_dc(source_dc, "shell snapshot")?;
+        let bitmap_info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: width(source_bounds),
+                // A negative height creates a top-down DIB whose first
+                // scan line is the top of the virtual desktop.
+                biHeight: -height(source_bounds),
+                biPlanes: 1,
+                biBitCount: 32,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut bits: *mut c_void = null_mut();
+        surface.bitmap = unsafe {
+            CreateDIBSection(
+                source_dc,
+                &bitmap_info,
+                DIB_RGB_COLORS,
+                &mut bits,
+                null_mut(),
+                0,
+            )
+        };
+        if surface.bitmap.is_null() {
+            write_diagnostic("CreateDIBSection failed for the shell snapshot");
+            return Err(());
+        }
+        if bits.is_null() {
+            write_diagnostic("CreateDIBSection returned no writable shell-snapshot pixels");
+            return Err(());
+        }
+        surface.select("shell snapshot")
+    }
+
+    fn select(mut self, name: &str) -> Result<Self, ()> {
+        self.previous_bitmap = unsafe { SelectObject(self.dc, self.bitmap as HGDIOBJ) };
+        if invalid_gdi_object(self.previous_bitmap) {
+            write_diagnostic(&format!("SelectObject failed for the {name}"));
+            return Err(());
+        }
+        Ok(self)
+    }
+
+    fn dc(&self) -> HDC {
+        self.dc
+    }
+}
+
+impl Drop for GdiMemorySurface {
+    fn drop(&mut self) {
+        let mut bitmap_deselected = true;
+        if !self.dc.is_null()
+            && !self.previous_bitmap.is_null()
+            && !invalid_gdi_object(self.previous_bitmap)
+        {
+            let restored = unsafe { SelectObject(self.dc, self.previous_bitmap) };
+            bitmap_deselected = !invalid_gdi_object(restored);
+            if !bitmap_deselected {
+                write_diagnostic("SelectObject failed while releasing the shell snapshot");
+            }
+        }
+        self.previous_bitmap = null_mut();
+
+        if !self.bitmap.is_null() && bitmap_deselected {
+            if unsafe { DeleteObject(self.bitmap as HGDIOBJ) } == 0 {
+                write_diagnostic("DeleteObject failed while releasing the shell snapshot");
+            }
+            self.bitmap = null_mut();
+        }
+        if !self.dc.is_null() {
+            if unsafe { DeleteDC(self.dc) } == 0 {
+                write_diagnostic("DeleteDC failed while releasing the shell snapshot");
+            }
+            self.dc = null_mut();
+        }
+        if !self.bitmap.is_null() {
+            // A selected bitmap cannot be deleted until its memory DC is gone.
+            // Destroying that DC above releases the selection so this retry
+            // is safe and matches the original cleanup path.
+            if unsafe { DeleteObject(self.bitmap as HGDIOBJ) } == 0 {
+                write_diagnostic("DeleteObject failed after releasing the shell snapshot DC");
+            }
+            self.bitmap = null_mut();
+        }
+    }
+}
+
+/// A DC acquired from a window.  Unlike a memory DC, this handle must be
+/// released with ReleaseDC and the owning HWND is therefore retained here.
+struct WindowDc {
+    hwnd: HWND,
+    dc: HDC,
+}
+
+impl WindowDc {
+    fn new(hwnd: HWND) -> Result<Self, ()> {
+        let dc = unsafe { GetDC(hwnd) };
+        if dc.is_null() {
+            write_diagnostic("GetDC failed for the Explorer desktop host");
+            return Err(());
+        }
+        Ok(Self { hwnd, dc })
+    }
+
+    fn dc(&self) -> HDC {
+        self.dc
+    }
+}
+
+impl Drop for WindowDc {
+    fn drop(&mut self) {
+        if !self.dc.is_null() {
+            if unsafe { ReleaseDC(self.hwnd, self.dc) } == 0 {
+                write_diagnostic("ReleaseDC failed for the Explorer desktop host");
+            }
+            self.dc = null_mut();
+        }
+    }
+}
+
+struct GdiShellDesktopSnapshotFrame {
+    surface: GdiMemorySurface,
     size: (i32, i32),
 }
 
@@ -110,18 +254,8 @@ impl GdiShellDesktopSnapshotFrame {
             return Err(());
         }
 
-        let source_dc = unsafe { GetDC(shell_desktop) };
-        if source_dc.is_null() {
-            write_diagnostic("GetDC failed for the Explorer desktop host");
-            return Err(());
-        }
-
-        let result = Self::new_with_source_dc(shell_desktop, source_dc, source_bounds);
-        let released = unsafe { ReleaseDC(shell_desktop, source_dc) };
-        if released == 0 {
-            write_diagnostic("ReleaseDC failed for the Explorer desktop host");
-        }
-        result
+        let source_dc = WindowDc::new(shell_desktop)?;
+        Self::new_with_source_dc(shell_desktop, source_dc.dc(), source_bounds)
     }
 
     fn new_with_source_dc(
@@ -156,167 +290,78 @@ impl GdiShellDesktopSnapshotFrame {
             return Err(());
         };
 
-        let mut memory_dc: HDC = null_mut();
-        let mut bitmap: HBITMAP = null_mut();
-        let mut previous_bitmap: HGDIOBJ = null_mut();
-        let mut committed = false;
-        let result = (|| {
-            memory_dc = unsafe { CreateCompatibleDC(source_dc) };
-            if memory_dc.is_null() {
-                write_diagnostic("CreateCompatibleDC failed for the shell snapshot");
-                return Err(());
-            }
+        let memory_surface = GdiMemorySurface::new_dib(source_dc, source_bounds)?;
 
-            let bitmap_info = BITMAPINFO {
-                bmiHeader: BITMAPINFOHEADER {
-                    biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-                    biWidth: width(source_bounds),
-                    // A negative height creates a top-down DIB whose first
-                    // scan line is the top of the virtual desktop.
-                    biHeight: -height(source_bounds),
-                    biPlanes: 1,
-                    biBitCount: 32,
-                    ..Default::default()
-                },
-                ..Default::default()
-            };
-            let mut bits: *mut c_void = null_mut();
-            bitmap = unsafe {
-                CreateDIBSection(
-                    source_dc,
-                    &bitmap_info,
-                    DIB_RGB_COLORS,
-                    &mut bits,
-                    null_mut(),
-                    0,
-                )
-            };
-            if bitmap.is_null() {
-                write_diagnostic("CreateDIBSection failed for the shell snapshot");
-                return Err(());
-            }
-            if bits.is_null() {
-                write_diagnostic("CreateDIBSection returned no writable shell-snapshot pixels");
-                return Err(());
-            }
-
-            previous_bitmap = unsafe { SelectObject(memory_dc, bitmap as HGDIOBJ) };
-            if invalid_gdi_object(previous_bitmap) {
-                write_diagnostic("SelectObject failed for the shell snapshot");
-                return Err(());
-            }
-
-            // Initialize every pixel to black.  The shell host can be smaller
-            // than a disconnected monitor or report stale bounds during an
-            // Explorer restart; uncovered portions must never come from a
-            // screen DC.
-            if unsafe {
-                PatBlt(
-                    memory_dc,
-                    0,
-                    0,
-                    width(source_bounds),
-                    height(source_bounds),
-                    BLACKNESS,
-                )
-            } == 0
-            {
-                write_diagnostic("PatBlt failed for the shell snapshot");
-                return Err(());
-            }
-
-            let source_x = copy_bounds.left - desktop_client_bounds.left;
-            let source_y = copy_bounds.top - desktop_client_bounds.top;
-            let destination_x = copy_bounds.left - source_bounds.left;
-            let destination_y = copy_bounds.top - source_bounds.top;
-
-            // PrintWindow(PW_RENDERFULLCONTENT) asks Explorer to render its
-            // desktop host and icon list into an off-screen surface.  A plain
-            // window DC, DWM thumbnail, or screen capture is intentionally
-            // not used because each can include covering applications.
-            let mut printed_dc: HDC = null_mut();
-            let mut printed_bitmap: HBITMAP = null_mut();
-            let mut printed_previous_bitmap: HGDIOBJ = null_mut();
-            let printed_result = (|| {
-                printed_dc = unsafe { CreateCompatibleDC(source_dc) };
-                if printed_dc.is_null() {
-                    write_diagnostic("CreateCompatibleDC failed for the shell print surface");
-                    return Err(());
-                }
-                printed_bitmap = unsafe {
-                    CreateCompatibleBitmap(source_dc, width(client_rect), height(client_rect))
-                };
-                if printed_bitmap.is_null() {
-                    write_diagnostic("CreateCompatibleBitmap failed for the shell print surface");
-                    return Err(());
-                }
-                printed_previous_bitmap =
-                    unsafe { SelectObject(printed_dc, printed_bitmap as HGDIOBJ) };
-                if invalid_gdi_object(printed_previous_bitmap) {
-                    write_diagnostic("SelectObject failed for the shell print surface");
-                    return Err(());
-                }
-                if unsafe {
-                    PatBlt(
-                        printed_dc,
-                        0,
-                        0,
-                        width(client_rect),
-                        height(client_rect),
-                        BLACKNESS,
-                    )
-                } == 0
-                {
-                    write_diagnostic("PatBlt failed for the shell print surface");
-                    return Err(());
-                }
-                if unsafe { print_window(shell_desktop, printed_dc, PW_RENDERFULLCONTENT) } == 0 {
-                    write_diagnostic("PrintWindow failed for the Explorer desktop host");
-                    return Err(());
-                }
-                if unsafe {
-                    BitBlt(
-                        memory_dc,
-                        destination_x,
-                        destination_y,
-                        width(copy_bounds),
-                        height(copy_bounds),
-                        printed_dc,
-                        source_x,
-                        source_y,
-                        SRCCOPY,
-                    )
-                } == 0
-                {
-                    write_diagnostic("BitBlt failed while mapping the shell print surface");
-                    return Err(());
-                }
-                Ok(())
-            })();
-            release_surface(
-                &mut printed_dc,
-                &mut printed_bitmap,
-                &mut printed_previous_bitmap,
-            );
-            printed_result?;
-
-            committed = true;
-            Ok(Self {
-                memory_dc,
-                bitmap,
-                previous_bitmap,
-                size: (width(source_bounds), height(source_bounds)),
-            })
-        })();
-
-        if !committed {
-            release_surface(&mut memory_dc, &mut bitmap, &mut previous_bitmap);
+        // Initialize every pixel to black.  The shell host can be smaller
+        // than a disconnected monitor or report stale bounds during an
+        // Explorer restart; uncovered portions must never come from a
+        // screen DC.
+        if unsafe {
+            PatBlt(
+                memory_surface.dc(),
+                0,
+                0,
+                width(source_bounds),
+                height(source_bounds),
+                BLACKNESS,
+            )
+        } == 0
+        {
+            write_diagnostic("PatBlt failed for the shell snapshot");
+            return Err(());
         }
-        result
-    }
 
-    fn size(&self) -> (i32, i32) {
-        self.size
+        let source_x = copy_bounds.left - desktop_client_bounds.left;
+        let source_y = copy_bounds.top - desktop_client_bounds.top;
+        let destination_x = copy_bounds.left - source_bounds.left;
+        let destination_y = copy_bounds.top - source_bounds.top;
+
+        // PrintWindow(PW_RENDERFULLCONTENT) asks Explorer to render its
+        // desktop host and icon list into an off-screen surface.  A plain
+        // window DC, DWM thumbnail, or screen capture is intentionally
+        // not used because each can include covering applications.
+        let printed_surface =
+            GdiMemorySurface::new_compatible(source_dc, width(client_rect), height(client_rect))?;
+        if unsafe {
+            PatBlt(
+                printed_surface.dc(),
+                0,
+                0,
+                width(client_rect),
+                height(client_rect),
+                BLACKNESS,
+            )
+        } == 0
+        {
+            write_diagnostic("PatBlt failed for the shell print surface");
+            return Err(());
+        }
+        if print_window(shell_desktop, printed_surface.dc(), PW_RENDERFULLCONTENT) == 0 {
+            write_diagnostic("PrintWindow failed for the Explorer desktop host");
+            return Err(());
+        }
+        if unsafe {
+            BitBlt(
+                memory_surface.dc(),
+                destination_x,
+                destination_y,
+                width(copy_bounds),
+                height(copy_bounds),
+                printed_surface.dc(),
+                source_x,
+                source_y,
+                SRCCOPY,
+            )
+        } == 0
+        {
+            write_diagnostic("BitBlt failed while mapping the shell print surface");
+            return Err(());
+        }
+
+        Ok(Self {
+            surface: memory_surface,
+            size: (width(source_bounds), height(source_bounds)),
+        })
     }
 
     fn draw(&self, destination_dc: HDC, destination_bounds: RECT) -> Result<(), ()> {
@@ -331,7 +376,7 @@ impl GdiShellDesktopSnapshotFrame {
                     destination_bounds.top,
                     source_width,
                     source_height,
-                    self.memory_dc,
+                    self.surface.dc(),
                     0,
                     0,
                     SRCCOPY,
@@ -346,7 +391,7 @@ impl GdiShellDesktopSnapshotFrame {
                     destination_bounds.top,
                     width(destination_bounds),
                     height(destination_bounds),
-                    self.memory_dc,
+                    self.surface.dc(),
                     0,
                     0,
                     source_width,
@@ -360,50 +405,6 @@ impl GdiShellDesktopSnapshotFrame {
             painted
         };
         if painted == 0 { Err(()) } else { Ok(()) }
-    }
-}
-
-impl Drop for GdiShellDesktopSnapshotFrame {
-    fn drop(&mut self) {
-        release_surface(
-            &mut self.memory_dc,
-            &mut self.bitmap,
-            &mut self.previous_bitmap,
-        );
-    }
-}
-
-fn release_surface(dc: &mut HDC, bitmap: &mut HBITMAP, previous_bitmap: &mut HGDIOBJ) {
-    let mut bitmap_deselected = true;
-    if !dc.is_null() && !previous_bitmap.is_null() && !invalid_gdi_object(*previous_bitmap) {
-        let restored = unsafe { SelectObject(*dc, *previous_bitmap) };
-        bitmap_deselected = !invalid_gdi_object(restored);
-        if !bitmap_deselected {
-            write_diagnostic("SelectObject failed while releasing the shell snapshot");
-        }
-    }
-    *previous_bitmap = null_mut();
-
-    if !bitmap.is_null() && bitmap_deselected {
-        if unsafe { DeleteObject(*bitmap as HGDIOBJ) } == 0 {
-            write_diagnostic("DeleteObject failed while releasing the shell snapshot");
-        }
-        *bitmap = null_mut();
-    }
-    if !dc.is_null() {
-        if unsafe { DeleteDC(*dc) } == 0 {
-            write_diagnostic("DeleteDC failed while releasing the shell snapshot");
-        }
-        *dc = null_mut();
-    }
-    if !bitmap.is_null() {
-        // A selected bitmap cannot be deleted until its memory DC is gone.
-        // Destroying that DC above releases the selection so this retry is
-        // safe and matches the original cleanup path.
-        if unsafe { DeleteObject(*bitmap as HGDIOBJ) } == 0 {
-            write_diagnostic("DeleteObject failed after releasing the shell snapshot DC");
-        }
-        *bitmap = null_mut();
     }
 }
 
@@ -521,6 +522,6 @@ unsafe extern "system" {
     fn PrintWindow(hwnd: HWND, hdc_blt: HDC, flags: u32) -> BOOL;
 }
 
-unsafe fn print_window(hwnd: HWND, hdc: HDC, flags: u32) -> BOOL {
+fn print_window(hwnd: HWND, hdc: HDC, flags: u32) -> BOOL {
     unsafe { PrintWindow(hwnd, hdc, flags) }
 }

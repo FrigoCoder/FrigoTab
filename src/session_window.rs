@@ -8,6 +8,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::Graphics::Gdi::{HDC, InvalidateRect, UpdateWindow};
@@ -41,6 +42,7 @@ pub struct SessionWindow {
     snapshot_completion: Arc<Mutex<Option<SnapshotCompletion>>>,
     snapshot_refresh_running: Arc<AtomicBool>,
     disposal_requested: Arc<AtomicBool>,
+    snapshot_worker: Option<JoinHandle<()>>,
     activating_selection: bool,
     disposed: bool,
 }
@@ -66,6 +68,7 @@ impl SessionWindow {
             snapshot_completion: Arc::new(Mutex::new(None)),
             snapshot_refresh_running: Arc::new(AtomicBool::new(false)),
             disposal_requested: Arc::new(AtomicBool::new(false)),
+            snapshot_worker: None,
             activating_selection: false,
             disposed: false,
         }
@@ -92,6 +95,7 @@ impl SessionWindow {
 
     /// Paint the retained shell image into the owner’s client DC.  The owner
     /// WndProc calls this from WM_PAINT before any DWM thumbnail is revealed.
+    #[allow(clippy::not_unsafe_ptr_arg_deref)] // HDC is an opaque GDI handle.
     pub fn paint(&self, destination_dc: HDC, destination_bounds: RECT) {
         if self.disposed {
             return;
@@ -130,6 +134,16 @@ impl SessionWindow {
         self.disposal_requested.store(true, Ordering::Release);
         self.disposed = true;
         self.close_session_resources();
+        // The completion mutex is also the worker's finalization gate. Once
+        // this lock is acquired after cancellation, the worker has either
+        // posted while the HWND is still owned or has observed cancellation.
+        self.snapshot_completion
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .take();
+        // A hung Explorer PrintWindow must not hang UI teardown. The worker's
+        // Arc-owned state remains valid until the detached thread returns.
+        drop(self.snapshot_worker.take());
         self.desktop_snapshot = None;
         self.desktop_snapshot_bounds = RECT::default();
     }
@@ -156,7 +170,7 @@ impl SessionWindow {
         }
 
         let owner = WindowHandle::new(self.hwnd);
-        let applications = ApplicationWindows::new(owner, &finder).map_err(|_| ())?;
+        let applications = ApplicationWindows::new(owner, &finder);
         if applications.is_empty() {
             return Ok(0);
         }
@@ -168,11 +182,11 @@ impl SessionWindow {
             ShowWindow(self.hwnd, SW_SHOW);
         }
         self.paint_owner_synchronously();
-        if let Some(applications) = self.applications.as_mut() {
-            if applications.set_visible(true).is_err() {
-                self.close_session_resources();
-                return Err(());
-            }
+        if let Some(applications) = self.applications.as_mut()
+            && applications.set_visible(true).is_err()
+        {
+            self.close_session_resources();
+            return Err(());
         }
         // Foreground activation is deliberately last; a SetForegroundWindow
         // deactivation is the expected selection handoff, not interruption.
@@ -206,6 +220,7 @@ impl SessionWindow {
     }
 
     fn queue_desktop_snapshot_refresh(&mut self, bounds: RECT) {
+        self.reap_finished_snapshot_worker();
         if self.disposed
             || bounds.right <= bounds.left
             || bounds.bottom <= bounds.top
@@ -221,40 +236,35 @@ impl SessionWindow {
         let running = Arc::clone(&self.snapshot_refresh_running);
         let disposed = Arc::clone(&self.disposal_requested);
         let owner = self.hwnd as usize;
-        if std::thread::Builder::new()
+        match std::thread::Builder::new()
             .name("FrigoTab desktop snapshot".to_string())
             .spawn(move || {
                 let candidate = ShellDesktopSnapshot::capture(bounds);
-                if !candidate.is_available() || disposed.load(Ordering::Acquire) {
+                if !candidate.is_available() {
                     running.store(false, Ordering::Release);
                     return;
                 }
 
-                if completion
-                    .lock()
-                    .map(|mut slot| {
-                        *slot = Some(SnapshotCompletion {
-                            snapshot: candidate,
-                            bounds,
-                        });
-                    })
-                    .is_err()
-                {
+                let mut slot = completion.lock().unwrap_or_else(|error| error.into_inner());
+                if disposed.load(Ordering::Acquire) {
                     running.store(false, Ordering::Release);
                     return;
                 }
+                *slot = Some(SnapshotCompletion {
+                    snapshot: candidate,
+                    bounds,
+                });
 
                 if unsafe { PostMessageW(owner as HWND, WM_DESKTOP_SNAPSHOT_READY, 0, 0) } == 0 {
-                    if let Ok(mut slot) = completion.lock() {
-                        *slot = None;
-                    }
+                    *slot = None;
                     running.store(false, Ordering::Release);
                 }
-            })
-            .is_err()
-        {
-            self.snapshot_refresh_running
-                .store(false, Ordering::Release);
+            }) {
+            Ok(worker) => self.snapshot_worker = Some(worker),
+            Err(_) => {
+                self.snapshot_refresh_running
+                    .store(false, Ordering::Release);
+            }
         }
     }
 
@@ -264,11 +274,12 @@ impl SessionWindow {
     pub fn publish_desktop_snapshot(&mut self) {
         self.snapshot_refresh_running
             .store(false, Ordering::Release);
+        self.reap_finished_snapshot_worker();
         let Some(completion) = self
             .snapshot_completion
             .lock()
-            .ok()
-            .and_then(|mut slot| slot.take())
+            .unwrap_or_else(|error| error.into_inner())
+            .take()
         else {
             return;
         };
@@ -296,6 +307,18 @@ impl SessionWindow {
             return;
         }
         self.queue_desktop_snapshot_refresh_current();
+    }
+
+    fn reap_finished_snapshot_worker(&mut self) {
+        if !self.snapshot_refresh_running.load(Ordering::Acquire) {
+            self.join_snapshot_worker();
+        }
+    }
+
+    fn join_snapshot_worker(&mut self) {
+        if let Some(worker) = self.snapshot_worker.take() {
+            let _ = worker.join();
+        }
     }
 
     fn paint_owner_synchronously(&self) {
@@ -377,7 +400,9 @@ impl SwitcherSessionPort for SessionWindow {
     }
 
     fn close(&mut self) {
-        self.close_session_resources();
+        if !self.disposed {
+            self.close_session_resources();
+        }
     }
 
     fn relayout(&mut self) -> Result<(), ()> {

@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::sync::Mutex;
 
 use crate::keyboard_input::{KeyboardInput, SwitcherKey};
@@ -9,22 +8,14 @@ pub struct KeyboardSuppressionState {
     state: Mutex<SuppressionState>,
 }
 
+#[derive(Default)]
 struct SuppressionState {
-    consumed_keys: HashSet<SwitcherKey>,
+    // SwitcherKey has fewer than 32 variants.  A mask keeps the hook path
+    // allocation-free while retaining independent key-up bookkeeping.
+    consumed_keys: u32,
     session_active_or_pending: bool,
     next_admission_token: i64,
     pending_admission_token: i64,
-}
-
-impl Default for SuppressionState {
-    fn default() -> Self {
-        Self {
-            consumed_keys: HashSet::new(),
-            session_active_or_pending: false,
-            next_admission_token: 0,
-            pending_admission_token: 0,
-        }
-    }
 }
 
 impl KeyboardSuppressionState {
@@ -34,38 +25,18 @@ impl KeyboardSuppressionState {
         }
     }
 
-    pub fn session_active_or_pending(&self) -> bool {
-        self.state
-            .lock()
-            .expect("keyboard suppression state lock poisoned")
-            .session_active_or_pending
-    }
-
-    pub fn admission_pending(&self) -> bool {
-        self.state
-            .lock()
-            .expect("keyboard suppression state lock poisoned")
-            .pending_admission_token
-            != 0
-    }
-
-    pub fn should_consume(&self, input: KeyboardInput) -> bool {
-        self.should_consume_with_token(input).0
-    }
-
     /// Returns the non-zero token only for the event that changes the
     /// switcher from idle to pending. Repeated Tab events deliberately receive
     /// no token, so a failed repeat delivery cannot cancel an accepted post.
     pub fn should_consume_with_token(&self, input: KeyboardInput) -> (bool, i64) {
-        let mut state = self
-            .state
-            .lock()
-            .expect("keyboard suppression state lock poisoned");
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         if input.injected {
             return (false, 0);
         }
 
-        if input.is_up() && state.consumed_keys.remove(&input.key) {
+        let key_bit = input.key.bit();
+        if input.is_up() && state.consumed_keys & key_bit != 0 {
+            state.consumed_keys &= !key_bit;
             return (true, 0);
         }
         if !input.is_down() {
@@ -80,7 +51,7 @@ impl KeyboardSuppressionState {
                 state.session_active_or_pending = true;
                 state.next_admission_token = next_token(state.next_admission_token);
                 state.pending_admission_token = state.next_admission_token;
-                state.consumed_keys.insert(input.key);
+                state.consumed_keys |= key_bit;
                 return (true, state.pending_admission_token);
             }
             false
@@ -92,16 +63,13 @@ impl KeyboardSuppressionState {
         };
 
         if consume {
-            state.consumed_keys.insert(input.key);
+            state.consumed_keys |= key_bit;
         }
         (consume, 0)
     }
 
     pub fn set_session_visible(&self, visible: bool) {
-        let mut state = self
-            .state
-            .lock()
-            .expect("keyboard suppression state lock poisoned");
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         state.session_active_or_pending = visible;
         state.pending_admission_token = 0;
     }
@@ -109,27 +77,21 @@ impl KeyboardSuppressionState {
     /// Cancels only an admission that has not reached the UI.  The consumed
     /// ledger for a visible session is intentionally left untouched.
     pub fn abort_pending_admission(&self, admission_token: i64) -> bool {
-        let mut state = self
-            .state
-            .lock()
-            .expect("keyboard suppression state lock poisoned");
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         if admission_token == 0 || admission_token != state.pending_admission_token {
             return false;
         }
         state.pending_admission_token = 0;
         state.session_active_or_pending = false;
-        state.consumed_keys.remove(&SwitcherKey::Tab);
+        state.consumed_keys &= !SwitcherKey::Tab.bit();
         true
     }
 
     pub fn reset(&self) {
-        let mut state = self
-            .state
-            .lock()
-            .expect("keyboard suppression state lock poisoned");
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         state.session_active_or_pending = false;
         state.pending_admission_token = 0;
-        state.consumed_keys.clear();
+        state.consumed_keys = 0;
     }
 }
 

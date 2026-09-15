@@ -197,6 +197,7 @@ impl KeyHook {
     /// Start the dedicated hook thread and wait for the `WH_KEYBOARD_LL` hook
     /// to be installed.  The supplied owner must be the UI-thread HWND which
     /// handles [`WM_KEY_HOOK_INPUT`].
+    #[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND is opaque, never dereferenced as Rust memory.
     pub fn start(owner: HWND) -> Result<Self, KeyHookError> {
         if owner.is_null() || unsafe { IsWindow(owner) == 0 } {
             return Err(KeyHookError::InvalidOwner);
@@ -307,7 +308,7 @@ impl KeyHook {
     where
         F: FnOnce(KeyboardInput) -> KeyHandling,
     {
-        let Some(callback) = self.shared.callbacks.take(wparam as usize) else {
+        let Some(callback) = self.shared.callbacks.take(wparam) else {
             return false;
         };
         callback();

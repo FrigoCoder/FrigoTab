@@ -13,7 +13,6 @@ pub mod keyboard_modifier_state;
 pub mod keyboard_suppression_state;
 pub mod layer_updater;
 pub mod layout;
-pub mod points;
 pub mod rect;
 pub mod screen_point;
 pub mod session_window;

@@ -5,6 +5,8 @@
 //! three native operations are checked for failed HRESULTs, including the
 //! best-effort unregister performed by `Drop`.
 
+use std::num::NonZeroIsize;
+
 use windows_sys::Win32::Foundation::{E_FAIL, HWND, RECT};
 use windows_sys::Win32::Graphics::Dwm::{
     DWM_THUMBNAIL_PROPERTIES, DWM_TNP_OPACITY, DWM_TNP_RECTDESTINATION, DWM_TNP_RECTSOURCE,
@@ -19,7 +21,7 @@ use windows_sys::Win32::System::Diagnostics::Debug::OutputDebugStringW;
 /// is a separate update.  The handle is owned by this value and is released
 /// when it is dropped.
 pub struct DwmThumbnail {
-    handle: isize,
+    handle: NonZeroIsize,
 }
 
 impl DwmThumbnail {
@@ -28,6 +30,7 @@ impl DwmThumbnail {
     /// DWM registrations are hidden by default.  The caller must set the
     /// source and destination rectangles and explicitly make the thumbnail
     /// visible after the owner has painted its backdrop.
+    #[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND values are opaque window identities.
     pub fn register(destination: HWND, source: HWND) -> Result<Self, i32> {
         let mut handle = 0isize;
         let hresult = unsafe { DwmRegisterThumbnail(destination, source, &mut handle) };
@@ -46,12 +49,12 @@ impl DwmThumbnail {
             }
             return Err(hresult);
         }
-        if handle == 0 {
+        let Some(handle) = NonZeroIsize::new(handle) else {
             // The original implementation rejects a successful call that returns a
             // null handle.  E_FAIL is used here because there is no HRESULT
             // associated with that malformed result.
             return Err(E_FAIL);
-        }
+        };
         Ok(Self { handle })
     }
 
@@ -89,14 +92,11 @@ impl DwmThumbnail {
 
     /// Expose the native registration for diagnostics only.
     pub fn handle(&self) -> isize {
-        self.handle
+        self.handle.get()
     }
 
     fn update(&self, properties: DWM_THUMBNAIL_PROPERTIES) -> Result<(), i32> {
-        if self.handle == 0 {
-            return Err(E_FAIL);
-        }
-        let hresult = unsafe { DwmUpdateThumbnailProperties(self.handle, &properties) };
+        let hresult = unsafe { DwmUpdateThumbnailProperties(self.handle.get(), &properties) };
         if hresult < 0 {
             write_diagnostic("DwmUpdateThumbnailProperties", hresult);
             Err(hresult)
@@ -108,12 +108,7 @@ impl DwmThumbnail {
 
 impl Drop for DwmThumbnail {
     fn drop(&mut self) {
-        if self.handle == 0 {
-            return;
-        }
-        let handle = self.handle;
-        self.handle = 0;
-        let hresult = unsafe { DwmUnregisterThumbnail(handle) };
+        let hresult = unsafe { DwmUnregisterThumbnail(self.handle.get()) };
         if hresult < 0 {
             write_diagnostic("DwmUnregisterThumbnail", hresult);
         }
