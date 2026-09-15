@@ -83,9 +83,56 @@ fn check_drawing(status: Status) -> Result<()> {
 
 /// A GDI+ graphics object backed by a Win32 memory DC.
 pub struct Graphics {
-    raw: *mut GpGraphics,
+    raw: NonNull<GpGraphics>,
     pub width: f32,
     pub height: f32,
+}
+
+/// A temporary HDC borrowed from a GDI+ graphics object.
+///
+/// GDI+ requires every successful `GdipGetDC` call to be paired with
+/// `GdipReleaseDC` before the graphics object is used again.  Keeping the
+/// graphics borrow in this guard prevents the object from being mutably used
+/// or dropped while the HDC is outstanding.  The explicit `release` method
+/// preserves the original error reporting; `Drop` is the panic/early-return
+/// fallback.
+struct GraphicsDc<'a> {
+    graphics: &'a Graphics,
+    dc: NonNull<std::ffi::c_void>,
+    released: bool,
+}
+
+impl<'a> GraphicsDc<'a> {
+    fn acquire(graphics: &'a Graphics) -> Result<Self> {
+        let mut dc = null_mut();
+        check(unsafe { GdipGetDC(graphics.raw.as_ptr(), &mut dc) })?;
+        let dc = NonNull::new(dc).ok_or(Error(1))?;
+        Ok(Self {
+            graphics,
+            dc,
+            released: false,
+        })
+    }
+
+    fn handle(&self) -> HDC {
+        self.dc.as_ptr()
+    }
+
+    fn release(mut self) -> Result<()> {
+        let status = unsafe { GdipReleaseDC(self.graphics.raw.as_ptr(), self.handle()) };
+        self.released = true;
+        check(status)
+    }
+}
+
+impl Drop for GraphicsDc<'_> {
+    fn drop(&mut self) {
+        if !self.released {
+            unsafe {
+                let _ = GdipReleaseDC(self.graphics.raw.as_ptr(), self.handle());
+            }
+        }
+    }
 }
 
 /// Owns a GDI+ solid brush.  Keeping the native handle in a non-null RAII
@@ -119,9 +166,7 @@ impl Graphics {
         ensure_started()?;
         let mut raw = null_mut();
         check(unsafe { GdipCreateFromHDC(hdc, &mut raw) })?;
-        if raw.is_null() {
-            return Err(Error(1));
-        }
+        let raw = NonNull::new(raw).ok_or(Error(1))?;
         Ok(Self {
             raw,
             width: width as f32,
@@ -131,18 +176,20 @@ impl Graphics {
 
     /// Clear the surface with the transparent color used by the renderer.
     pub fn clear(&mut self) -> Result<()> {
-        check(unsafe { GdipGraphicsClear(self.raw, 0) })
+        check(unsafe { GdipGraphicsClear(self.raw.as_ptr(), 0) })
     }
 
     /// Matches the exact quality flags set by `ApplicationWindow.RenderOverlay`.
     pub fn set_overlay_quality(&mut self) -> Result<()> {
-        check(unsafe { GdipSetPixelOffsetMode(self.raw, PixelOffsetModeHighQuality) })?;
-        check(unsafe { GdipSetSmoothingMode(self.raw, SmoothingModeAntiAlias) })?;
+        check(unsafe { GdipSetPixelOffsetMode(self.raw.as_ptr(), PixelOffsetModeHighQuality) })?;
+        check(unsafe { GdipSetSmoothingMode(self.raw.as_ptr(), SmoothingModeAntiAlias) })?;
         Ok(())
     }
 
     pub fn set_text_rendering_hint(&mut self) -> Result<()> {
-        check(unsafe { GdipSetTextRenderingHint(self.raw, TextRenderingHintAntiAliasGridFit) })
+        check(unsafe {
+            GdipSetTextRenderingHint(self.raw.as_ptr(), TextRenderingHintAntiAliasGridFit)
+        })
     }
 
     pub fn fill_rect(&mut self, rect: RectF, argb: u32) -> Result<()> {
@@ -182,7 +229,7 @@ impl Graphics {
         check_drawing(unsafe {
             SetLastError(0);
             GdipFillPolygon(
-                self.raw,
+                self.raw.as_ptr(),
                 brush.as_brush(),
                 points.as_ptr(),
                 points.len() as i32,
@@ -207,7 +254,7 @@ impl Graphics {
         let mut lines = 0;
         check(unsafe {
             GdipMeasureString(
-                self.raw,
+                self.raw.as_ptr(),
                 utf16.as_ptr(),
                 utf16.len() as i32,
                 font.raw.as_ptr(),
@@ -230,7 +277,7 @@ impl Graphics {
         check_drawing(unsafe {
             SetLastError(0);
             GdipDrawString(
-                self.raw,
+                self.raw.as_ptr(),
                 utf16.as_ptr(),
                 utf16.len() as i32,
                 font.raw.as_ptr(),
@@ -278,32 +325,41 @@ impl Graphics {
         if icon.is_null() {
             return Ok(());
         }
-        let mut dc = null_mut();
-        check(unsafe { GdipGetDC(self.raw, &mut dc) })?;
-        if dc.is_null() {
-            return Err(Error(1));
-        }
+        let dc = GraphicsDc::acquire(self)?;
         unsafe {
             // The original icon drawing path does not surface DrawIconEx's
             // BOOL result to the caller.
-            let saved_dc = SaveDC(dc);
-            IntersectClipRect(dc, x, y, x.saturating_add(width), y.saturating_add(height));
-            DrawIconEx(dc, x, y, icon, width, height, 0, null_mut(), DI_NORMAL);
+            let saved_dc = SaveDC(dc.handle());
+            IntersectClipRect(
+                dc.handle(),
+                x,
+                y,
+                x.saturating_add(width),
+                y.saturating_add(height),
+            );
+            DrawIconEx(
+                dc.handle(),
+                x,
+                y,
+                icon,
+                width,
+                height,
+                0,
+                null_mut(),
+                DI_NORMAL,
+            );
             if saved_dc != 0 {
-                RestoreDC(dc, saved_dc);
+                RestoreDC(dc.handle(), saved_dc);
             }
         }
-        check(unsafe { GdipReleaseDC(self.raw, dc) })
+        dc.release()
     }
 }
 
 impl Drop for Graphics {
     fn drop(&mut self) {
-        if !self.raw.is_null() {
-            unsafe {
-                let _ = GdipDeleteGraphics(self.raw);
-            }
-            self.raw = null_mut();
+        unsafe {
+            let _ = GdipDeleteGraphics(self.raw.as_ptr());
         }
     }
 }

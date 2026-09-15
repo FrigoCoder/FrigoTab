@@ -7,14 +7,14 @@
 
 use std::cmp::{max, min};
 use std::ffi::c_void;
-use std::ptr::{null, null_mut};
+use std::ptr::{NonNull, null, null_mut};
 
 use windows_sys::Win32::Foundation::{HWND, POINT, RECT};
 use windows_sys::Win32::Graphics::Gdi::{
     BITMAPINFO, BITMAPINFOHEADER, BLACKNESS, BitBlt, COLORONCOLOR, ClientToScreen,
     CreateCompatibleBitmap, CreateCompatibleDC, CreateDIBSection, DIB_RGB_COLORS, DeleteDC,
-    DeleteObject, GetDC, HBITMAP, HDC, HGDIOBJ, PatBlt, ReleaseDC, SRCCOPY, SelectObject,
-    SetStretchBltMode, StretchBlt,
+    DeleteObject, GetDC, HDC, HGDIOBJ, PatBlt, ReleaseDC, SRCCOPY, SelectObject, SetStretchBltMode,
+    StretchBlt,
 };
 use windows_sys::Win32::System::Diagnostics::Debug::OutputDebugStringW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -89,29 +89,31 @@ impl ShellDesktopSnapshot {
 /// is created follows the same cleanup path as a successfully published
 /// surface.
 struct GdiMemorySurface {
-    dc: HDC,
-    bitmap: HBITMAP,
-    previous_bitmap: HGDIOBJ,
+    dc: GdiHandle,
+    bitmap: Option<GdiHandle>,
+    previous_bitmap: Option<GdiHandle>,
 }
+
+type GdiHandle = NonNull<c_void>;
 
 impl GdiMemorySurface {
     fn new_dc(source_dc: HDC, name: &str) -> Result<Self, ()> {
         let dc = unsafe { CreateCompatibleDC(source_dc) };
-        if dc.is_null() {
+        let Some(dc) = NonNull::new(dc) else {
             write_diagnostic(&format!("CreateCompatibleDC failed for the {name}"));
             return Err(());
-        }
+        };
         Ok(Self {
             dc,
-            bitmap: null_mut(),
-            previous_bitmap: null_mut(),
+            bitmap: None,
+            previous_bitmap: None,
         })
     }
 
     fn new_compatible(source_dc: HDC, width: i32, height: i32) -> Result<Self, ()> {
         let mut surface = Self::new_dc(source_dc, "shell print surface")?;
-        surface.bitmap = unsafe { CreateCompatibleBitmap(source_dc, width, height) };
-        if surface.bitmap.is_null() {
+        surface.bitmap = NonNull::new(unsafe { CreateCompatibleBitmap(source_dc, width, height) });
+        if surface.bitmap.is_none() {
             write_diagnostic("CreateCompatibleBitmap failed for the shell print surface");
             return Err(());
         }
@@ -134,7 +136,7 @@ impl GdiMemorySurface {
             ..Default::default()
         };
         let mut bits: *mut c_void = null_mut();
-        surface.bitmap = unsafe {
+        surface.bitmap = NonNull::new(unsafe {
             CreateDIBSection(
                 source_dc,
                 &bitmap_info,
@@ -143,8 +145,8 @@ impl GdiMemorySurface {
                 null_mut(),
                 0,
             )
-        };
-        if surface.bitmap.is_null() {
+        });
+        if surface.bitmap.is_none() {
             write_diagnostic("CreateDIBSection failed for the shell snapshot");
             return Err(());
         }
@@ -156,8 +158,13 @@ impl GdiMemorySurface {
     }
 
     fn select(mut self, name: &str) -> Result<Self, ()> {
-        self.previous_bitmap = unsafe { SelectObject(self.dc, self.bitmap as HGDIOBJ) };
-        if invalid_gdi_object(self.previous_bitmap) {
+        let Some(bitmap) = self.bitmap else {
+            write_diagnostic(&format!("SelectObject failed for the {name}"));
+            return Err(());
+        };
+        self.previous_bitmap =
+            valid_gdi_handle(unsafe { SelectObject(self.dc(), bitmap.as_ptr()) });
+        if self.previous_bitmap.is_none() {
             write_diagnostic(&format!("SelectObject failed for the {name}"));
             return Err(());
         }
@@ -165,45 +172,41 @@ impl GdiMemorySurface {
     }
 
     fn dc(&self) -> HDC {
-        self.dc
+        self.dc.as_ptr()
     }
 }
 
 impl Drop for GdiMemorySurface {
     fn drop(&mut self) {
         let mut bitmap_deselected = true;
-        if !self.dc.is_null()
-            && !self.previous_bitmap.is_null()
-            && !invalid_gdi_object(self.previous_bitmap)
-        {
-            let restored = unsafe { SelectObject(self.dc, self.previous_bitmap) };
+        if let Some(previous_bitmap) = self.previous_bitmap {
+            let restored = unsafe { SelectObject(self.dc(), previous_bitmap.as_ptr()) };
             bitmap_deselected = !invalid_gdi_object(restored);
             if !bitmap_deselected {
                 write_diagnostic("SelectObject failed while releasing the shell snapshot");
             }
         }
-        self.previous_bitmap = null_mut();
+        self.previous_bitmap = None;
 
-        if !self.bitmap.is_null() && bitmap_deselected {
-            if unsafe { DeleteObject(self.bitmap as HGDIOBJ) } == 0 {
-                write_diagnostic("DeleteObject failed while releasing the shell snapshot");
+        if let Some(bitmap) = self.bitmap.take() {
+            if bitmap_deselected {
+                if unsafe { DeleteObject(bitmap.as_ptr()) } == 0 {
+                    write_diagnostic("DeleteObject failed while releasing the shell snapshot");
+                }
+            } else {
+                self.bitmap = Some(bitmap);
             }
-            self.bitmap = null_mut();
         }
-        if !self.dc.is_null() {
-            if unsafe { DeleteDC(self.dc) } == 0 {
-                write_diagnostic("DeleteDC failed while releasing the shell snapshot");
-            }
-            self.dc = null_mut();
+        if unsafe { DeleteDC(self.dc()) } == 0 {
+            write_diagnostic("DeleteDC failed while releasing the shell snapshot");
         }
-        if !self.bitmap.is_null() {
+        if let Some(bitmap) = self.bitmap.take() {
             // A selected bitmap cannot be deleted until its memory DC is gone.
             // Destroying that DC above releases the selection so this retry
             // is safe and matches the original cleanup path.
-            if unsafe { DeleteObject(self.bitmap as HGDIOBJ) } == 0 {
+            if unsafe { DeleteObject(bitmap.as_ptr()) } == 0 {
                 write_diagnostic("DeleteObject failed after releasing the shell snapshot DC");
             }
-            self.bitmap = null_mut();
         }
     }
 }
@@ -212,31 +215,28 @@ impl Drop for GdiMemorySurface {
 /// released with ReleaseDC and the owning HWND is therefore retained here.
 struct WindowDc {
     hwnd: HWND,
-    dc: HDC,
+    dc: GdiHandle,
 }
 
 impl WindowDc {
     fn new(hwnd: HWND) -> Result<Self, ()> {
         let dc = unsafe { GetDC(hwnd) };
-        if dc.is_null() {
+        let Some(dc) = NonNull::new(dc) else {
             write_diagnostic("GetDC failed for the Explorer desktop host");
             return Err(());
-        }
+        };
         Ok(Self { hwnd, dc })
     }
 
     fn dc(&self) -> HDC {
-        self.dc
+        self.dc.as_ptr()
     }
 }
 
 impl Drop for WindowDc {
     fn drop(&mut self) {
-        if !self.dc.is_null() {
-            if unsafe { ReleaseDC(self.hwnd, self.dc) } == 0 {
-                write_diagnostic("ReleaseDC failed for the Explorer desktop host");
-            }
-            self.dc = null_mut();
+        if unsafe { ReleaseDC(self.hwnd, self.dc()) } == 0 {
+            write_diagnostic("ReleaseDC failed for the Explorer desktop host");
         }
     }
 }
@@ -446,6 +446,14 @@ fn invalid_gdi_object(value: HGDIOBJ) -> bool {
     value.is_null() || value == (-1isize as *mut c_void)
 }
 
+fn valid_gdi_handle(value: HGDIOBJ) -> Option<GdiHandle> {
+    if invalid_gdi_object(value) {
+        None
+    } else {
+        NonNull::new(value)
+    }
+}
+
 fn write_diagnostic(message: &str) {
     let message = format!("{message}\0");
     let wide: Vec<u16> = message.encode_utf16().collect();
@@ -453,6 +461,20 @@ fn write_diagnostic(message: &str) {
 }
 
 struct ShellDesktopWindowLocator;
+
+const fn wide_class<const N: usize>(bytes: &[u8; N]) -> [u16; N] {
+    let mut wide = [0; N];
+    let mut index = 0;
+    while index < N {
+        wide[index] = bytes[index] as u16;
+        index += 1;
+    }
+    wide
+}
+
+const WORKERW_CLASS: [u16; 8] = wide_class(b"WorkerW\0");
+const DESKTOP_VIEW_CLASS: [u16; 17] = wide_class(b"SHELLDLL_DefView\0");
+const ICON_VIEW_CLASS: [u16; 14] = wide_class(b"SysListView32\0");
 
 impl ShellDesktopWindowLocator {
     fn find() -> HWND {
@@ -464,9 +486,7 @@ impl ShellDesktopWindowLocator {
 
         let mut worker = null_mut();
         loop {
-            worker = unsafe {
-                FindWindowExW(null_mut(), worker, class_name("WorkerW").as_ptr(), null())
-            };
+            worker = unsafe { FindWindowExW(null_mut(), worker, WORKERW_CLASS.as_ptr(), null()) };
             if worker.is_null() {
                 return null_mut();
             }
@@ -480,38 +500,22 @@ impl ShellDesktopWindowLocator {
         if parent.is_null() {
             return null_mut();
         }
-        let desktop_view = unsafe {
-            FindWindowExW(
-                parent,
-                null_mut(),
-                class_name("SHELLDLL_DefView").as_ptr(),
-                null(),
-            )
-        };
+        let desktop_view =
+            unsafe { FindWindowExW(parent, null_mut(), DESKTOP_VIEW_CLASS.as_ptr(), null()) };
         if desktop_view.is_null() {
             return null_mut();
         }
 
         // Require Explorer's icon list so an unrelated intermediate window
         // with the same class cannot become a capture source.
-        let icon_view = unsafe {
-            FindWindowExW(
-                desktop_view,
-                null_mut(),
-                class_name("SysListView32").as_ptr(),
-                null(),
-            )
-        };
+        let icon_view =
+            unsafe { FindWindowExW(desktop_view, null_mut(), ICON_VIEW_CLASS.as_ptr(), null()) };
         if icon_view.is_null() {
             null_mut()
         } else {
             desktop_view
         }
     }
-}
-
-fn class_name(name: &str) -> Vec<u16> {
-    name.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
 // windows-sys gates PrintWindow behind Win32_Storage_Xps.  Keep this one

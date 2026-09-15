@@ -1,17 +1,17 @@
 //! Per-pixel alpha surface used by one application tile.
 
-use std::ptr::null_mut;
+use std::ffi::c_void;
+use std::ptr::{NonNull, null_mut};
 
 use windows_sys::Win32::Foundation::{GetLastError, HWND, POINT, RECT, SIZE};
 use windows_sys::Win32::Graphics::Gdi::{
-    BLENDFUNCTION, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC,
-    HBITMAP, HDC, HGDIOBJ, ReleaseDC, SelectObject,
+    BLENDFUNCTION, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, HDC,
+    HGDIOBJ, ReleaseDC, SelectObject,
 };
-use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetWindowRect, IsWindow, ULW_ALPHA, UpdateLayeredWindow,
-};
+use windows_sys::Win32::UI::WindowsAndMessaging::{GetWindowRect, ULW_ALPHA, UpdateLayeredWindow};
 
 use crate::gdi_plus::{self, Graphics};
+use crate::window_handle::WindowHandle;
 
 fn win32_error(operation: &str) -> String {
     format!("{operation} failed (Win32 error {})", unsafe {
@@ -29,23 +29,26 @@ fn gdiplus_error(operation: &str, error: gdi_plus::Error) -> String {
 /// that DC instead of reacquiring it for every redraw, matching the original
 /// implementation's resource lifetime.
 struct ScreenDc {
-    handle: HDC,
+    handle: NonNull<c_void>,
 }
 
 impl ScreenDc {
     fn acquire() -> Result<Self, String> {
         let handle = unsafe { GetDC(null_mut()) };
-        if handle.is_null() {
-            return Err(win32_error("GetDC"));
-        }
-        Ok(Self { handle })
+        NonNull::new(handle)
+            .map(|handle| Self { handle })
+            .ok_or_else(|| win32_error("GetDC"))
+    }
+
+    fn handle(&self) -> HDC {
+        self.handle.as_ptr()
     }
 }
 
 impl Drop for ScreenDc {
     fn drop(&mut self) {
         unsafe {
-            ReleaseDC(null_mut(), self.handle);
+            ReleaseDC(null_mut(), self.handle());
         }
     }
 }
@@ -56,53 +59,83 @@ impl Drop for ScreenDc {
 /// bitmap is important: deleting a selected GDI object is invalid and can
 /// leave the process holding the resource indefinitely.
 struct MemorySurface {
-    dc: HDC,
-    bitmap: HBITMAP,
-    old_bitmap: HGDIOBJ,
+    dc: NonNull<c_void>,
+    bitmap: Option<NonNull<c_void>>,
+    old_bitmap: Option<NonNull<c_void>>,
 }
 
 impl MemorySurface {
     fn create(screen_dc: HDC, width: i32, height: i32) -> Result<Self, String> {
         let dc = unsafe { CreateCompatibleDC(screen_dc) };
-        if dc.is_null() {
-            return Err(win32_error("CreateCompatibleDC"));
-        }
+        let dc = NonNull::new(dc).ok_or_else(|| win32_error("CreateCompatibleDC"))?;
 
-        let bitmap = unsafe { CreateCompatibleBitmap(screen_dc, width, height) };
-        if bitmap.is_null() {
-            let error = win32_error("CreateCompatibleBitmap");
-            unsafe {
-                DeleteDC(dc);
-            }
-            return Err(error);
-        }
-
-        let old_bitmap = unsafe { SelectObject(dc, bitmap.cast()) };
-        if old_bitmap.is_null() || old_bitmap == (-1isize as HGDIOBJ) {
-            let error = win32_error("SelectObject");
-            unsafe {
-                DeleteObject(bitmap.cast());
-                DeleteDC(dc);
-            }
-            return Err(error);
-        }
-
-        Ok(Self {
+        // Construct the guard as soon as the DC exists.  Returning from any
+        // later failure path now follows the same cleanup path as a fully
+        // initialized surface.
+        let mut surface = Self {
             dc,
-            bitmap,
-            old_bitmap,
-        })
+            bitmap: None,
+            old_bitmap: None,
+        };
+
+        surface.bitmap = NonNull::new(unsafe { CreateCompatibleBitmap(screen_dc, width, height) });
+        let bitmap = surface
+            .bitmap
+            .ok_or_else(|| win32_error("CreateCompatibleBitmap"))?;
+
+        surface.old_bitmap =
+            valid_gdi_object(unsafe { SelectObject(surface.dc(), bitmap.as_ptr()) });
+        surface
+            .old_bitmap
+            .ok_or_else(|| win32_error("SelectObject"))?;
+
+        Ok(surface)
+    }
+
+    fn dc(&self) -> HDC {
+        self.dc.as_ptr()
     }
 }
 
 impl Drop for MemorySurface {
     fn drop(&mut self) {
+        let mut delete_after_dc = false;
+        if let Some(old_bitmap) = self.old_bitmap.take() {
+            let restored = unsafe { SelectObject(self.dc(), old_bitmap.as_ptr()) };
+            if invalid_gdi_object(restored) {
+                delete_after_dc = true;
+            } else if let Some(bitmap) = self.bitmap.take() {
+                if unsafe { DeleteObject(bitmap.as_ptr()) } == 0 {
+                    delete_after_dc = true;
+                    self.bitmap = Some(bitmap);
+                } else {
+                    self.bitmap = None;
+                }
+            }
+        } else if self.bitmap.is_some() {
+            delete_after_dc = true;
+        }
+
         unsafe {
-            SelectObject(self.dc, self.old_bitmap);
-            DeleteObject(self.bitmap.cast());
-            DeleteDC(self.dc);
+            DeleteDC(self.dc());
+        }
+
+        if delete_after_dc && let Some(bitmap) = self.bitmap.take() {
+            unsafe {
+                DeleteObject(bitmap.as_ptr());
+            }
         }
     }
+}
+
+fn invalid_gdi_object(value: HGDIOBJ) -> bool {
+    value.is_null() || value == (-1isize as HGDIOBJ)
+}
+
+fn valid_gdi_object(value: HGDIOBJ) -> Option<NonNull<c_void>> {
+    (!invalid_gdi_object(value))
+        .then(|| NonNull::new(value))
+        .flatten()
 }
 
 /// Owns the same native resources as the original `LayerUpdater`: a screen
@@ -131,7 +164,7 @@ impl LayerUpdater {
         // This is intentionally CreateCompatibleBitmap, matching the original
         // LayerUpdater exactly. GDI+ clears and paints the selected surface
         // before UpdateLayeredWindow consumes it.
-        let surface = MemorySurface::create(screen_dc.handle, width, height)?;
+        let surface = MemorySurface::create(screen_dc.handle(), width, height)?;
 
         Ok(Self {
             hwnd,
@@ -154,10 +187,10 @@ impl LayerUpdater {
     {
         // LayerUpdater.Update returns immediately once its Form is disposed.
         // This also makes a late WM_GETICON callback harmless after teardown.
-        if self.hwnd.is_null() || unsafe { IsWindow(self.hwnd) } == 0 {
+        if !WindowHandle::new(self.hwnd).is_valid() {
             return Ok(());
         }
-        let mut graphics = Graphics::from_hdc(self.surface.dc, self.width, self.height)
+        let mut graphics = Graphics::from_hdc(self.surface.dc(), self.width, self.height)
             .map_err(|error| gdiplus_error("GdipCreateFromHDC", error))?;
         graphics
             .clear()
@@ -195,7 +228,7 @@ impl LayerUpdater {
                 null_mut(),
                 &destination,
                 &size,
-                self.surface.dc,
+                self.surface.dc(),
                 &source,
                 0,
                 &blend,

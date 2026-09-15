@@ -11,7 +11,6 @@ use std::{
 
 use windows_sys::Win32::Foundation::{HWND, POINT, RECT};
 use windows_sys::Win32::Graphics::Gdi::ScreenToClient;
-use windows_sys::Win32::UI::WindowsAndMessaging::{GetWindowTextLengthW, GetWindowTextW};
 
 use crate::frigo_window::FrigoWindow;
 use crate::gdi_plus::Font;
@@ -174,7 +173,7 @@ fn render_overlay_with_icon(
     index: usize,
     selected: bool,
 ) -> Result<(), String> {
-    let title = window_title(application);
+    let title = WindowHandle::new(application).get_window_text();
     layer.update(|graphics| {
         graphics.set_overlay_quality()?;
         if selected {
@@ -248,11 +247,4 @@ fn screen_to_client_rect(owner: HWND, bounds: RECT) -> RECT {
         right: bottom_right.x,
         bottom: bottom_right.y,
     }
-}
-
-fn window_title(hwnd: HWND) -> String {
-    let length = unsafe { GetWindowTextLengthW(hwnd) };
-    let mut buffer = vec![0u16; (length.max(0) + 1) as usize];
-    let count = unsafe { GetWindowTextW(hwnd, buffer.as_mut_ptr(), buffer.len() as i32) };
-    String::from_utf16_lossy(&buffer[..(count.max(0) as usize).min(buffer.len())])
 }

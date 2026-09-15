@@ -1,5 +1,28 @@
 //! The small rectangle value used by the Win32 side of FrigoTab.
 
+use windows_sys::Win32::Foundation::RECT;
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+};
+
+/// Return the bounds of the Windows virtual screen in screen coordinates.
+pub fn virtual_screen_bounds() -> RECT {
+    let (left, top, width, height) = unsafe {
+        (
+            GetSystemMetrics(SM_XVIRTUALSCREEN),
+            GetSystemMetrics(SM_YVIRTUALSCREEN),
+            GetSystemMetrics(SM_CXVIRTUALSCREEN),
+            GetSystemMetrics(SM_CYVIRTUALSCREEN),
+        )
+    };
+    RECT {
+        left,
+        top,
+        right: left.saturating_add(width),
+        bottom: top.saturating_add(height),
+    }
+}
+
 /// A screen/client rectangle represented by its origin and extent.
 ///
 /// This is the native rectangle value that crosses the UI/native boundary.

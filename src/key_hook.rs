@@ -33,10 +33,10 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     VK_TAB,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GetMessageW, IsWindow, KBDLLHOOKSTRUCT, LLKHF_ALTDOWN,
-    LLKHF_INJECTED, LLKHF_LOWER_IL_INJECTED, MSG, PM_NOREMOVE, PeekMessageW, PostMessageW,
-    PostThreadMessageW, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, WH_KEYBOARD_LL,
-    WM_APP, WM_KEYDOWN, WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    CallNextHookEx, DispatchMessageW, GetMessageW, KBDLLHOOKSTRUCT, LLKHF_ALTDOWN, LLKHF_INJECTED,
+    LLKHF_LOWER_IL_INJECTED, MSG, PM_NOREMOVE, PeekMessageW, PostMessageW, PostThreadMessageW,
+    SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, WH_KEYBOARD_LL, WM_APP, WM_KEYDOWN,
+    WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN, WM_SYSKEYUP,
 };
 
 use crate::alt_tab_recovery_plan::AltTabRecoveryPlan;
@@ -45,6 +45,7 @@ use crate::key_handling::KeyHandling;
 use crate::keyboard_input::{KeyTransition, KeyboardInput, KeyboardModifierKey, SwitcherKey};
 use crate::keyboard_modifier_state::KeyboardModifierState;
 use crate::keyboard_suppression_state::KeyboardSuppressionState;
+use crate::window_handle::WindowHandle;
 
 /// Message posted to the UI window for an admitted keyboard callback.
 ///
@@ -199,7 +200,7 @@ impl KeyHook {
     /// handles [`WM_KEY_HOOK_INPUT`].
     #[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND is opaque, never dereferenced as Rust memory.
     pub fn start(owner: HWND) -> Result<Self, KeyHookError> {
-        if owner.is_null() || unsafe { IsWindow(owner) == 0 } {
+        if !WindowHandle::new(owner).is_valid() {
             return Err(KeyHookError::InvalidOwner);
         }
 
@@ -270,7 +271,7 @@ impl KeyHook {
         if self.shared.disposed.load(Ordering::Acquire) {
             return;
         }
-        let input = self
+        let mut input = self
             .shared
             .input
             .lock()
@@ -287,7 +288,7 @@ impl KeyHook {
     /// Invalidate queued callbacks and clear modifier/suppression state after
     /// a desktop interruption, display transition, or shutdown.
     pub fn reset_input_state(&self) {
-        let input = self
+        let mut input = self
             .shared
             .input
             .lock()
@@ -326,7 +327,7 @@ impl KeyHook {
             && input.alt
         {
             let (alt_still_down, shift_still_down) = {
-                let state = self
+                let mut state = self
                     .shared
                     .input
                     .lock()
@@ -355,7 +356,7 @@ impl Drop for KeyHook {
         }
 
         {
-            let input = self
+            let mut input = self
                 .shared
                 .input
                 .lock()
@@ -584,7 +585,7 @@ fn hook_proc_inner(shared: &HookShared, _code: i32, wparam: WPARAM, lparam: LPAR
     let consume;
     let mut recovery = None;
     {
-        let state = shared
+        let mut state = shared
             .input
             .lock()
             .unwrap_or_else(|error| error.into_inner());

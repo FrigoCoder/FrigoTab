@@ -21,8 +21,8 @@ use std::time::{Duration, Instant};
 use frigotab::key_handling::KeyHandling;
 use frigotab::keyboard_input::{KeyTransition, KeyboardInput, SwitcherKey};
 use frigotab::screen_point::ScreenPoint;
-use frigotab::session_window::{SessionWindow, WM_DESKTOP_SNAPSHOT_READY};
-use frigotab::switcher_application::SwitcherApplication;
+use frigotab::session_window::{BackgroundMode, SessionWindow, WM_DESKTOP_SNAPSHOT_READY};
+use frigotab::switcher_application::{AltTabBehavior, SwitcherApplication};
 use frigotab::switcher_state::SwitcherState;
 use windows_sys::Win32::Foundation::{HWND, LPARAM, POINT, RECT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{
@@ -34,18 +34,26 @@ use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::HiDpi::{
     DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetThreadDpiAwarenessContext,
 };
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEINPUT, SendInput,
+    VK_ESCAPE,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    DispatchMessageW, EnumWindows, GW_OWNER, GWL_EXSTYLE, GWL_STYLE, GWLP_USERDATA, GetClientRect,
-    GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowRect, GetWindowTextLengthW,
-    GetWindowTextW, GetWindowThreadProcessId, IDC_ARROW, IDI_APPLICATION, IsWindow,
-    IsWindowVisible, LoadCursorW, LoadIconW, MA_NOACTIVATE, MSG, PM_REMOVE, PeekMessageW,
-    PostMessageW, RegisterClassExW, SW_HIDE, SW_MINIMIZE, SW_RESTORE, SW_SHOWNA, SWP_NOACTIVATE,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow,
-    TranslateMessage, WM_CLOSE, WM_ERASEBKGND, WM_MOUSEACTIVATE, WM_NCCREATE, WM_NCDESTROY,
-    WM_PAINT, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_OVERLAPPEDWINDOW,
-    WS_POPUP,
+    DispatchMessageW, EnumWindows, GW_OWNER, GWL_EXSTYLE, GWL_STYLE, GWLP_USERDATA, GetClassNameW,
+    GetClientRect, GetCursorPos, GetForegroundWindow, GetMenuItemCount, GetMenuItemInfoW,
+    GetMenuItemRect, GetSubMenu, GetWindow, GetWindowLongPtrW, GetWindowRect, GetWindowTextLengthW,
+    GetWindowTextW, GetWindowThreadProcessId, HMENU, IDC_ARROW, IDI_APPLICATION, IsWindow,
+    IsWindowVisible, LoadCursorW, LoadIconW, MA_NOACTIVATE, MENUITEMINFOW, MFS_CHECKED, MIIM_FTYPE,
+    MIIM_STATE, MIIM_STRING, MIIM_SUBMENU, MN_GETHMENU, MSG, PM_REMOVE, PeekMessageW, PostMessageW,
+    RegisterClassExW, SW_HIDE, SW_MINIMIZE, SW_RESTORE, SW_SHOWNA, SWP_NOACTIVATE, SendMessageW,
+    SetCursorPos, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow,
+    TranslateMessage, WM_CLOSE, WM_ERASEBKGND, WM_KEYDOWN, WM_KEYUP, WM_MOUSEACTIVATE, WM_NCCREATE,
+    WM_NCDESTROY, WM_PAINT, WM_RBUTTONUP, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_TOOLWINDOW,
+    WS_EX_TOPMOST, WS_OVERLAPPEDWINDOW, WS_POPUP,
 };
+
+use frigotab::sys_tray_icon::TRAY_CALLBACK_MESSAGE;
 
 pub type Color = u32;
 pub const RED: Color = rgb(255, 0, 0);
@@ -355,6 +363,31 @@ impl LiveSession {
         self.state.controller.state()
     }
 
+    pub fn set_alt_tab_behavior(&mut self, behavior: AltTabBehavior) {
+        self.state.controller.set_alt_tab_behavior(behavior);
+    }
+
+    pub fn alt_tab_behavior(&self) -> AltTabBehavior {
+        self.state.controller.alt_tab_behavior()
+    }
+
+    pub fn set_background_mode(&mut self, mode: BackgroundMode) {
+        self.state
+            .session
+            .as_mut()
+            .expect("live session exists")
+            .set_background_mode(mode);
+        pump_messages();
+    }
+
+    pub fn background_mode(&self) -> BackgroundMode {
+        self.state
+            .session
+            .as_ref()
+            .expect("live session exists")
+            .background_mode()
+    }
+
     pub fn candidate_count(&self) -> usize {
         self.state.controller.candidate_count()
     }
@@ -596,6 +629,19 @@ unsafe extern "system" fn live_owner_window_proc(
 
 pub const WM_BEGIN_SESSION: u32 = 0x4001;
 
+/// A snapshot of one item in the real notification-area popup menu.
+///
+/// The handle is deliberately not exposed: it is valid only while
+/// `TrackPopupMenu` is running in the child process.  Tests inspect the
+/// labels/check marks and select items through the visible popup itself
+/// rather than sending production command IDs directly.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TrayMenuItem {
+    pub label: String,
+    pub checked: bool,
+    pub children: Vec<TrayMenuItem>,
+}
+
 pub struct RunningFrigoTab {
     process: Child,
     owner: HWND,
@@ -687,6 +733,88 @@ impl RunningFrigoTab {
         window_bounds(self.owner).unwrap_or_default()
     }
 
+    /// Opens and reads the actual tray popup, then dismisses it with Escape.
+    /// This crosses the same owner-window callback and `TrackPopupMenu` path
+    /// that a real notification-area right click uses.
+    pub fn tray_menu(&self) -> Option<Vec<TrayMenuItem>> {
+        let popup = self.open_tray_popup()?;
+        let result = tray_menu_items(popup);
+        dismiss_tray_popup(self.pid(), popup);
+        result
+    }
+
+    /// Selects a child item by its visible labels in the real tray menu.
+    /// `parent` names a submenu such as `Background`; `child` names its item
+    /// such as `Black rectangle`.
+    pub fn select_tray_menu_item(&self, parent: &str, child: &str) -> bool {
+        let _cursor = CursorPosition::capture();
+        let Some(popup) = self.open_tray_popup() else {
+            return false;
+        };
+        let Some(menu) = popup_menu(popup) else {
+            dismiss_tray_popup(self.pid(), popup);
+            return false;
+        };
+        let Some(items) = read_menu_items(menu, 0) else {
+            dismiss_tray_popup(self.pid(), popup);
+            return false;
+        };
+        let Some(parent_index) = items
+            .iter()
+            .position(|item| item.label == parent && !item.children.is_empty())
+        else {
+            dismiss_tray_popup(self.pid(), popup);
+            return false;
+        };
+        let Some(child_index) = items[parent_index]
+            .children
+            .iter()
+            .position(|item| item.label == child)
+        else {
+            dismiss_tray_popup(self.pid(), popup);
+            return false;
+        };
+
+        let submenu = unsafe { GetSubMenu(menu, parent_index as i32) };
+        if submenu.is_null() || !click_menu_item(menu, parent_index) {
+            dismiss_tray_popup(self.pid(), popup);
+            return false;
+        }
+
+        if !wait_until(Duration::from_secs(2), || {
+            menu_item_rect(submenu, child_index).is_some()
+        }) {
+            dismiss_tray_popup(self.pid(), popup);
+            return false;
+        }
+        if !click_menu_item(submenu, child_index) {
+            dismiss_tray_popup(self.pid(), popup);
+            return false;
+        }
+
+        wait_until(Duration::from_secs(2), || {
+            find_tray_popup(self.pid()).is_none()
+        })
+    }
+
+    fn open_tray_popup(&self) -> Option<HWND> {
+        if self.owner.is_null()
+            || unsafe { PostMessageW(self.owner, TRAY_CALLBACK_MESSAGE, 0, WM_RBUTTONUP as isize) }
+                == 0
+        {
+            return None;
+        }
+
+        let mut popup = None;
+        if !wait_until(Duration::from_secs(2), || {
+            popup = find_tray_popup(self.pid());
+            popup.is_some()
+        }) {
+            return None;
+        }
+        popup
+    }
+
     pub fn wait_exit(&mut self, timeout: Duration) -> Option<ExitStatus> {
         let deadline = Instant::now() + timeout;
         loop {
@@ -715,6 +843,154 @@ impl Drop for RunningFrigoTab {
             let _ = self.process.kill();
             let _ = self.process.wait();
         }
+    }
+}
+
+fn find_tray_popup(pid: u32) -> Option<HWND> {
+    windows_for_pid(pid)
+        .into_iter()
+        .find(|&hwnd| is_window_visible(hwnd) && window_class(hwnd) == "#32768")
+}
+
+fn window_class(hwnd: HWND) -> String {
+    let mut value = [0u16; 256];
+    let length = unsafe { GetClassNameW(hwnd, value.as_mut_ptr(), value.len() as i32) };
+    if length <= 0 {
+        String::new()
+    } else {
+        String::from_utf16_lossy(&value[..length as usize])
+    }
+}
+
+fn tray_menu_items(popup: HWND) -> Option<Vec<TrayMenuItem>> {
+    read_menu_items(popup_menu(popup)?, 0)
+}
+
+fn popup_menu(popup: HWND) -> Option<HMENU> {
+    (!popup.is_null())
+        .then(|| unsafe { SendMessageW(popup, MN_GETHMENU, 0, 0) as HMENU })
+        .filter(|menu| !menu.is_null())
+}
+
+fn read_menu_items(menu: HMENU, depth: usize) -> Option<Vec<TrayMenuItem>> {
+    if menu.is_null() || depth > 4 {
+        return None;
+    }
+    let count = unsafe { GetMenuItemCount(menu) };
+    if !(0..=32).contains(&count) {
+        return None;
+    }
+
+    let mut items = Vec::with_capacity(count as usize);
+    for position in 0..count {
+        let mut text = [0u16; 128];
+        let mut info = MENUITEMINFOW {
+            cbSize: size_of::<MENUITEMINFOW>() as u32,
+            fMask: MIIM_FTYPE | MIIM_STATE | MIIM_STRING | MIIM_SUBMENU,
+            dwTypeData: text.as_mut_ptr(),
+            cch: (text.len() - 1) as u32,
+            ..Default::default()
+        };
+        if unsafe { GetMenuItemInfoW(menu, position as u32, 1, &mut info) } == 0 {
+            return None;
+        }
+        let length = text
+            .iter()
+            .position(|&character| character == 0)
+            .unwrap_or(text.len());
+        let children = if info.hSubMenu.is_null() {
+            Vec::new()
+        } else {
+            read_menu_items(info.hSubMenu, depth + 1)?
+        };
+        items.push(TrayMenuItem {
+            label: String::from_utf16_lossy(&text[..length]),
+            checked: info.fState & MFS_CHECKED != 0,
+            children,
+        });
+    }
+    Some(items)
+}
+
+fn post_menu_key(popup: HWND, key: u16) -> bool {
+    const KEY_UP_LPARAM: isize = (1 << 30) | (1 << 31) | 1;
+    unsafe {
+        SendMessageW(popup, WM_KEYDOWN, key as usize, 1);
+        SendMessageW(popup, WM_KEYUP, key as usize, KEY_UP_LPARAM);
+    }
+    thread::sleep(Duration::from_millis(20));
+    true
+}
+
+fn menu_item_rect(menu: HMENU, position: usize) -> Option<RECT> {
+    if menu.is_null() {
+        return None;
+    }
+    let mut bounds = RECT::default();
+    (unsafe { GetMenuItemRect(null_mut(), menu, position as u32, &mut bounds) } != 0)
+        .then_some(bounds)
+}
+
+fn click_menu_item(menu: HMENU, position: usize) -> bool {
+    let Some(bounds) = menu_item_rect(menu, position) else {
+        return false;
+    };
+    let x = bounds.left + (bounds.right - bounds.left) / 2;
+    let y = bounds.top + (bounds.bottom - bounds.top) / 2;
+    if unsafe { SetCursorPos(x, y) } == 0 {
+        return false;
+    }
+    let inputs = [
+        mouse_input(MOUSEEVENTF_LEFTDOWN),
+        mouse_input(MOUSEEVENTF_LEFTUP),
+    ];
+    let sent = unsafe {
+        SendInput(
+            inputs.len() as u32,
+            inputs.as_ptr(),
+            size_of::<INPUT>() as i32,
+        )
+    };
+    thread::sleep(Duration::from_millis(40));
+    sent == inputs.len() as u32
+}
+
+fn mouse_input(flags: u32) -> INPUT {
+    INPUT {
+        r#type: INPUT_MOUSE,
+        Anonymous: INPUT_0 {
+            mi: MOUSEINPUT {
+                dwFlags: flags,
+                ..Default::default()
+            },
+        },
+    }
+}
+
+struct CursorPosition(POINT);
+
+impl CursorPosition {
+    fn capture() -> Option<Self> {
+        let mut position = POINT::default();
+        (unsafe { GetCursorPos(&mut position) } != 0).then_some(Self(position))
+    }
+}
+
+impl Drop for CursorPosition {
+    fn drop(&mut self) {
+        unsafe { SetCursorPos(self.0.x, self.0.y) };
+    }
+}
+
+fn dismiss_tray_popup(pid: u32, popup: HWND) {
+    if !popup.is_null() {
+        for _ in 0..4 {
+            if find_tray_popup(pid).is_none() {
+                return;
+            }
+            let _ = post_menu_key(popup, VK_ESCAPE);
+        }
+        let _ = wait_until(Duration::from_secs(2), || find_tray_popup(pid).is_none());
     }
 }
 

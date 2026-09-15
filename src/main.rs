@@ -1,24 +1,27 @@
 #![windows_subsystem = "windows"]
 
+use std::cell::RefCell;
 use std::mem::{size_of, transmute};
 use std::ptr::{null, null_mut};
 
 use frigotab::key_handling::KeyHandling;
 use frigotab::key_hook::{KeyHook, WM_KEY_HOOK_INPUT};
 use frigotab::keyboard_input::{KeyTransition, KeyboardInput, SwitcherKey};
+use frigotab::rect::virtual_screen_bounds;
 use frigotab::screen_point::ScreenPoint;
-use frigotab::session_window::{SessionWindow, WM_DESKTOP_SNAPSHOT_READY};
+use frigotab::session_window::{SessionPainter, SessionWindow, WM_DESKTOP_SNAPSHOT_READY};
 use frigotab::single_instance_guard::{APPLICATION_MUTEX_NAME, SingleInstanceGuard};
 use frigotab::switcher_application::SwitcherApplication;
 use frigotab::switcher_state::SwitcherState;
 use frigotab::sys_tray_icon::{SysTrayIcon, TRAY_CALLBACK_MESSAGE, TrayAction};
+use frigotab::window_handle::WindowHandle;
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{BeginPaint, ClientToScreen, EndPaint, PAINTSTRUCT};
 use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    DispatchMessageW, GWLP_USERDATA, GetClientRect, GetSystemMetrics, GetWindowLongPtrW, IDC_ARROW,
-    IsWindow, LoadCursorW, MA_ACTIVATE, MB_ICONERROR, MB_OK, MSG, MessageBoxW, PostQuitMessage,
+    DispatchMessageW, GWLP_USERDATA, GetClientRect, GetWindowLongPtrW, IDC_ARROW, LoadCursorW,
+    MA_ACTIVATE, MB_ICONERROR, MB_OK, MSG, MessageBoxW, PostMessageW, PostQuitMessage,
     RegisterClassExW, SetProcessDPIAware, SetWindowLongPtrW, TranslateMessage, WM_ACTIVATEAPP,
     WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_DWMCOMPOSITIONCHANGED, WM_ENDSESSION,
     WM_ERASEBKGND, WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCCREATE, WM_NCDESTROY,
@@ -41,6 +44,14 @@ struct App {
     hook: Option<KeyHook>,
     tray: Option<SysTrayIcon>,
     reported_session_visibility: bool,
+}
+
+/// Stable userdata for the owner HWND. The painter deliberately lives beside,
+/// rather than inside, the dynamically borrowed application state so a
+/// synchronous WM_PAINT can safely repaint during native session operations.
+struct OwnerContext {
+    app: RefCell<App>,
+    painter: Option<SessionPainter>,
 }
 
 impl App {
@@ -173,13 +184,19 @@ fn main() {
         return;
     }
 
-    let bounds = virtual_bounds();
+    let bounds = virtual_screen_bounds();
     if bounds.right <= bounds.left || bounds.bottom <= bounds.top {
         return;
     }
 
-    let mut app = Box::new(App::new());
-    let app_pointer = (&mut *app) as *mut App;
+    // Win32 calls can synchronously re-enter this WndProc. RefCell turns
+    // those native callback boundaries into checked Rust borrows instead of
+    // manufacturing aliased `&mut App` references from the userdata pointer.
+    let mut context = Box::new(OwnerContext {
+        app: RefCell::new(App::new()),
+        painter: None,
+    });
+    let context_pointer = (&mut *context) as *mut OwnerContext;
     let owner = unsafe {
         CreateWindowExW(
             WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
@@ -193,7 +210,7 @@ fn main() {
             null_mut(),
             null_mut(),
             instance,
-            app_pointer.cast(),
+            context_pointer.cast(),
         )
     };
     if owner.is_null() {
@@ -202,16 +219,22 @@ fn main() {
 
     // SessionWindow captures Explorer while this owner remains hidden. This
     // is the same startup ordering as SessionForm's retained desktop frame.
-    app.session = Some(SessionWindow::new(owner));
-    app.tray = match SysTrayIcon::new(owner) {
-        Ok(tray) => Some(tray),
+    let session = SessionWindow::new(owner);
+    context.painter = Some(session.painter());
+    context.app.get_mut().session = Some(session);
+    let app = &context.app;
+    let tray = match SysTrayIcon::new(owner) {
+        Ok(tray) => tray,
         Err(error) => {
             show_error(&format!(
                 "FrigoTab could not create its tray icon (Win32 error {error})."
             ));
-            app.close_for_shutdown();
-            if let Some(session) = app.session.as_mut() {
-                session.dispose();
+            {
+                let mut app = app.borrow_mut();
+                app.close_for_shutdown();
+                if let Some(session) = app.session.as_mut() {
+                    session.dispose();
+                }
             }
             unsafe {
                 DestroyWindow(owner);
@@ -219,15 +242,19 @@ fn main() {
             return;
         }
     };
-    app.hook = match KeyHook::start(owner) {
-        Ok(hook) => Some(hook),
+    app.borrow_mut().tray = Some(tray);
+    let hook = match KeyHook::start(owner) {
+        Ok(hook) => hook,
         Err(error) => {
             show_error(&format!(
                 "FrigoTab could not install its global keyboard hook.\n\n{error}"
             ));
-            app.close_for_shutdown();
-            if let Some(session) = app.session.as_mut() {
-                session.dispose();
+            {
+                let mut app = app.borrow_mut();
+                app.close_for_shutdown();
+                if let Some(session) = app.session.as_mut() {
+                    session.dispose();
+                }
             }
             unsafe {
                 DestroyWindow(owner);
@@ -235,6 +262,7 @@ fn main() {
             return;
         }
     };
+    app.borrow_mut().hook = Some(hook);
 
     #[cfg(debug_assertions)]
     unsafe {
@@ -260,16 +288,19 @@ fn main() {
         }
     }
 
-    app.close_for_shutdown();
-    if let Some(session) = app.session.as_mut() {
-        session.dispose();
+    {
+        let mut app = app.borrow_mut();
+        app.close_for_shutdown();
+        if let Some(session) = app.session.as_mut() {
+            session.dispose();
+        }
     }
-    if unsafe { IsWindow(owner) } != 0 {
+    if WindowHandle::new(owner).is_valid() {
         unsafe {
             DestroyWindow(owner);
         }
     }
-    drop(app);
+    drop(context);
 }
 
 fn acquire_instance() -> Option<SingleInstanceGuard> {
@@ -316,40 +347,76 @@ unsafe extern "system" fn owner_window_proc(
     if message == WM_NCCREATE {
         let create = lparam as *const CREATESTRUCTW;
         if !create.is_null() {
-            let app = unsafe { (*create).lpCreateParams as *mut App };
+            let context = unsafe { (*create).lpCreateParams as *mut OwnerContext };
             unsafe {
-                SetWindowLongPtrW(hwnd, GWLP_USERDATA, app as isize);
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, context as isize);
             }
             return 1;
         }
     }
 
-    let pointer = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut App };
+    let pointer = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OwnerContext };
     if pointer.is_null() {
         return unsafe { DefWindowProcW(hwnd, message, wparam, lparam) };
     }
+    // The Box holding this context outlives its owner HWND. Native calls may
+    // synchronously enter this function again, so application branches use a
+    // checked, tightly-scoped dynamic borrow instead of an `*mut App`.
+    let context = unsafe { &*pointer };
+    let app = &context.app;
 
-    // TrackPopupMenu pumps a nested message loop. Keep no Rust reference to
-    // App or its tray owner alive across that call, so a reentrant WM_CLOSE
-    // can safely perform the normal teardown.
+    // TrackPopupMenu pumps a nested message loop. Keep no Ref/RefMut alive
+    // across it so a reentrant WM_CLOSE can perform the normal teardown.
     if message == TRAY_CALLBACK_MESSAGE {
-        // Ignore a callback that was already queued when the tray registration
-        // was removed. This read ends before the modal menu can reenter us.
-        if unsafe { (*pointer).tray.is_none() } {
+        let settings = {
+            let Ok(app) = app.try_borrow() else {
+                return 0;
+            };
+            app.tray.as_ref().map(|_| {
+                (
+                    app.controller.alt_tab_behavior(),
+                    app.session
+                        .as_ref()
+                        .map(SessionWindow::background_mode)
+                        .unwrap_or_default(),
+                )
+            })
+        };
+        let Some((alt_tab_behavior, background_mode)) = settings else {
             return 0;
-        }
-        let action = SysTrayIcon::handle_callback(hwnd, lparam);
-        if action == Some(TrayAction::Exit) && unsafe { IsWindow(hwnd) } != 0 {
-            let app = unsafe { &mut *pointer };
-            app.close_for_shutdown();
-            unsafe {
-                DestroyWindow(hwnd);
+        };
+        let action = SysTrayIcon::handle_callback(hwnd, lparam, alt_tab_behavior, background_mode);
+        if WindowHandle::new(hwnd).is_valid()
+            && unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OwnerContext == pointer }
+        {
+            let mut destroy = false;
+            if let Ok(mut app) = app.try_borrow_mut() {
+                match action {
+                    Some(TrayAction::SetAltTabBehavior(behavior)) => {
+                        app.controller.set_alt_tab_behavior(behavior);
+                    }
+                    Some(TrayAction::SetBackgroundMode(mode)) => {
+                        if let Some(session) = app.session.as_mut() {
+                            session.set_background_mode(mode);
+                        }
+                    }
+                    Some(TrayAction::Exit) => {
+                        app.close_for_shutdown();
+                        destroy = true;
+                    }
+                    None => {}
+                }
+            }
+            // DestroyWindow synchronously sends WM_DESTROY/WM_NCDESTROY.
+            // Wait until the RefMut above has ended before entering it.
+            if destroy {
+                unsafe {
+                    DestroyWindow(hwnd);
+                }
             }
         }
         return 0;
     }
-
-    let app = unsafe { &mut *pointer };
 
     match message {
         WM_PAINT => {
@@ -359,8 +426,8 @@ unsafe extern "system" fn owner_window_proc(
             unsafe {
                 GetClientRect(hwnd, &mut client);
             }
-            if let Some(session) = app.session.as_ref() {
-                session.paint(dc, client);
+            if let Some(painter) = context.painter.as_ref() {
+                painter.paint(dc, client);
             }
             unsafe {
                 EndPaint(hwnd, &paint);
@@ -370,15 +437,21 @@ unsafe extern "system" fn owner_window_proc(
         WM_ERASEBKGND => 1,
         WM_MOUSEACTIVATE => MA_ACTIVATE as isize,
         WM_MOUSEMOVE => {
-            app.handle_mouse_move(mouse_screen_point(hwnd, lparam));
+            if let Ok(mut app) = app.try_borrow_mut() {
+                app.handle_mouse_move(mouse_screen_point(hwnd, lparam));
+            }
             0
         }
         WM_LBUTTONDOWN => {
-            app.handle_mouse_click(mouse_screen_point(hwnd, lparam));
+            if let Ok(mut app) = app.try_borrow_mut() {
+                app.handle_mouse_click(mouse_screen_point(hwnd, lparam));
+            }
             0
         }
         WM_ACTIVATEAPP => {
-            if wparam == 0 {
+            if wparam == 0
+                && let Ok(mut app) = app.try_borrow_mut()
+            {
                 let activating = app
                     .session
                     .as_ref()
@@ -390,41 +463,73 @@ unsafe extern "system" fn owner_window_proc(
             0
         }
         WM_DISPLAYCHANGE | WM_DPICHANGED | WM_DWMCOMPOSITIONCHANGED => {
-            app.relayout();
+            if let Ok(mut app) = app.try_borrow_mut() {
+                app.relayout();
+            }
             0
         }
         WM_ENDSESSION => {
-            app.interrupt();
+            if let Ok(mut app) = app.try_borrow_mut() {
+                app.interrupt();
+            }
             0
         }
         WM_QUERYENDSESSION => {
-            app.interrupt();
+            if let Ok(mut app) = app.try_borrow_mut() {
+                app.interrupt();
+            }
             1
         }
         WM_BEGIN_SESSION => {
-            app.begin_session();
+            if let Ok(mut app) = app.try_borrow_mut() {
+                app.begin_session();
+            }
             0
         }
         WM_DESKTOP_SNAPSHOT_READY => {
-            app.publish_snapshot();
+            if let Ok(mut app) = app.try_borrow_mut() {
+                app.publish_snapshot();
+            }
             0
         }
         WM_KEY_HOOK_INPUT => {
-            app.dispatch_hook_message(wparam);
+            if let Ok(mut app) = app.try_borrow_mut() {
+                app.dispatch_hook_message(wparam);
+            }
             0
         }
         #[cfg(debug_assertions)]
         windows_sys::Win32::UI::WindowsAndMessaging::WM_TIMER if wparam == DEBUG_TIMER_ID => {
-            app.close_for_shutdown();
-            unsafe {
-                DestroyWindow(hwnd);
+            let can_destroy = if let Ok(mut app) = app.try_borrow_mut() {
+                app.close_for_shutdown();
+                true
+            } else {
+                false
+            };
+            if can_destroy {
+                unsafe {
+                    DestroyWindow(hwnd);
+                }
             }
             0
         }
         WM_CLOSE => {
-            app.close_for_shutdown();
-            unsafe {
-                DestroyWindow(hwnd);
+            let can_destroy = if let Ok(mut app) = app.try_borrow_mut() {
+                app.close_for_shutdown();
+                true
+            } else {
+                false
+            };
+            if can_destroy {
+                unsafe {
+                    DestroyWindow(hwnd);
+                }
+            } else {
+                // Retry after the native call which caused this reentrancy
+                // returns and releases its checked application borrow.
+                unsafe {
+                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                }
             }
             0
         }
@@ -432,7 +537,9 @@ unsafe extern "system" fn owner_window_proc(
             // WM_DESTROY is also reachable when the owner is destroyed by
             // another path than WM_CLOSE. Finish the worker/resource teardown
             // while this HWND cannot yet be reused by another window.
-            app.close_for_shutdown();
+            if let Ok(mut app) = app.try_borrow_mut() {
+                app.close_for_shutdown();
+            }
             unsafe {
                 PostQuitMessage(0);
             }
@@ -463,25 +570,6 @@ fn enable_dpi_awareness() {
     }
     unsafe {
         let _ = SetProcessDPIAware();
-    }
-}
-
-fn virtual_bounds() -> RECT {
-    let left =
-        unsafe { GetSystemMetrics(windows_sys::Win32::UI::WindowsAndMessaging::SM_XVIRTUALSCREEN) };
-    let top =
-        unsafe { GetSystemMetrics(windows_sys::Win32::UI::WindowsAndMessaging::SM_YVIRTUALSCREEN) };
-    let width = unsafe {
-        GetSystemMetrics(windows_sys::Win32::UI::WindowsAndMessaging::SM_CXVIRTUALSCREEN)
-    };
-    let height = unsafe {
-        GetSystemMetrics(windows_sys::Win32::UI::WindowsAndMessaging::SM_CYVIRTUALSCREEN)
-    };
-    RECT {
-        left,
-        top,
-        right: left.saturating_add(width),
-        bottom: top.saturating_add(height),
     }
 }
 

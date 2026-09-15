@@ -1,14 +1,15 @@
 //! Window icon acquisition, including the asynchronous WM_GETICON request
 //! used by the original `WindowIcon` class.
 
-use std::ptr::NonNull;
 use std::{
     cell::RefCell,
+    ffi::c_void,
+    ptr::NonNull,
     rc::{Rc, Weak},
 };
 
 use windows_sys::Win32::Foundation::{HWND, LRESULT};
-use windows_sys::Win32::Graphics::Gdi::{BITMAP, DeleteObject, GetObjectW, HBITMAP};
+use windows_sys::Win32::Graphics::Gdi::{BITMAP, DeleteObject, GetObjectW};
 use windows_sys::Win32::System::LibraryLoader::GetModuleFileNameW;
 use windows_sys::Win32::UI::Shell::ExtractAssociatedIconW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -56,18 +57,15 @@ impl Drop for OwnedIcon {
 
 /// `GetIconInfo` transfers ownership of both returned bitmap handles.
 struct IconInfoBitmaps {
-    color: HBITMAP,
-    mask: HBITMAP,
+    color: Option<NonNull<c_void>>,
+    mask: Option<NonNull<c_void>>,
 }
 
 impl Drop for IconInfoBitmaps {
     fn drop(&mut self) {
-        unsafe {
-            if !self.color.is_null() {
-                DeleteObject(self.color.cast());
-            }
-            if !self.mask.is_null() {
-                DeleteObject(self.mask.cast());
+        for bitmap in [self.color, self.mask].into_iter().flatten() {
+            unsafe {
+                DeleteObject(bitmap.as_ptr());
             }
         }
     }
@@ -227,31 +225,23 @@ fn icon_size(icon: HICON) -> Result<(i32, i32), String> {
     }
 
     let bitmaps = IconInfoBitmaps {
-        color: info.hbmColor,
-        mask: info.hbmMask,
+        color: NonNull::new(info.hbmColor),
+        mask: NonNull::new(info.hbmMask),
     };
-    let bitmap_handle = if !bitmaps.color.is_null() {
-        bitmaps.color
-    } else {
-        bitmaps.mask
-    };
+    let bitmap_handle = bitmaps.color.or(bitmaps.mask);
     let mut bitmap = BITMAP::default();
-    let read = if bitmap_handle.is_null() {
-        0
-    } else {
-        unsafe {
-            GetObjectW(
-                bitmap_handle.cast(),
-                std::mem::size_of::<BITMAP>() as i32,
-                (&mut bitmap as *mut BITMAP).cast(),
-            )
-        }
-    };
+    let read = bitmap_handle.map_or(0, |handle| unsafe {
+        GetObjectW(
+            handle.as_ptr(),
+            std::mem::size_of::<BITMAP>() as i32,
+            (&mut bitmap as *mut BITMAP).cast(),
+        )
+    });
     if read == 0 {
         return Err("GetObjectW failed for the cloned window icon".to_string());
     }
 
-    let height = if bitmaps.color.is_null() {
+    let height = if bitmaps.color.is_none() {
         bitmap.bmHeight / 2
     } else {
         bitmap.bmHeight

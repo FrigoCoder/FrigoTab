@@ -91,11 +91,6 @@ impl SingleInstanceGuard {
         let error = unsafe { GetLastError() };
         Err(SingleInstanceError::Wait(error))
     }
-
-    /// Convenience form using the application's canonical mutex name.
-    pub fn acquire() -> Result<Option<Self>, SingleInstanceError> {
-        Self::try_acquire(APPLICATION_MUTEX_NAME)
-    }
 }
 
 impl Drop for SingleInstanceGuard {

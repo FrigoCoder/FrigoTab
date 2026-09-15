@@ -66,10 +66,6 @@ impl DeferredKeyboardDispatcher {
         })
     }
 
-    pub fn pending_count(&self) -> usize {
-        self.pending.load(Ordering::Acquire)
-    }
-
     /// Prevents callbacks posted before a session/desktop interruption from
     /// reaching the handler after input state has been reset. Already-posted
     /// callbacks still release their bounded queue slots.

@@ -1,13 +1,16 @@
-//! Native notification-area icon and its one-item Exit menu.
+//! Native notification-area icon and its small settings menu.
 //!
 //! The shell owns the visible tray copy, while this value keeps the icon
 //! handle and notification registration alive for the same lifetime as the
 //! application.  Only right-click/context-menu callbacks are acted upon;
 //! double-clicks and every other tray event remain no-ops.
 
+use std::ffi::c_void;
 use std::mem::size_of;
-use std::ptr::{null, null_mut};
+use std::ptr::{NonNull, null, null_mut};
 
+use crate::session_window::BackgroundMode;
+use crate::switcher_application::AltTabBehavior;
 use windows_sys::Win32::Foundation::{GetLastError, HWND, POINT};
 use windows_sys::Win32::System::LibraryLoader::GetModuleFileNameW;
 use windows_sys::Win32::UI::Shell::{
@@ -16,20 +19,27 @@ use windows_sys::Win32::UI::Shell::{
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, DestroyIcon, DestroyMenu, GetCursorPos, HICON, HMENU,
-    IDI_APPLICATION, LoadIconW, MF_STRING, PostMessageW, SetForegroundWindow, TPM_BOTTOMALIGN,
-    TPM_LEFTALIGN, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, WM_APP, WM_CONTEXTMENU, WM_NULL,
-    WM_RBUTTONUP,
+    IDI_APPLICATION, LoadIconW, MF_CHECKED, MF_POPUP, MF_SEPARATOR, MF_STRING, PostMessageW,
+    SetForegroundWindow, TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_RETURNCMD, TPM_RIGHTBUTTON,
+    TrackPopupMenu, WM_APP, WM_CONTEXTMENU, WM_NULL, WM_RBUTTONUP,
 };
 
 pub const TRAY_CALLBACK_MESSAGE: u32 = WM_APP + 1;
 
 const TRAY_ICON_ID: u32 = 1;
-const EXIT_COMMAND: usize = 1;
+const STICKY_COMMAND: usize = 1;
+const TAP_COMMAND: usize = 2;
+const FULL_DESKTOP_COMMAND: usize = 3;
+const IMAGE_ONLY_COMMAND: usize = 4;
+const BLACK_COMMAND: usize = 5;
+const EXIT_COMMAND: usize = 6;
 
-/// The only action exposed by the tray menu.
+/// An action selected from the tray menu.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TrayAction {
     Exit,
+    SetAltTabBehavior(AltTabBehavior),
+    SetBackgroundMode(BackgroundMode),
 }
 
 /// Owns an icon returned by an API that transfers ownership to the caller.
@@ -73,23 +83,49 @@ impl ApplicationIcon {
 }
 
 /// Owns a temporary popup menu until it has been dismissed.
-struct PopupMenu(HMENU);
+struct PopupMenu(Option<NonNull<c_void>>);
 
 impl PopupMenu {
     fn new() -> Option<Self> {
-        let handle = unsafe { CreatePopupMenu() };
-        (!handle.is_null()).then_some(Self(handle))
+        NonNull::new(unsafe { CreatePopupMenu() }).map(|handle| Self(Some(handle)))
     }
 
     fn handle(&self) -> HMENU {
         self.0
+            .expect("an attached popup menu is no longer directly usable")
+            .as_ptr()
+    }
+
+    /// Attach this menu as a child of another menu and transfer ownership to
+    /// Win32. `DestroyMenu` on the parent recursively destroys attached
+    /// submenus, so the child must no longer run its own `Drop` afterwards.
+    fn attach_to(mut self, parent: HMENU, label: &str) -> bool {
+        let text = wide(label);
+        let result = unsafe {
+            AppendMenuW(
+                parent,
+                MF_POPUP | MF_STRING,
+                self.handle() as usize,
+                text.as_ptr(),
+            )
+        };
+        if result == 0 {
+            return false;
+        }
+        // The parent menu now owns this child and will destroy it
+        // recursively. Clear the guard before it is dropped so ownership is
+        // transferred without leaking or double-destroying the HMENU.
+        self.0.take();
+        true
     }
 }
 
 impl Drop for PopupMenu {
     fn drop(&mut self) {
-        unsafe {
-            DestroyMenu(self.0);
+        if let Some(handle) = self.0.take() {
+            unsafe {
+                DestroyMenu(handle.as_ptr());
+            }
         }
     }
 }
@@ -131,11 +167,19 @@ impl SysTrayIcon {
         })
     }
 
-    /// Process a notification-area callback.  Only context/right-click
-    /// events open the one-item Exit menu.
-    pub fn handle_callback(owner: HWND, event: isize) -> Option<TrayAction> {
+    /// Process a notification-area callback. Only context/right-click events
+    /// open the menu. The settings are copied in before entering the modal
+    /// menu loop, so no Rust borrow of the application crosses `TrackPopupMenu`.
+    pub fn handle_callback(
+        owner: HWND,
+        event: isize,
+        alt_tab_behavior: AltTabBehavior,
+        background_mode: BackgroundMode,
+    ) -> Option<TrayAction> {
         match event as u32 {
-            WM_RBUTTONUP | WM_CONTEXTMENU => Self::show_menu(owner),
+            WM_RBUTTONUP | WM_CONTEXTMENU => {
+                Self::show_menu(owner, alt_tab_behavior, background_mode)
+            }
             _ => None,
         }
     }
@@ -152,11 +196,55 @@ impl SysTrayIcon {
         Ok(())
     }
 
-    fn show_menu(owner: HWND) -> Option<TrayAction> {
+    fn show_menu(
+        owner: HWND,
+        alt_tab_behavior: AltTabBehavior,
+        background_mode: BackgroundMode,
+    ) -> Option<TrayAction> {
         let menu = PopupMenu::new()?;
 
-        let label = wide("Exit");
-        if unsafe { AppendMenuW(menu.handle(), MF_STRING, EXIT_COMMAND, label.as_ptr()) } == 0 {
+        let alt_tab_menu = PopupMenu::new()?;
+        if !append_item(
+            alt_tab_menu.handle(),
+            STICKY_COMMAND,
+            "Sticky",
+            alt_tab_behavior == AltTabBehavior::Sticky,
+        ) || !append_item(
+            alt_tab_menu.handle(),
+            TAP_COMMAND,
+            "Tap (classic)",
+            alt_tab_behavior == AltTabBehavior::Tap,
+        ) || !alt_tab_menu.attach_to(menu.handle(), "Alt-Tab behavior")
+        {
+            return None;
+        }
+
+        let background_menu = PopupMenu::new()?;
+        if !append_item(
+            background_menu.handle(),
+            FULL_DESKTOP_COMMAND,
+            "Full desktop",
+            background_mode == BackgroundMode::FullDesktop,
+        ) || !append_item(
+            background_menu.handle(),
+            IMAGE_ONLY_COMMAND,
+            "Background image only",
+            background_mode == BackgroundMode::ImageOnly,
+        ) || !append_item(
+            background_menu.handle(),
+            BLACK_COMMAND,
+            "Black rectangle",
+            background_mode == BackgroundMode::Black,
+        ) || !background_menu.attach_to(menu.handle(), "Background")
+        {
+            return None;
+        }
+
+        if unsafe { AppendMenuW(menu.handle(), MF_SEPARATOR, 0, null()) } == 0 {
+            return None;
+        }
+
+        if !append_item(menu.handle(), EXIT_COMMAND, "Exit", false) {
             return None;
         }
 
@@ -183,7 +271,17 @@ impl SysTrayIcon {
             PostMessageW(owner, WM_NULL, 0, 0);
         }
 
-        (command == EXIT_COMMAND).then_some(TrayAction::Exit)
+        match command {
+            STICKY_COMMAND => Some(TrayAction::SetAltTabBehavior(AltTabBehavior::Sticky)),
+            TAP_COMMAND => Some(TrayAction::SetAltTabBehavior(AltTabBehavior::Tap)),
+            FULL_DESKTOP_COMMAND => {
+                Some(TrayAction::SetBackgroundMode(BackgroundMode::FullDesktop))
+            }
+            IMAGE_ONLY_COMMAND => Some(TrayAction::SetBackgroundMode(BackgroundMode::ImageOnly)),
+            BLACK_COMMAND => Some(TrayAction::SetBackgroundMode(BackgroundMode::Black)),
+            EXIT_COMMAND => Some(TrayAction::Exit),
+            _ => None,
+        }
     }
 }
 
@@ -191,6 +289,12 @@ impl Drop for SysTrayIcon {
     fn drop(&mut self) {
         let _ = self.remove();
     }
+}
+
+fn append_item(menu: HMENU, command: usize, label: &str, checked: bool) -> bool {
+    let text = wide(label);
+    let flags = MF_STRING | if checked { MF_CHECKED } else { 0 };
+    unsafe { AppendMenuW(menu, flags, command, text.as_ptr()) != 0 }
 }
 
 fn application_icon() -> ApplicationIcon {

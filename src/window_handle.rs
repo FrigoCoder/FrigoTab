@@ -11,7 +11,7 @@ use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::keybd_event;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GWL_EXSTYLE, GWL_STYLE, GetWindowLongPtrW, GetWindowPlacement, GetWindowRect,
-    GetWindowTextLengthW, GetWindowTextW, SW_RESTORE, SW_SHOWMAXIMIZED, SW_SHOWMINIMIZED,
+    GetWindowTextLengthW, GetWindowTextW, IsWindow, SW_RESTORE, SW_SHOWMAXIMIZED, SW_SHOWMINIMIZED,
     SW_SHOWNORMAL, SetForegroundWindow, ShowWindow, WINDOWPLACEMENT, WS_DISABLED, WS_EX_APPWINDOW,
     WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT, WS_MINIMIZE, WS_VISIBLE,
 };
@@ -61,6 +61,10 @@ impl WindowHandle {
 
     pub const fn raw(self) -> HWND {
         self.0
+    }
+
+    pub fn is_valid(self) -> bool {
+        !self.0.is_null() && unsafe { IsWindow(self.0) != 0 }
     }
 
     pub fn get_window_styles(self) -> WindowStyles {

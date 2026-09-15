@@ -3,6 +3,18 @@ use crate::keyboard_input::{KeyboardInput, SwitcherKey};
 use crate::screen_point::ScreenPoint;
 use crate::switcher_state::SwitcherState;
 
+/// Determines what releasing Alt does after the switcher opens.
+///
+/// Sticky mode keeps the session open for deliberate keyboard or pointer
+/// selection. Tap mode follows the classic Alt-Tab gesture and commits the
+/// currently selected candidate when Alt is released.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum AltTabBehavior {
+    #[default]
+    Sticky,
+    Tap,
+}
+
 /// The boundary between the deterministic switcher state machine and the
 /// Win32 implementation.  The implementation owns native windows, thumbnails,
 /// drawing resources, and foreground-window calls.
@@ -47,6 +59,7 @@ pub struct SwitcherApplication {
     state: SwitcherState,
     candidate_count: usize,
     selected_index: Option<usize>,
+    alt_tab_behavior: AltTabBehavior,
 }
 
 impl SwitcherApplication {
@@ -64,6 +77,14 @@ impl SwitcherApplication {
 
     pub fn selected_index(&self) -> Option<usize> {
         self.selected_index
+    }
+
+    pub fn alt_tab_behavior(&self) -> AltTabBehavior {
+        self.alt_tab_behavior
+    }
+
+    pub fn set_alt_tab_behavior(&mut self, behavior: AltTabBehavior) {
+        self.alt_tab_behavior = behavior;
     }
 
     /// Handles a normalized keyboard event and returns whether the global hook
@@ -217,9 +238,12 @@ impl SwitcherApplication {
             return KeyHandling::Consume;
         }
         if input.is_up() && input.key == SwitcherKey::Alt {
-            // FrigoTab is sticky: releasing Alt does not choose a target; a
-            // number or pointer click does that. Passing the release through
-            // balances the physical Alt-down that opened the session.
+            if self.alt_tab_behavior == AltTabBehavior::Tap {
+                self.try_commit_selection(port);
+            }
+            // The physical Alt-down event was allowed through before the
+            // switcher opened. Pass its release through as well so the
+            // foreground application cannot be left with a stuck modifier.
             return KeyHandling::PassThrough;
         }
         KeyHandling::PassThrough

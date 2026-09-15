@@ -110,20 +110,27 @@ impl FrigoWindow {
         let Some(hwnd) = NonNull::new(raw) else {
             return Err(error("CreateWindowExW"));
         };
+        // Take ownership before the final placement call. If SetWindowPos
+        // fails, returning the error drops this guard and destroys the HWND
+        // instead of leaking a partially-created popup.
+        let window = Self { hwnd };
         unsafe {
             // HWND_TOPMOST is kept explicit to preserve the original
             // topmost-window behavior through SetWindowPos.
-            SetWindowPos(
-                hwnd.as_ptr(),
+            if SetWindowPos(
+                window.hwnd(),
                 HWND_TOPMOST,
                 bounds.left,
                 bounds.top,
                 width,
                 height,
                 SWP_NOACTIVATE | SWP_NOOWNERZORDER,
-            );
+            ) == 0
+            {
+                return Err(error("SetWindowPos"));
+            }
         }
-        Ok(Self { hwnd })
+        Ok(window)
     }
 
     pub fn hwnd(&self) -> HWND {

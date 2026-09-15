@@ -371,13 +371,7 @@ fn monitor_info(monitor: HMONITOR) -> Option<MonitorNativeInfo> {
     };
     // GetMonitorInfoW receives a MONITORINFO pointer; MONITORINFOEXW starts
     // with that exact structure and carries the device name after it.
-    if unsafe {
-        GetMonitorInfoW(
-            monitor,
-            (&mut info as *mut MONITORINFOEXW).cast::<MONITORINFO>(),
-        )
-    } == 0
-    {
+    if unsafe { GetMonitorInfoW(monitor, &mut info.monitorInfo) } == 0 {
         return None;
     }
     let id_end = info
