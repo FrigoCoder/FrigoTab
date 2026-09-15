@@ -1,0 +1,43 @@
+[package]
+name = "frigotab"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+publish = false
+build = "build.rs"
+
+[[bin]]
+name = "FrigoTab"
+path = "src/main.rs"
+
+[dependencies]
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_GdiPlus",
+    "Win32_Security",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+# Windows resources are part of the executable packaging, not the production
+# dependency graph.  Keep this build-only helper free of its optional TOML
+# parser; the resource inputs are explicit in build.rs.
+[build-dependencies]
+winresource = { version = "0.1.31", default-features = false }
+
+[profile.release]
+codegen-units = 1
+lto = true
+panic = "abort"
+strip = true
+
+[workspace]
+members = ["acceptance-tests"]
+resolver = "3"

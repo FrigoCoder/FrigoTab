@@ -4,16 +4,17 @@ The matrix separates deterministic acceptance tests from native-desktop checks t
 
 ## Automated suite
 
-The suite is plain C# MSTest. All 28 tests execute against real application objects, native Windows resources, or the launched executable. There is no Reqnroll/Gherkin layer, `.feature` file, or intentionally-red lane.
+The suite is made up of plain Rust integration tests. All 31 tests execute against real application objects, native Windows resources, or the launched executable. There is no BDD/Gherkin layer, feature file, fake session, or intentionally-red lane.
 
 | Timestamped family | Count | Evidence boundary | Coverage |
 | --- | ---: | --- | --- |
-| `T20260914T211700Z_001_RealSwitcherAcceptanceTests` | 15 | Real WinForms objects and HWNDs | Opening, sticky Alt release, forward/reverse wrapping, number and pointer selection, cancellation, stale targets, activation recovery, key-up balancing, pass-through, cleanup, and reopening. |
-| `T20260914T212400Z_002_RealWindowAndBackdropAcceptanceTests` | 7 | Real window, DWM, GDI, and shell objects | Candidate classification, Unicode titles, restored geometry, stale HWND layout, shell wallpaper/icon snapshot, staged DWM visibility, and repeated thumbnail disposal. |
-| `T20260914T212400Z_003_RealProcessAcceptanceTests` | 6 | Launched `FrigoTab.exe` | Hidden/resident startup, single-instance exit, real session HWND, full desktop session, pointer activation, and first-frame shell backdrop ordering. |
-| **Total** | **28** |  | **All automated tests pass before a publish is accepted.** |
+| `t20260914t211700z_001_real_switcher_acceptance_tests` | 15 | Real switcher/session HWNDs and native resources | Opening, sticky Alt release, forward/reverse wrapping, number and pointer selection, cancellation, stale targets, activation recovery, key-up balancing, pass-through, cleanup, and reopening. |
+| `t20260914t212400z_002_real_window_and_backdrop_acceptance_tests` | 7 | Real window, DWM, GDI, and shell objects | Candidate classification, Unicode titles, restored geometry, stale HWND layout, shell wallpaper/icon snapshot, staged DWM visibility, and repeated thumbnail disposal. |
+| `t20260914t212400z_003_real_process_acceptance_tests` | 6 | Launched `FrigoTab.exe` | Hidden/resident startup, single-instance exit, real session HWND, full desktop session, pointer activation, and first-frame shell backdrop ordering. |
+| `t20260914t223000z_004_real_visual_parity_acceptance_tests` | 3 | Launched `FrigoTab.exe` and real layered preview windows | Owned window topology, DWM tile coverage, selected-tile tint, measured title backing, icon rendering, and centered number rendering. |
+| **Total** | **31** |  | **All automated tests pass before a publish is accepted.** |
 
-The class and file prefixes are UTC timestamps recording when a family was introduced. Keep the prefix when refactoring a family; methods remain descriptive plain C# names. The process tests accept `FRIGOTAB_EXE` when a different built executable is being compared with the current C# baseline.
+The file prefixes are UTC timestamps recording when a family was introduced. Keep the prefix when refactoring a family; test functions remain descriptive plain Rust names. The process tests accept `FRIGOTAB_EXE` when a different built executable is being compared with the current Rust build.
 
 ## Manual Windows release matrix
 
@@ -21,8 +22,10 @@ Run these checks on each supported Windows configuration. Record the OS build, x
 
 The Debug executable retains the historical ten-second `StartQuitTimer` safety timer. Use a Release artifact for sustained testing:
 
-- `artifacts/publish/lean-win-x64/FrigoTab.exe` is framework-dependent and requires the .NET 10 Windows Desktop Runtime.
-- `artifacts/publish/portable-win-x64/FrigoTab.exe` is a compressed self-contained executable and carries its runtime.
+- `target/release/FrigoTab.exe` is the optimized native executable produced by Cargo.
+- `artifacts/publish/win-x64/FrigoTab.exe` is the release artifact produced by `build.ps1 -Task Publish`.
+
+Both artifacts are native x64 executables and do not require a managed runtime.
 
 | Scenario | Pass condition |
 | --- | --- |
@@ -49,11 +52,10 @@ The Debug executable retains the historical ten-second `StartQuitTimer` safety t
 ```powershell
 .\build.ps1 -Task Restore
 .\build.ps1 -Task Build -Configuration Debug
-.\build.ps1 -Task Test
-.\build.ps1 -Task Verify
+.\build.ps1 -Task Test -Configuration Release
+.\build.ps1 -Task Verify -Configuration Release
 .\build.ps1 -Task Publish -Configuration Release
-.\build.ps1 -Task PublishPortable -Configuration Release
 .\build.ps1 -Task Clean
 ```
 
-`Verify` and `Test` run all 28 acceptance tests. `Publish` and `PublishPortable` repeat the Release build and green test gate before producing artifacts. `Clean` removes generated `bin`, `obj`, and `artifacts` output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point. No CI/CD service is required by this local workflow.
+`Verify` and `Test` run all 31 acceptance tests serially. `Publish` repeats the Release build and green test gate before producing `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point. No CI/CD service is required by this local workflow.

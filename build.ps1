@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Clean', 'Restore', 'Build', 'Test', 'Verify', 'Publish', 'PublishPortable')]
+    [ValidateSet('Clean', 'Restore', 'Build', 'Test', 'Verify', 'Publish')]
     [string] $Task = 'Verify',
 
     [ValidateSet('Debug', 'Release')]
@@ -11,37 +11,51 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$solutionPath = Join-Path $repositoryRoot 'FrigoTab.sln'
-$applicationProjectPath = Join-Path $repositoryRoot 'FrigoTab\FrigoTab.csproj'
-$acceptanceProjectPath = Join-Path $repositoryRoot 'FrigoTab.AcceptanceTests\FrigoTab.AcceptanceTests.csproj'
-$leanPublishPath = Join-Path $repositoryRoot 'artifacts\publish\lean-win-x64'
-$portablePublishPath = Join-Path $repositoryRoot 'artifacts\publish\portable-win-x64'
-
-$dotnetCommand = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue
-if ($null -eq $dotnetCommand) {
-    Write-Error @"
-The dotnet CLI was not found on PATH. Install the .NET 10 SDK (10.0.100 or later)
-from https://dotnet.microsoft.com/download/dotnet/10.0, then run this command again.
-No software was installed automatically.
-"@
-    exit 1
+$cargoCommand = Get-Command cargo -CommandType Application -ErrorAction SilentlyContinue
+if ($null -eq $cargoCommand) {
+    throw 'The cargo CLI was not found on PATH. Install Rust with rustup and try again.'
 }
+$cargoPath = $cargoCommand.Source
 
-$dotnetPath = $dotnetCommand.Source
-$script:restoreComplete = $false
-$script:buildComplete = $false
-
-function Invoke-Dotnet {
+function Invoke-Cargo {
     param(
         [Parameter(Mandatory = $true)]
         [string[]] $Arguments
     )
 
-    Write-Host ("> dotnet " + ($Arguments -join ' '))
-    & $dotnetPath @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet command failed with exit code $LASTEXITCODE."
+    Write-Host ("> cargo " + ($Arguments -join ' '))
+    Push-Location $repositoryRoot
+    try {
+        & $cargoPath @Arguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "cargo command failed with exit code $LASTEXITCODE."
+        }
     }
+    finally {
+        Pop-Location
+    }
+}
+
+function Get-ProfileArguments {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $BuildConfiguration
+    )
+
+    if ($BuildConfiguration -eq 'Release') {
+        return @('--release')
+    }
+    return @()
+}
+
+function Get-ExecutablePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $BuildConfiguration
+    )
+
+    $profile = if ($BuildConfiguration -eq 'Release') { 'release' } else { 'debug' }
+    return Join-Path $repositoryRoot (Join-Path "target\$profile" 'FrigoTab.exe')
 }
 
 function Assert-RepositoryChildPath {
@@ -58,164 +72,83 @@ function Assert-RepositoryChildPath {
 }
 
 function Invoke-Restore {
-    Invoke-Dotnet @('restore', $solutionPath, '--nologo')
-    $script:restoreComplete = $true
-}
-
-function Ensure-Restore {
-    if (-not $script:restoreComplete) {
-        Invoke-Restore
-    }
+    Invoke-Cargo @('fetch', '--locked')
 }
 
 function Invoke-Build {
-    Ensure-Restore
-    Invoke-Dotnet @(
-        'build', $solutionPath,
-        '--configuration', $Configuration,
-        '--no-restore',
-        '--nologo',
-        '-p:Platform=x64'
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $BuildConfiguration
     )
-    $script:buildComplete = $true
+
+    $arguments = @('build', '--workspace', '--locked') +
+        (Get-ProfileArguments -BuildConfiguration $BuildConfiguration)
+    Invoke-Cargo $arguments
 }
 
-function Invoke-GreenTests {
-    Ensure-Restore
-    if (-not $script:buildComplete) {
-        Invoke-Build
+function Invoke-Tests {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $BuildConfiguration
+    )
+
+    Invoke-Build -BuildConfiguration $BuildConfiguration
+    $executablePath = Get-ExecutablePath -BuildConfiguration $BuildConfiguration
+    if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
+        throw "Cargo did not produce the expected executable: $executablePath"
     }
 
-    Invoke-Dotnet @(
-        'test', $acceptanceProjectPath,
-        '--configuration', $Configuration,
-        '--no-build',
-        '--no-restore',
-        '--nologo',
-        '-p:Platform=x64',
-        '--filter', 'TestCategory=Acceptance'
+    $previousExecutable = $env:FRIGOTAB_EXE
+    try {
+        $env:FRIGOTAB_EXE = $executablePath
+        $arguments = @('test', '-p', 'frigotab-acceptance', '--locked') +
+            (Get-ProfileArguments -BuildConfiguration $BuildConfiguration) +
+            @('--', '--test-threads=1')
+        Invoke-Cargo $arguments
+    }
+    finally {
+        if ($null -eq $previousExecutable) {
+            Remove-Item Env:FRIGOTAB_EXE -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:FRIGOTAB_EXE = $previousExecutable
+        }
+    }
+}
+
+function Invoke-Verify {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $BuildConfiguration
     )
+
+    Invoke-Cargo @('fmt', '--all', '--', '--check')
+    $arguments = @('check', '--workspace', '--all-targets', '--locked') +
+        (Get-ProfileArguments -BuildConfiguration $BuildConfiguration)
+    Invoke-Cargo $arguments
+    Invoke-Tests -BuildConfiguration $BuildConfiguration
 }
 
 function Invoke-Clean {
-    foreach ($cleanConfiguration in @('Debug', 'Release')) {
-        Invoke-Dotnet @(
-            'clean', $solutionPath,
-            '--configuration', $cleanConfiguration,
-            '--nologo',
-            '--verbosity', 'minimal',
-            '-p:Platform=x64'
-        )
-    }
-
+    Invoke-Cargo @('clean')
     $artifactsPath = Join-Path $repositoryRoot 'artifacts'
     if (Test-Path -LiteralPath $artifactsPath) {
         Assert-RepositoryChildPath $artifactsPath
         Remove-Item -LiteralPath $artifactsPath -Recurse -Force
     }
-
-    # `dotnet clean` only removes outputs for the requested configuration and
-    # platform. Remove the known project output roots as well so this task has
-    # Maven-clean semantics even after RID-specific/self-contained publishes.
-    $generatedPaths = @(
-        (Join-Path $repositoryRoot 'FrigoTab\bin'),
-        (Join-Path $repositoryRoot 'FrigoTab\obj'),
-        (Join-Path $repositoryRoot 'FrigoTab.Core\bin'),
-        (Join-Path $repositoryRoot 'FrigoTab.Core\obj'),
-        (Join-Path $repositoryRoot 'FrigoTab.AcceptanceTests\bin'),
-        (Join-Path $repositoryRoot 'FrigoTab.AcceptanceTests\obj')
-    )
-    foreach ($generatedPath in $generatedPaths) {
-        if (Test-Path -LiteralPath $generatedPath) {
-            Assert-RepositoryChildPath $generatedPath
-            Remove-Item -LiteralPath $generatedPath -Recurse -Force
-        }
-    }
-}
-
-function Invoke-ReleaseGate {
-    # Publishing is release-gated: it first performs the same green build and
-    # acceptance suite as Verify, but with Release binaries.
-    Invoke-Dotnet @('restore', $solutionPath, '--nologo')
-    Invoke-Dotnet @(
-        'build', $solutionPath,
-        '--configuration', 'Release',
-        '--no-restore',
-        '--nologo',
-        '-p:Platform=x64'
-    )
-    Invoke-Dotnet @(
-        'test', $acceptanceProjectPath,
-        '--configuration', 'Release',
-        '--no-build',
-        '--no-restore',
-        '--nologo',
-        '-p:Platform=x64',
-        '--filter', 'TestCategory=Acceptance'
-    )
-
-}
-
-function Reset-PublishDirectory {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $Path
-    )
-
-    if (Test-Path -LiteralPath $Path) {
-        Assert-RepositoryChildPath $Path
-        Remove-Item -LiteralPath $Path -Recurse -Force
-    }
-    New-Item -ItemType Directory -Path $Path -Force | Out-Null
 }
 
 function Invoke-Publish {
-    Invoke-ReleaseGate
+    Invoke-Verify -BuildConfiguration 'Release'
 
-    # The default artifact is deliberately lean. It is a single application
-    # file and relies on the .NET 10 Windows Desktop Runtime on the target PC.
-    Invoke-Dotnet @('restore', $applicationProjectPath, '--runtime', 'win-x64', '--nologo')
-    Reset-PublishDirectory $leanPublishPath
-
-    Invoke-Dotnet @(
-        'publish', $applicationProjectPath,
-        '--configuration', 'Release',
-        '--runtime', 'win-x64',
-        '--self-contained', 'false',
-        '--no-restore',
-        '--nologo',
-        '-p:Platform=x64',
-        '-p:PublishSingleFile=true',
-        '-p:DebugType=None',
-        '-p:DebugSymbols=false',
-        '--output', $leanPublishPath
-    )
-}
-
-function Invoke-PublishPortable {
-    Invoke-ReleaseGate
-
-    # This fallback carries the entire Windows Desktop runtime for machines
-    # without .NET. Compression cuts the old 117 MiB / 273-file output to one
-    # roughly 47 MiB executable without unsupported WinForms trimming.
-    Invoke-Dotnet @('restore', $applicationProjectPath, '--runtime', 'win-x64', '--nologo')
-    Reset-PublishDirectory $portablePublishPath
-    Invoke-Dotnet @(
-        'publish', $applicationProjectPath,
-        '--configuration', 'Release',
-        '--runtime', 'win-x64',
-        '--self-contained', 'true',
-        '--no-restore',
-        '--nologo',
-        '-p:Platform=x64',
-        '-p:PublishSingleFile=true',
-        '-p:EnableCompressionInSingleFile=true',
-        '-p:IncludeNativeLibrariesForSelfExtract=true',
-        '-p:PublishReadyToRun=false',
-        '-p:DebugType=None',
-        '-p:DebugSymbols=false',
-        '--output', $portablePublishPath
-    )
+    $source = Get-ExecutablePath -BuildConfiguration 'Release'
+    $publishDirectory = Join-Path $repositoryRoot 'artifacts\publish\win-x64'
+    if (Test-Path -LiteralPath $publishDirectory) {
+        Assert-RepositoryChildPath $publishDirectory
+        Remove-Item -LiteralPath $publishDirectory -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $publishDirectory -Force | Out-Null
+    Copy-Item -LiteralPath $source -Destination (Join-Path $publishDirectory 'FrigoTab.exe')
 }
 
 switch ($Task) {
@@ -228,25 +161,19 @@ switch ($Task) {
         break
     }
     'Build' {
-        Invoke-Build
+        Invoke-Build -BuildConfiguration $Configuration
         break
     }
     'Test' {
-        Invoke-Build
-        Invoke-GreenTests
+        Invoke-Tests -BuildConfiguration $Configuration
         break
     }
     'Verify' {
-        Invoke-Build
-        Invoke-GreenTests
+        Invoke-Verify -BuildConfiguration $Configuration
         break
     }
     'Publish' {
         Invoke-Publish
-        break
-    }
-    'PublishPortable' {
-        Invoke-PublishPortable
         break
     }
 }

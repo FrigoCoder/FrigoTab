@@ -1,16 +1,24 @@
 # FrigoTab requirements and acceptance behaviors
 
-This is the observable behavior inventory for acceptance-test-driven development of the current C# application. It describes what a user can see or do and what native Windows behavior must remain intact; implementation details are not requirements.
+This is the observable behavior inventory of the current native Rust application. It describes what a user can see or do and what native Windows behavior must remain intact; implementation details are not requirements.
 
 ## Test policy
 
-The automated gate contains 28 green plain C# MSTest acceptance tests in three timestamped classes. They use real application objects and real Windows resources:
+The automated gate contains 31 green plain Rust integration acceptance tests. They use real application objects and real Windows resources:
 
-- 15 tests exercise the actual switcher/session forms, candidate HWNDs, layout, DWM previews, pointer routing, activation, and cleanup.
+- 15 tests exercise the actual switcher/session windows, candidate HWNDs, layout, DWM previews, pointer routing, activation, and cleanup.
 - 7 tests exercise real window classification, stale HWND/layout handling, shell desktop capture, DWM visibility, and native resource lifetime.
 - 6 tests launch the actual executable and verify startup, single-instance behavior, a real session HWND, pointer activation, and the first desktop frame.
+- 3 tests inspect the real layered preview-window topology and rendered visual details.
 
-Each test class and matching file starts with `TYYYYMMDDTHHMMSSZ_NNN_DescriptiveFamilyName`. The timestamp and family suffix are stable identifiers; methods use descriptive plain C# names.
+The four timestamped integration-test files are:
+
+- `acceptance-tests/tests/t20260914t211700z_001_real_switcher_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260914t212400z_002_real_window_and_backdrop_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260914t212400z_003_real_process_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260914t223000z_004_real_visual_parity_acceptance_tests.rs`
+
+The timestamp and family suffix are stable identifiers; test functions use descriptive plain Rust names.
 
 The global hook deliberately ignores injected keyboard events. Consequently, deterministic tests cover the real objects and executable, while physical keyboard transitions remain in the manual Windows checklist.
 
@@ -18,7 +26,7 @@ The global hook deliberately ignores injected keyboard events. Consequently, det
 
 | Area | Requirement | Evidence |
 | --- | --- | --- |
-| Startup | Start a form-less WinForms message loop, own a per-user single-instance guard, show a tray icon, avoid a taskbar button, and keep the switcher hidden until a gesture. | Launched-process and real mutex acceptance tests; manual startup check. |
+| Startup | Start a native Win32 message loop, own a per-user single-instance guard, show a tray icon, avoid a taskbar button, and keep the switcher hidden until a gesture. | Launched-process and real mutex acceptance tests; manual startup check. |
 | Tray exit | Exit closes an active session, disposes native resources, and ends the process. | Real session cleanup and process tests; manual tray check. |
 | First Alt+Tab | A successful Alt+Tab opens the overlay and selects the first eligible candidate. An empty or failed opening leaves the native gesture usable. | Real session and executable acceptance tests; physical-hook check. |
 | Sticky Alt release | Releasing Alt deliberately leaves the overlay open for an explicit choice. Immediate release and held-then-released Alt have the same behavior. | Real session acceptance test; physical-hook check. |
@@ -36,7 +44,7 @@ The global hook deliberately ignores injected keyboard events. Consequently, det
 | First frame | Prepare or reuse the shell snapshot before opening, paint the owner from it synchronously, and reveal DWM previews only after that paint. The first visible frame must not show application pixels. | Real process first-frame acceptance test; manual visual check. |
 | Shell fallback | If the shell host or render is unavailable, use the last matching frame when possible or black, release partial resources, and keep opening usable. | Real shell-backdrop acceptance tests; manual protected/RDP check. |
 | DWM previews | Configure destination/source geometry, keep each thumbnail hidden until the owner backdrop is visible, surface native failures, and unregister/hide deterministically. | Real DWM acceptance tests; manual DWM-disabled/protected-surface check. |
-| Resource lifetime | Forms, thumbnails, icons, fonts, bitmaps, hook handles, tray resources, and mutexes are released on normal close, failed construction, and process exit. | Real cleanup/resource acceptance tests; manual repeated-session handle check. |
+| Resource lifetime | Windows, thumbnails, icons, fonts, bitmaps, hook handles, tray resources, and mutexes are released on normal close, failed construction, and process exit. | Real cleanup/resource acceptance tests; manual repeated-session handle check. |
 | Activation handoff | Restore minimized targets and attempt foreground activation without `AttachThreadInput`. The intentional deactivation during handoff is not treated as an external interruption. | Real activation acceptance tests; manual focus/taskbar check. |
 | Interruption | Lock/unlock, desktop deactivation, tray exit, display/DPI change, and DWM composition changes reset or safely close the current session and input state. | Manual Windows matrix; selected real-session cleanup coverage. |
 
