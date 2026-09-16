@@ -6,20 +6,22 @@ FrigoTab is a small native Win32 application written in Rust around Win32 window
 
 | Component | Responsibility | Source |
 | --- | --- | --- |
-| Composition root | Starts the native Win32 loop, owns lifetime, and connects the tray, hook, and single-instance guard. | `src/main.rs`, `src/single_instance_guard.rs` |
-| Tray | Creates the native notification-area icon, Exit command, and the runtime-only menus for Alt-release and backdrop behavior. | `src/sys_tray_icon.rs`, `src/main.rs` |
-| Keyboard hook | Installs `WH_KEYBOARD_LL`, tracks physical modifier transitions, forwards bounded input events, and keeps the native callback safe. | `src/key_hook.rs`, `src/keyboard_modifier_state.rs`, `src/keyboard_input.rs` |
-| Switcher controller | Opens, navigates, cancels, commits, and closes one session while keeping consumed keyboard gestures balanced. | `src/switcher_application.rs`, `src/key_handling.rs`, `src/switcher_state.rs`, `src/keyboard_suppression_state.rs`, `src/deferred_keyboard_dispatcher.rs`, `src/alt_tab_recovery_plan.rs` |
-| Session view | Owns the actual overlay owner window, preview windows, pointer routing, selection rendering, the selected backdrop mode, shell backdrop, and activation calls. | `src/session_window.rs`, `src/frigo_window.rs`, `src/application_window.rs`, `src/application_windows.rs` |
-| Window catalog | Enumerates and classifies eligible top-level application HWNDs. | `src/window_finder.rs`, `src/window_handle.rs`, `src/window_icon.rs` |
-| Window/layout | Reads titles, icons, styles, placement, monitor geometry, and activation state; assigns stable tile rectangles. | `src/layout.rs`, `src/rect.rs`, `src/points.rs`, `src/screen_point.rs` |
-| DWM preview | Registers thumbnails, applies destination geometry and visibility while the owner is hidden, and disposes handles on close. | `src/thumbnail.rs` |
-| Layered overlay | Renders the selected tint, title, icon, and number into the owned layered preview windows. | `src/layer_updater.rs`, `src/gdi_plus.rs` |
-| Shell backdrop | Captures Explorer's wallpaper-and-icons surface into a retained native bitmap for Full desktop mode; the session also supports direct image-only and black painting. | `src/shell_desktop_snapshot.rs`, `src/session_window.rs` |
-| Observable state | Publishes selected and visible changes used by the session and controller. | `src/application_windows.rs`, `src/switcher_state.rs` |
-| Acceptance boundary | Runs the same production HWNDs, shell/DWM calls, native resources, and executable used by the application. | `acceptance-tests/src/lib.rs`, `acceptance-tests/tests/*.rs` |
+| Composition root | Starts the native Win32 loop, owns lifetime, and connects the tray, hook, and single-instance guard. | `src/main.rs`, `src/composition/`, `src/system/` |
+| Tray | Creates the native notification-area icon, Exit command, and the runtime-only menus for Alt-release and backdrop behavior. | `src/tray/`, `src/main.rs` |
+| Keyboard hook | Installs `WH_KEYBOARD_LL`, tracks physical modifier transitions, forwards bounded input events, and keeps the native callback safe. | `src/input/` |
+| Switcher controller | Opens, navigates, cancels, commits, and closes one session while keeping consumed keyboard gestures balanced. | `src/switcher/`, `src/input/` |
+| Session view | Owns the overlay owner window, previews, pointer routing, selection rendering, and selected backdrop mode. | `src/switcher/`, `src/window/` |
+| Window catalog | Enumerates and classifies eligible top-level application HWNDs; obtains their handles and icons. | `src/window/` |
+| Geometry and layout | Reads restored placement and monitor geometry; assigns stable tile rectangles. | `src/geometry/` |
+| DWM preview | Registers thumbnails, applies destination geometry and visibility while the owner is hidden, and disposes handles on close. | `src/rendering/thumbnail.rs` |
+| Layered overlay | Renders the selected tint, title, icon, and number into the owned layered preview windows. | `src/rendering/` |
+| Shell backdrop | Captures Explorer's wallpaper-and-icons surface into a retained native bitmap for Full desktop mode; the session also supports direct image-only and black painting. | `src/desktop/`, `src/switcher/session_window.rs` |
+| Observable state | Publishes selected and visible changes used by the session and controller. | `src/window/application_windows.rs`, `src/switcher/switcher_state.rs` |
+| Acceptance boundary | Runs the same production HWNDs, shell/DWM calls, native resources, and executable used by the application. Its fixture, live-session, process, and screen drivers are grouped by role. | `acceptance-tests/src/`, `acceptance-tests/tests/*.rs` |
 
 The application creates one preview window per selectable candidate. The backdrop is not composed from those application windows.
+
+The package folders group related modules, and each named production struct or enum has its own source file. `src/lib.rs` re-exports the former flat module paths for compatibility; those aliases refer to the same types and contain no duplicate implementations. New code uses the package paths directly.
 
 The owner HWND stores one stable context. Mutable application state is protected by checked `RefCell` borrows, while its cloneable `SessionPainter` owns only the independently shared backdrop state. This matters because Win32 may synchronously deliver `WM_PAINT` from inside another native call: the callback can repaint the real first frame without creating a second mutable reference to the application or session.
 

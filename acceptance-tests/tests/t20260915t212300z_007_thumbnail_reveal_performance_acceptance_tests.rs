@@ -9,9 +9,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use frigotab::layout::Layout;
-use frigotab::window_finder::WindowFinder;
-use frigotab::window_handle::WindowHandle;
+use frigotab::geometry::Layout;
+use frigotab::window::{WindowFinder, WindowHandle};
 use frigotab_acceptance::{
     FixtureOptions, FixtureWindow, GREEN, MAGENTA, RED, RunningFrigoTab, color_distance,
     screen_pixel, serial_guard, set_per_monitor_dpi_awareness,

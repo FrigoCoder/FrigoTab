@@ -2,10 +2,9 @@
 
 use std::time::Duration;
 
-use frigotab::key_handling::KeyHandling;
-use frigotab::keyboard_input::{KeyTransition, KeyboardInput, SwitcherKey};
-use frigotab::screen_point::ScreenPoint;
-use frigotab::switcher_state::SwitcherState;
+use frigotab::geometry::ScreenPoint;
+use frigotab::input::{KeyHandling, KeyTransition, KeyboardInput, SwitcherKey};
+use frigotab::switcher::SwitcherState;
 use frigotab_acceptance::{
     LiveSession, LiveTile, foreground_window, is_layered, is_window_visible, serial_guard,
     visible_owned_layered_windows, wait_until, window_bounds, window_owner,

@@ -4,6 +4,8 @@ FrigoTab is a native Windows Alt-Tab replacement. It shows eligible application 
 
 The application is implemented in Rust as one small Win32 executable. Its acceptance gate uses plain Rust integration tests that create real HWNDs, exercise the real DWM, GDI, and Explorer shell APIs, and launch the real executable. The tests are acceptance tests, not unit tests or a BDD framework.
 
+Production code is grouped under `src/composition`, `src/input`, `src/switcher`, `src/window`, `src/geometry`, `src/rendering`, `src/desktop`, `src/tray`, and `src/system`. Each named struct or enum has its own source file; package `mod.rs` files collect and re-export related types. The former flat library module paths remain as aliases in `src/lib.rs` for callers that already use them.
+
 ## Development loop
 
 The behavior inventory, test boundary, and native validation checklist are documented in:

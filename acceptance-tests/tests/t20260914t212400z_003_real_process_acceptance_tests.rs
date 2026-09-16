@@ -12,7 +12,7 @@ use std::ptr::null_mut;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use frigotab::shell_desktop_snapshot::ShellDesktopSnapshot;
+use frigotab::desktop::ShellDesktopSnapshot;
 use frigotab_acceptance::{
     FixtureOptions, FixtureWindow, GREEN, MAGENTA, RunningFrigoTab, capture_screen_image,
     color_distance, pixel_at, pump_messages, serial_guard, set_per_monitor_dpi_awareness,

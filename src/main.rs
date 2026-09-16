@@ -1,20 +1,17 @@
 #![windows_subsystem = "windows"]
 
-use std::cell::RefCell;
 use std::mem::{size_of, transmute};
 use std::ptr::{null, null_mut};
 
-use frigotab::key_handling::KeyHandling;
-use frigotab::key_hook::{KeyHook, WM_KEY_HOOK_INPUT};
-use frigotab::keyboard_input::{KeyTransition, KeyboardInput, SwitcherKey};
-use frigotab::rect::virtual_screen_bounds;
-use frigotab::screen_point::ScreenPoint;
-use frigotab::session_window::{SessionPainter, SessionWindow, WM_DESKTOP_SNAPSHOT_READY};
-use frigotab::single_instance_guard::{APPLICATION_MUTEX_NAME, SingleInstanceGuard};
-use frigotab::switcher_application::SwitcherApplication;
-use frigotab::switcher_state::SwitcherState;
-use frigotab::sys_tray_icon::{SysTrayIcon, TRAY_CALLBACK_MESSAGE, TrayAction};
-use frigotab::window_handle::WindowHandle;
+mod composition;
+
+use composition::OwnerContext;
+use frigotab::geometry::{ScreenPoint, virtual_screen_bounds};
+use frigotab::input::{KeyHook, WM_KEY_HOOK_INPUT};
+use frigotab::switcher::{SessionWindow, SwitcherState, WM_DESKTOP_SNAPSHOT_READY};
+use frigotab::system::{APPLICATION_MUTEX_NAME, SingleInstanceGuard};
+use frigotab::tray::{SysTrayIcon, TRAY_CALLBACK_MESSAGE, TrayAction};
+use frigotab::window::WindowHandle;
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{BeginPaint, ClientToScreen, EndPaint, PAINTSTRUCT};
 use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
@@ -33,140 +30,6 @@ const OWNER_TITLE: &str = "FrigoTab";
 const WM_BEGIN_SESSION: u32 = 0x4001;
 #[cfg(debug_assertions)]
 const DEBUG_TIMER_ID: usize = 1;
-
-/// The one UI-thread-owned object graph corresponding to `Program.Run`.
-/// `SessionWindow` is kept separate from the deterministic controller just as
-/// `SessionWindow` is separate from `SwitcherApplication` in the original
-/// application.
-struct App {
-    controller: SwitcherApplication,
-    session: Option<SessionWindow>,
-    hook: Option<KeyHook>,
-    tray: Option<SysTrayIcon>,
-    reported_session_visibility: bool,
-}
-
-/// Stable userdata for the owner HWND. The painter deliberately lives beside,
-/// rather than inside, the dynamically borrowed application state so a
-/// synchronous WM_PAINT can safely repaint during native session operations.
-struct OwnerContext {
-    app: RefCell<App>,
-    painter: Option<SessionPainter>,
-}
-
-impl App {
-    fn new() -> Self {
-        Self {
-            controller: SwitcherApplication::new(),
-            session: None,
-            hook: None,
-            tray: None,
-            reported_session_visibility: false,
-        }
-    }
-
-    fn handle_keyboard(&mut self, input: KeyboardInput) -> KeyHandling {
-        let handling = if let Some(session) = self.session.as_mut() {
-            self.controller.handle_keyboard(session, input)
-        } else {
-            KeyHandling::PassThrough
-        };
-        self.sync_session_visibility();
-        handling
-    }
-
-    fn handle_mouse_move(&mut self, point: ScreenPoint) {
-        if let Some(session) = self.session.as_mut() {
-            self.controller.handle_mouse_move(session, point);
-            self.sync_session_visibility();
-        }
-    }
-
-    fn handle_mouse_click(&mut self, point: ScreenPoint) {
-        if let Some(session) = self.session.as_mut() {
-            self.controller.handle_mouse_click(session, point);
-            self.sync_session_visibility();
-        }
-    }
-
-    fn begin_session(&mut self) {
-        let input = KeyboardInput::new(SwitcherKey::Tab, KeyTransition::Down, true, false, false);
-        let _ = self.handle_keyboard(input);
-    }
-
-    fn dispatch_hook_message(&mut self, wparam: WPARAM) {
-        let Some(hook) = self.hook.as_ref() else {
-            return;
-        };
-        // `dispatch_ui_message` invokes the handler synchronously on this UI
-        // thread. A raw pointer avoids borrowing `self.hook` across the
-        // closure while keeping the KeyHook alive for the entire call.
-        let hook = hook as *const KeyHook;
-        unsafe {
-            (*hook).dispatch_ui_message(wparam, |input| self.handle_keyboard(input));
-        }
-    }
-
-    fn sync_session_visibility(&mut self) {
-        let visible = self.controller.state() == SwitcherState::Visible;
-        if visible != self.reported_session_visibility {
-            if let Some(hook) = self.hook.as_ref() {
-                hook.set_session_visible(visible);
-            }
-            self.reported_session_visibility = visible;
-        }
-    }
-
-    fn interrupt(&mut self) {
-        if let Some(session) = self.session.as_mut() {
-            self.controller.interrupt(session);
-        }
-        if let Some(hook) = self.hook.as_ref() {
-            hook.reset_input_state();
-        }
-        self.sync_session_visibility();
-    }
-
-    fn close_for_shutdown(&mut self) {
-        if let Some(session) = self.session.as_mut() {
-            // SessionForm.Dispose marks itself disposed before controller.Close,
-            // which prevents CloseSessionResources from queuing a final shell
-            // capture while the application is shutting down.
-            session.dispose();
-            self.controller.close(session);
-        }
-        self.sync_session_visibility();
-        if let Some(hook) = self.hook.take() {
-            hook.drain_ui_messages();
-            drop(hook);
-        }
-        // Remove the notification-area registration while the owner HWND is
-        // still valid.  This prevents a failed NIM_DELETE from leaving a
-        // stale icon after the owner is destroyed.
-        drop(self.tray.take());
-    }
-
-    fn relayout(&mut self) {
-        let was_visible = self.controller.state() == SwitcherState::Visible;
-        if let Some(session) = self.session.as_mut() {
-            self.controller.relayout(session);
-            if was_visible
-                && self.controller.state() != SwitcherState::Visible
-                && let Some(hook) = self.hook.as_ref()
-            {
-                hook.reset_input_state();
-            }
-            session.queue_desktop_snapshot_refresh_current();
-        }
-        self.sync_session_visibility();
-    }
-
-    fn publish_snapshot(&mut self) {
-        if let Some(session) = self.session.as_mut() {
-            session.publish_desktop_snapshot();
-        }
-    }
-}
 
 fn main() {
     enable_dpi_awareness();
@@ -192,10 +55,7 @@ fn main() {
     // Win32 calls can synchronously re-enter this WndProc. RefCell turns
     // those native callback boundaries into checked Rust borrows instead of
     // manufacturing aliased `&mut App` references from the userdata pointer.
-    let mut context = Box::new(OwnerContext {
-        app: RefCell::new(App::new()),
-        painter: None,
-    });
+    let mut context = Box::new(OwnerContext::new());
     let context_pointer = (&mut *context) as *mut OwnerContext;
     let owner = unsafe {
         CreateWindowExW(

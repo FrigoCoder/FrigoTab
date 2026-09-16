@@ -9,12 +9,10 @@ use std::ptr::{null, null_mut};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use frigotab::layout::Layout;
-use frigotab::rect::Rectangle;
-use frigotab::shell_desktop_snapshot::ShellDesktopSnapshot;
-use frigotab::thumbnail::DwmThumbnail;
-use frigotab::window_finder::WindowFinder;
-use frigotab::window_handle::WindowHandle;
+use frigotab::desktop::ShellDesktopSnapshot;
+use frigotab::geometry::{Layout, Rectangle};
+use frigotab::rendering::DwmThumbnail;
+use frigotab::window::{WindowFinder, WindowHandle};
 use frigotab_acceptance::{
     Color, FixtureOptions, FixtureWindow, MAGENTA, pixel_at, pump_messages, serial_guard,
     window_bounds,
