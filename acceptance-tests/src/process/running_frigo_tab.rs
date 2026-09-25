@@ -182,6 +182,35 @@ impl RunningFrigoTab {
         })
     }
 
+    /// Selects a top-level item by its visible label in the real tray menu.
+    /// This is used for settings that do not need a submenu, such as the
+    /// close-button visibility switch.
+    pub fn select_top_level_tray_item(&self, label: &str) -> bool {
+        let _cursor = CursorPosition::capture();
+        let Some(popup) = self.open_tray_popup() else {
+            return false;
+        };
+        let Some(menu) = popup_menu(popup) else {
+            dismiss_tray_popup(self.pid(), popup);
+            return false;
+        };
+        let Some(items) = read_menu_items(menu, 0) else {
+            dismiss_tray_popup(self.pid(), popup);
+            return false;
+        };
+        let Some(position) = items.iter().position(|item| item.label == label) else {
+            dismiss_tray_popup(self.pid(), popup);
+            return false;
+        };
+        if !click_menu_item(menu, position) {
+            dismiss_tray_popup(self.pid(), popup);
+            return false;
+        }
+        wait_until(Duration::from_secs(2), || {
+            find_tray_popup(self.pid()).is_none()
+        })
+    }
+
     fn open_tray_popup(&self) -> Option<HWND> {
         if self.owner.is_null()
             || unsafe { PostMessageW(self.owner, TRAY_CALLBACK_MESSAGE, 0, WM_RBUTTONUP as isize) }

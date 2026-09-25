@@ -33,7 +33,8 @@ const TAP_COMMAND: usize = 2;
 const FULL_DESKTOP_COMMAND: usize = 3;
 const IMAGE_ONLY_COMMAND: usize = 4;
 const BLACK_COMMAND: usize = 5;
-const EXIT_COMMAND: usize = 6;
+const CLOSE_BUTTONS_COMMAND: usize = 6;
+const EXIT_COMMAND: usize = 7;
 
 pub use super::tray_action::TrayAction;
 
@@ -82,11 +83,15 @@ impl SysTrayIcon {
         event: isize,
         alt_tab_behavior: AltTabBehavior,
         background_mode: BackgroundMode,
+        close_buttons_visible: bool,
     ) -> Option<TrayAction> {
         match event as u32 {
-            WM_RBUTTONUP | WM_CONTEXTMENU => {
-                Self::show_menu(owner, alt_tab_behavior, background_mode)
-            }
+            WM_RBUTTONUP | WM_CONTEXTMENU => Self::show_menu(
+                owner,
+                alt_tab_behavior,
+                background_mode,
+                close_buttons_visible,
+            ),
             _ => None,
         }
     }
@@ -107,6 +112,7 @@ impl SysTrayIcon {
         owner: HWND,
         alt_tab_behavior: AltTabBehavior,
         background_mode: BackgroundMode,
+        close_buttons_visible: bool,
     ) -> Option<TrayAction> {
         let menu = PopupMenu::new()?;
 
@@ -144,6 +150,15 @@ impl SysTrayIcon {
             background_mode == BackgroundMode::Black,
         ) || !background_menu.attach_to(menu.handle(), "Background")
         {
+            return None;
+        }
+
+        if !append_item(
+            menu.handle(),
+            CLOSE_BUTTONS_COMMAND,
+            "Close buttons",
+            close_buttons_visible,
+        ) {
             return None;
         }
 
@@ -186,6 +201,9 @@ impl SysTrayIcon {
             }
             IMAGE_ONLY_COMMAND => Some(TrayAction::SetBackgroundMode(BackgroundMode::ImageOnly)),
             BLACK_COMMAND => Some(TrayAction::SetBackgroundMode(BackgroundMode::Black)),
+            CLOSE_BUTTONS_COMMAND => {
+                Some(TrayAction::SetCloseButtonsVisible(!close_buttons_visible))
+            }
             EXIT_COMMAND => Some(TrayAction::Exit),
             _ => None,
         }

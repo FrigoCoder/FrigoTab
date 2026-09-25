@@ -107,6 +107,18 @@ impl SwitcherApplication {
             return;
         }
 
+        match port.try_close_at(point) {
+            Ok(true) => {
+                self.try_clear_selection(port);
+                return;
+            }
+            Ok(false) => {}
+            Err(()) => {
+                self.close(port);
+                return;
+            }
+        }
+
         let index = match port.hit_test(point) {
             Ok(index) => index,
             Err(()) => {

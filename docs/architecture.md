@@ -11,6 +11,7 @@ FrigoTab is a small native Win32 application written in Rust around Win32 window
 | Keyboard hook | Installs `WH_KEYBOARD_LL`, tracks physical modifier transitions, forwards bounded input events, and keeps the native callback safe. | `src/input/` |
 | Switcher controller | Opens, navigates, cancels, commits, and closes one session while keeping consumed keyboard gestures balanced. | `src/switcher/`, `src/input/` |
 | Session view | Owns the overlay owner window, previews, pointer routing, selection rendering, and selected backdrop mode. | `src/switcher/`, `src/window/` |
+| Thumbnail controls | Renders the optional per-thumbnail close control and routes its hit region to the exact source HWND without activating it. | `src/window/application_window.rs`, `src/window/application_windows.rs`, `src/tray/sys_tray_icon.rs` |
 | Window catalog | Enumerates and classifies eligible top-level application HWNDs; obtains their handles and icons. | `src/window/` |
 | Geometry and layout | Reads restored placement and monitor geometry; assigns stable tile rectangles. | `src/geometry/` |
 | DWM preview | Registers thumbnails, applies destination geometry and visibility while the owner is hidden, and disposes handles on close. | `src/rendering/thumbnail.rs` |
@@ -31,8 +32,9 @@ The owner HWND stores one stable context. Mutable application state is protected
 2. The controller asks the session view to enumerate eligible windows and build the overlay.
 3. The view lays out real candidate HWNDs and configures their DWM thumbnails while the owner remains hidden, allowing the compositor to prepare the redirected source surfaces off-screen.
 4. The view shows and synchronously paints the owner from the selected backdrop (the retained shell snapshot in Full desktop mode), then shows the already-rendered title/number overlays. Tab/Shift+Tab, numbers, and pointer movement update the selected candidate.
-5. In the default Sticky mode, releasing Alt does not commit the first candidate; the session remains available until an explicit number/pointer activation or Escape/Alt+F4 cancellation. Tray-selected Tap (classic) commits the current selection on Alt release.
-6. Activation restores a minimized target and attempts `SetForegroundWindow` after the historical input nudge. The controller then closes and disposes the session.
+5. If close buttons are enabled (the default), each tile also paints a 32x32 black button with a white `×`. A pointer hit in that region asynchronously posts `WM_CLOSE` to the exact source HWND, clears selection, and leaves a Sticky session open. If buttons are hidden through the tray, the same region is handled as ordinary tile activation.
+6. In the default Sticky mode, releasing Alt does not commit the first candidate; the session remains available until an explicit number/pointer activation or Escape/Alt+F4 cancellation. Tray-selected Tap (classic) commits the current selection on Alt release.
+7. Activation restores a minimized target and attempts `SetForegroundWindow` after the historical input nudge. The controller then closes and disposes the session.
 
 The handoff intentionally does not use `AttachThreadInput`; joining input queues can corrupt focus and key-state isolation. Windows may still deny foreground activation, in which case the overlay remains usable.
 
@@ -50,6 +52,6 @@ Windows, icons, fonts, layered DCs, bitmaps, thumbnails, hook handles, the tray 
 
 ## Acceptance boundary
 
-The automated gate has 41 tests in seven timestamped plain Rust integration-test modules. The tests use real HWNDs and native Windows resources, including DWM/GDI, the Explorer shell surface, the real tray popup, and the launched executable. They verify observable behavior such as Sticky and Tap release, navigation, selection, tray-only runtime settings, all backdrop modes, stale-window recovery, first-frame backdrop ordering, first-frame thumbnail readiness, DWM visibility, process lifetime, visual parity, and cleanup.
+The automated gate has 44 tests in eight timestamped plain Rust integration-test modules. The tests use real HWNDs and native Windows resources, including DWM/GDI, the Explorer shell surface, the real tray popup, and the launched executable. They verify observable behavior such as Sticky and Tap release, navigation, selection, tray-only runtime settings, optional close buttons and exact-source close requests, all backdrop modes, stale-window recovery, first-frame backdrop ordering, first-frame thumbnail readiness, DWM visibility, process lifetime, visual parity, and cleanup.
 
 The global hook ignores injected events by design. Therefore physical Alt/Tab transitions, focus/UIPI restrictions, Explorer restart, protected surfaces, lock/unlock, mixed monitor/DPI topology, and long-running native handle behavior remain manual release checks. The automated results are necessary evidence, not a claim that every Windows desktop configuration is identical.

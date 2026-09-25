@@ -239,13 +239,22 @@ unsafe extern "system" fn owner_window_proc(
                         .as_ref()
                         .map(SessionWindow::background_mode)
                         .unwrap_or_default(),
+                    app.session
+                        .as_ref()
+                        .is_none_or(SessionWindow::close_buttons_visible),
                 )
             })
         };
-        let Some((alt_tab_behavior, background_mode)) = settings else {
+        let Some((alt_tab_behavior, background_mode, close_buttons_visible)) = settings else {
             return 0;
         };
-        let action = SysTrayIcon::handle_callback(hwnd, lparam, alt_tab_behavior, background_mode);
+        let action = SysTrayIcon::handle_callback(
+            hwnd,
+            lparam,
+            alt_tab_behavior,
+            background_mode,
+            close_buttons_visible,
+        );
         if WindowHandle::new(hwnd).is_valid()
             && unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OwnerContext == pointer }
         {
@@ -258,6 +267,11 @@ unsafe extern "system" fn owner_window_proc(
                     Some(TrayAction::SetBackgroundMode(mode)) => {
                         if let Some(session) = app.session.as_mut() {
                             session.set_background_mode(mode);
+                        }
+                    }
+                    Some(TrayAction::SetCloseButtonsVisible(visible)) => {
+                        if let Some(session) = app.session.as_mut() {
+                            session.set_close_buttons_visible(visible);
                         }
                     }
                     Some(TrayAction::Exit) => {

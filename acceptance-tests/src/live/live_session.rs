@@ -156,6 +156,23 @@ impl LiveSession {
             .background_mode()
     }
 
+    pub fn set_close_buttons_visible(&mut self, visible: bool) {
+        self.state
+            .session
+            .as_mut()
+            .expect("live session exists")
+            .set_close_buttons_visible(visible);
+        pump_messages();
+    }
+
+    pub fn close_buttons_visible(&self) -> bool {
+        self.state
+            .session
+            .as_ref()
+            .expect("live session exists")
+            .close_buttons_visible()
+    }
+
     pub fn candidate_count(&self) -> usize {
         self.state.controller.candidate_count()
     }

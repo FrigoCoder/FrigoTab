@@ -41,6 +41,7 @@ pub struct SessionWindow {
     snapshot_refresh_running: Arc<AtomicBool>,
     disposal_requested: Arc<AtomicBool>,
     snapshot_worker: Option<JoinHandle<()>>,
+    close_buttons_visible: bool,
     activating_selection: bool,
     disposed: bool,
 }
@@ -70,6 +71,7 @@ impl SessionWindow {
             snapshot_refresh_running: Arc::new(AtomicBool::new(false)),
             disposal_requested: Arc::new(AtomicBool::new(false)),
             snapshot_worker: None,
+            close_buttons_visible: true,
             activating_selection: false,
             disposed: false,
         }
@@ -89,6 +91,20 @@ impl SessionWindow {
 
     pub fn painter(&self) -> SessionPainter {
         self.painter.clone()
+    }
+
+    pub fn close_buttons_visible(&self) -> bool {
+        self.close_buttons_visible
+    }
+
+    pub fn set_close_buttons_visible(&mut self, visible: bool) {
+        if self.close_buttons_visible == visible || self.disposed {
+            return;
+        }
+        self.close_buttons_visible = visible;
+        if let Some(applications) = self.applications.as_mut() {
+            applications.set_close_buttons_visible(visible);
+        }
     }
 
     /// Change the backdrop without disturbing the current preview graph.
@@ -175,7 +191,8 @@ impl SessionWindow {
         }
 
         let owner = WindowHandle::new(self.hwnd);
-        let applications = ApplicationWindows::new(owner, &finder);
+        let applications =
+            ApplicationWindows::with_close_buttons(owner, &finder, self.close_buttons_visible);
         if applications.is_empty() {
             return Ok(0);
         }
@@ -394,6 +411,13 @@ impl SwitcherSessionPort for SessionWindow {
             return Err(());
         };
         Ok(applications.hit_test(point.x, point.y))
+    }
+
+    fn try_close_at(&mut self, point: ScreenPoint) -> Result<bool, ()> {
+        let Some(applications) = self.applications.as_ref() else {
+            return Err(());
+        };
+        Ok(applications.try_close_at(point.x, point.y))
     }
 
     fn try_activate_selected(&mut self) -> Result<bool, ()> {

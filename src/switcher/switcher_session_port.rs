@@ -21,6 +21,11 @@ pub trait SwitcherSessionPort {
     /// not over a selectable candidate.
     fn hit_test(&mut self, point: ScreenPoint) -> Result<Option<usize>, ()>;
 
+    /// Requests closure when the point is over an enabled close button.
+    /// Returns `true` when the click belongs to that control, regardless of
+    /// whether the target eventually accepts the asynchronous close request.
+    fn try_close_at(&mut self, point: ScreenPoint) -> Result<bool, ()>;
+
     /// Attempts to activate the currently selected candidate. `Ok(false)`
     /// leaves the session visible so the user can retry or cancel.
     fn try_activate_selected(&mut self) -> Result<bool, ()>;

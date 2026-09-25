@@ -8,4 +8,5 @@ pub enum TrayAction {
     Exit,
     SetAltTabBehavior(AltTabBehavior),
     SetBackgroundMode(BackgroundMode),
+    SetCloseButtonsVisible(bool),
 }

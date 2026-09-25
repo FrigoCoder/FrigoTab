@@ -6,6 +6,7 @@
 //! are propagated to every native preview in the same order as the original.
 
 use windows_sys::Win32::Foundation::RECT;
+use windows_sys::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE};
 
 use super::application_window::ApplicationWindow;
 use super::window_finder::WindowFinder;
@@ -28,6 +29,14 @@ impl ApplicationWindows {
     /// layout, and thumbnail registration; that candidate is skipped while
     /// already valid previews remain part of the session.
     pub fn new(owner: WindowHandle, finder: &WindowFinder) -> Self {
+        Self::with_close_buttons(owner, finder, true)
+    }
+
+    pub(crate) fn with_close_buttons(
+        owner: WindowHandle,
+        finder: &WindowFinder,
+        close_buttons_visible: bool,
+    ) -> Self {
         let layout = Layout::new(&finder.windows);
         let mut windows = Vec::new();
         for application in finder.windows.iter().copied() {
@@ -44,7 +53,13 @@ impl ApplicationWindows {
             // already accepted, not by the original EnumWindows index.  A
             // stale candidate therefore cannot leave a gap in the shortcuts.
             let index = windows.len();
-            match ApplicationWindow::new(owner.raw(), application.raw(), index, native_bounds) {
+            match ApplicationWindow::with_close_buttons(
+                owner.raw(),
+                application.raw(),
+                index,
+                native_bounds,
+                close_buttons_visible,
+            ) {
                 Ok(window) => windows.push(window),
                 Err(error) => {
                     // Keep the candidate-independent failure policy. A stale
@@ -111,6 +126,47 @@ impl ApplicationWindows {
         for window in &mut self.windows {
             window.set_session_visible(value);
         }
+    }
+
+    /// Show or hide the per-tile close buttons and redraw current overlays.
+    ///
+    /// A redraw failure is isolated to the affected tile. The native preview
+    /// collection remains usable, matching the best-effort behavior of the
+    /// other visual state updates in this adapter.
+    pub fn set_close_buttons_visible(&mut self, value: bool) {
+        if self.disposed {
+            return;
+        }
+        for window in &mut self.windows {
+            if let Err(error) = window.set_close_buttons_visible(value) {
+                debug_log(&format!("Could not redraw close button: {error}"));
+            }
+        }
+    }
+
+    /// Request closure of the tile under a screen point.
+    ///
+    /// A point in a close-button region is consumed even when the target
+    /// rejects the asynchronous `WM_CLOSE` post. The collection is left
+    /// unchanged: applications may display a confirmation dialog or otherwise
+    /// defer/veto closure, and stale-source handling remains the same as for
+    /// windows closed outside the switcher.
+    pub fn try_close_at(&self, x: i32, y: i32) -> bool {
+        if self.disposed {
+            return false;
+        }
+        let Some(window) = self
+            .windows
+            .iter()
+            .find(|window| window.close_button_hit(x, y))
+        else {
+            return false;
+        };
+
+        unsafe {
+            let _ = PostMessageW(window.application(), WM_CLOSE, 0, 0);
+        }
+        true
     }
 
     /// Return the first tile containing a screen point.

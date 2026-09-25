@@ -16,12 +16,17 @@ use super::frigo_window::FrigoWindow;
 use super::window_handle::WindowHandle;
 use super::window_icon::WindowIcon;
 use crate::rendering::{DwmThumbnail, Font, LayerUpdater};
-use windows_sys::Win32::Graphics::GdiPlus::{FontStyleBold, FontStyleRegular, RectF};
+use windows_sys::Win32::Graphics::GdiPlus::{FontStyleBold, FontStyleRegular, PointF, RectF};
 
 const PAD: f32 = 8.0;
 const ARGB_BLACK: u32 = 0xff00_0000;
 const ARGB_WHITE: u32 = 0xffff_ffff;
 const ARGB_SELECTED: u32 = 0x8000_00ff;
+
+/// Size and inset of the optional per-tile close button, in physical pixels.
+/// These values are shared by drawing and hit-testing.
+pub(crate) const CLOSE_BUTTON_SIZE: i32 = 32;
+pub(crate) const CLOSE_BUTTON_INSET: i32 = 8;
 
 /// A separate, owned top-level popup carrying one application's overlay.
 pub struct ApplicationWindow {
@@ -36,10 +41,21 @@ pub struct ApplicationWindow {
     bounds: RECT,
     selected: bool,
     selected_state: Rc<Cell<bool>>,
+    close_buttons_visible_state: Rc<Cell<bool>>,
 }
 
 impl ApplicationWindow {
     pub fn new(owner: HWND, application: HWND, index: usize, bounds: RECT) -> Result<Self, String> {
+        Self::with_close_buttons(owner, application, index, bounds, true)
+    }
+
+    pub(crate) fn with_close_buttons(
+        owner: HWND,
+        application: HWND,
+        index: usize,
+        bounds: RECT,
+        close_buttons_visible: bool,
+    ) -> Result<Self, String> {
         let thumbnail = match DwmThumbnail::register(owner, application) {
             Ok(thumbnail) => {
                 if thumbnail
@@ -60,6 +76,8 @@ impl ApplicationWindow {
         let callback_layer = Rc::clone(&layer_updater);
         let selected_state = Rc::new(Cell::new(false));
         let callback_selected = Rc::clone(&selected_state);
+        let close_buttons_visible_state = Rc::new(Cell::new(close_buttons_visible));
+        let callback_close_buttons_visible = Rc::clone(&close_buttons_visible_state);
         window_icon.on_changed(move || {
             let _ = icon_state.with_icon(|icon, icon_width, icon_height| {
                 let _ = render_overlay_with_icon(
@@ -70,6 +88,7 @@ impl ApplicationWindow {
                     application,
                     index,
                     callback_selected.get(),
+                    callback_close_buttons_visible.get(),
                 );
             });
         });
@@ -81,6 +100,7 @@ impl ApplicationWindow {
             bounds,
             selected: false,
             selected_state,
+            close_buttons_visible_state,
             window_icon,
             layer_updater,
             _thumbnail: thumbnail,
@@ -132,6 +152,25 @@ impl ApplicationWindow {
             && point.y < self.bounds.bottom
     }
 
+    /// Show or hide this tile's close button and redraw its current overlay.
+    pub fn set_close_buttons_visible(&mut self, visible: bool) -> Result<(), String> {
+        if self.close_buttons_visible_state.get() == visible {
+            return Ok(());
+        }
+        self.close_buttons_visible_state.set(visible);
+        self.render_overlay()
+    }
+
+    /// Return whether a screen point is inside this tile's close button.
+    pub(crate) fn close_button_hit(&self, x: i32, y: i32) -> bool {
+        if !self.close_buttons_visible_state.get() {
+            return false;
+        }
+        close_button_bounds(self.bounds).is_some_and(|button| {
+            x >= button.left && x < button.right && y >= button.top && y < button.bottom
+        })
+    }
+
     fn render_overlay(&mut self) -> Result<(), String> {
         let selected = self.selected;
         let icon_result = self.window_icon.with_icon(|icon, icon_width, icon_height| {
@@ -143,12 +182,14 @@ impl ApplicationWindow {
                 self.application,
                 self.index,
                 selected,
+                self.close_buttons_visible_state.get(),
             )
         });
         icon_result.unwrap_or_else(|| Err("Window icon is unavailable".to_string()))
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Keeps the original small rendering helper flat.
 fn render_overlay_with_icon(
     layer: &mut LayerUpdater,
     icon: windows_sys::Win32::UI::WindowsAndMessaging::HICON,
@@ -157,6 +198,7 @@ fn render_overlay_with_icon(
     application: HWND,
     index: usize,
     selected: bool,
+    close_buttons_visible: bool,
 ) -> Result<(), String> {
     let title = WindowHandle::new(application).get_window_text();
     layer.update(|graphics| {
@@ -209,8 +251,100 @@ fn render_overlay_with_icon(
         };
         graphics.fill_rect(number_background, ARGB_BLACK)?;
         graphics.set_text_rendering_hint()?;
-        graphics.draw_string(&number, &number_font, number_background, ARGB_WHITE)
+        graphics.draw_string(&number, &number_font, number_background, ARGB_WHITE)?;
+
+        if close_buttons_visible
+            && let Some(button) = close_button_bounds(RECT {
+                left: 0,
+                top: 0,
+                right: graphics.width.round() as i32,
+                bottom: graphics.height.round() as i32,
+            })
+        {
+            render_close_button(graphics, button)?;
+        }
+        Ok(())
     })
+}
+
+/// Calculate the close-button rectangle in the same coordinate space as the
+/// supplied tile bounds. For rendering, pass a rectangle whose origin is
+/// `(0, 0)`; for input, pass the tile's screen rectangle.
+pub(crate) fn close_button_bounds(bounds: RECT) -> Option<RECT> {
+    let width = bounds.right.saturating_sub(bounds.left);
+    let height = bounds.bottom.saturating_sub(bounds.top);
+    if width < CLOSE_BUTTON_SIZE + CLOSE_BUTTON_INSET
+        || height < CLOSE_BUTTON_SIZE + CLOSE_BUTTON_INSET
+    {
+        return None;
+    }
+
+    Some(RECT {
+        left: bounds.right - CLOSE_BUTTON_INSET - CLOSE_BUTTON_SIZE,
+        top: bounds.top + CLOSE_BUTTON_INSET,
+        right: bounds.right - CLOSE_BUTTON_INSET,
+        bottom: bounds.top + CLOSE_BUTTON_INSET + CLOSE_BUTTON_SIZE,
+    })
+}
+
+fn render_close_button(
+    graphics: &mut crate::rendering::Graphics,
+    button: RECT,
+) -> crate::rendering::gdi_plus::Result<()> {
+    let background = RectF {
+        X: button.left as f32,
+        Y: button.top as f32,
+        Width: (button.right - button.left) as f32,
+        Height: (button.bottom - button.top) as f32,
+    };
+    graphics.fill_rect(background, ARGB_BLACK)?;
+
+    let left = button.left as f32 + 8.0;
+    let top = button.top as f32 + 8.0;
+    let right = button.right as f32 - 8.0;
+    let bottom = button.bottom as f32 - 8.0;
+    graphics.fill_polygon(
+        &[
+            PointF {
+                X: left,
+                Y: top + 3.0,
+            },
+            PointF {
+                X: left + 3.0,
+                Y: top,
+            },
+            PointF {
+                X: right,
+                Y: bottom - 3.0,
+            },
+            PointF {
+                X: right - 3.0,
+                Y: bottom,
+            },
+        ],
+        ARGB_WHITE,
+    )?;
+    graphics.fill_polygon(
+        &[
+            PointF {
+                X: right - 3.0,
+                Y: top,
+            },
+            PointF {
+                X: right,
+                Y: top + 3.0,
+            },
+            PointF {
+                X: left + 3.0,
+                Y: bottom,
+            },
+            PointF {
+                X: left,
+                Y: bottom - 3.0,
+            },
+        ],
+        ARGB_WHITE,
+    )
 }
 
 fn screen_to_client_rect(owner: HWND, bounds: RECT) -> RECT {
