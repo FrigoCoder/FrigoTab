@@ -94,10 +94,28 @@ impl SwitcherApplication {
         };
         match index {
             Some(index) if self.is_valid_index(index) => {
-                self.try_select(port, index);
+                if port.set_pointer_index(Some(index)).is_err() {
+                    self.close(port);
+                } else {
+                    self.selected_index = Some(index);
+                }
             }
             Some(_) => self.close(port),
-            None => self.try_clear_selection(port),
+            None => {
+                if port.set_pointer_index(None).is_err() {
+                    self.close(port);
+                } else {
+                    self.selected_index = None;
+                }
+            }
+        }
+    }
+
+    /// Clears pointer-only visual state after the cursor leaves the full-screen
+    /// owner. Keyboard selection remains unchanged.
+    pub fn handle_mouse_leave<P: SwitcherSessionPort>(&mut self, port: &mut P) {
+        if self.state == SwitcherState::Visible && port.set_hovered(None).is_err() {
+            self.close(port);
         }
     }
 
@@ -161,6 +179,22 @@ impl SwitcherApplication {
         }
         if port.relayout().is_err() {
             self.interrupt(port);
+        }
+    }
+
+    /// Publishes a replacement preview graph after an asynchronous close has
+    /// actually removed its source window.
+    pub fn refresh_closed_applications<P: SwitcherSessionPort>(&mut self, port: &mut P) {
+        if self.state != SwitcherState::Visible {
+            return;
+        }
+        match port.refresh_closed_applications() {
+            Ok(None) => {}
+            Ok(Some(0)) | Err(()) => self.close(port),
+            Ok(Some(count)) => {
+                self.candidate_count = count;
+                self.selected_index = None;
+            }
         }
     }
 

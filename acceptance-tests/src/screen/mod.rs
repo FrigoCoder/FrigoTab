@@ -1,7 +1,8 @@
-pub(crate) mod cursor_position;
+mod cursor_position;
 pub mod screen_capture;
 pub mod window_search;
 
+pub use cursor_position::CursorPosition;
 pub use screen_capture::{
     ScreenCapture, capture_screen, capture_screen_image, find_pixel, find_screen_pixel, pixel_at,
     screen_pixel,

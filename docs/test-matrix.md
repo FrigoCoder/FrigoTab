@@ -4,7 +4,7 @@ The matrix separates deterministic acceptance tests from native-desktop checks t
 
 ## Automated suite
 
-The suite is made up of plain Rust integration tests. All 44 tests execute against real application objects, native Windows resources, or the launched executable. There is no BDD/Gherkin layer, feature file, fake session, or intentionally-red lane.
+The suite is made up of plain Rust integration tests. All 45 tests execute against real application objects, native Windows resources, or the launched executable. There is no BDD/Gherkin layer, feature file, fake session, or intentionally-red lane.
 
 | Timestamped family | Count | Evidence boundary | Coverage |
 | --- | ---: | --- | --- |
@@ -15,8 +15,8 @@ The suite is made up of plain Rust integration tests. All 44 tests execute again
 | `t20260915t175100z_005_alt_tab_behavior_acceptance_tests` | 5 | Real switcher/session HWNDs | Default Sticky release, Tap (classic) initial/forward/reverse release activation, and release with no pointer selection. |
 | `t20260915t175100z_006_tray_and_background_acceptance_tests` | 4 | Launched `FrigoTab.exe` and its real tray popup | Default menu checkmarks, tray-only Tap selection, Black rectangle painting, and Background image only painting. |
 | `t20260915t212300z_007_thumbnail_reveal_performance_acceptance_tests` | 1 | Launched `FrigoTab.exe` and the real DWM compositor | A live preview source is present in the first composed owner frame without a delayed placeholder. |
-| `t20260925t203500z_008_close_button_acceptance_tests` | 3 | Real switcher/session HWNDs, layered previews, and the launched tray process | Close buttons are visible by default with the expected black/white rendering, close the exact source asynchronously without activation while keeping Sticky open, hidden buttons preserve ordinary tile activation, and the tray toggle changes the runtime setting. |
-| **Total** | **44** |  | **All automated tests pass before a publish is accepted.** |
+| `t20260925t203500z_008_close_button_acceptance_tests` | 4 | Real switcher/session HWNDs, layered previews, and the launched tray process | The tray submenu selects Always visible, On hover (Alt-Tab / Win-Tab), or Hidden; Always visible has the default black/white rendering, On hover shows a pointer-hovered white X without a background independently of keyboard selection, close requests target the exact source asynchronously without activation, and the live session refreshes, reflows, and renumbers after the source disappears while remaining open. |
+| **Total** | **45** |  | **All automated tests pass before a publish is accepted.** |
 
 The file prefixes are UTC timestamps recording when a family was introduced. Keep the prefix when refactoring a family; test functions remain descriptive plain Rust names. The process tests accept `FRIGOTAB_EXE` when a different built executable is being compared with the current Rust build.
 
@@ -39,8 +39,8 @@ Both artifacts are native x64 executables and do not require a managed runtime.
 | UIPI/elevation and focus denial | Ordinary/elevated boundaries do not join input queues; successful switches do not flash taskbar buttons; denied foreground activation leaves the overlay usable. |
 | Number selection | D1..D9 and NumPad1..NumPad9 choose the intended tile on supported keyboard layouts without intermittent refusal. |
 | Escape and Alt+F4 | The overlay closes without activating a target; the tray process stays alive. |
-| Tray behavior and backdrop settings | Right-click the tray icon and verify the checked Sticky/Tap, Full desktop/Image only/Black rectangle, and Close buttons (checked by default) items. Change each setting, open a new session, and verify the selected release behavior, backdrop, and close-button visibility; settings are runtime-only and reset after restart. |
-| Close-button pointer behavior | With Close buttons enabled, click the 32x32 black/white-× control and verify that only its source receives asynchronous `WM_CLOSE`, the source is not activated, the Sticky session remains open, and selection clears. Hide Close buttons and verify the same point activates the tile normally. |
+| Tray behavior and backdrop settings | Right-click the tray icon and verify the checked Sticky/Tap, Full desktop/Image only/Black rectangle, and Always visible/On hover/Hidden close-button items. Change each setting, open a new session, and verify the selected release behavior, backdrop, and close-button style; settings are runtime-only and reset after restart. |
+| Close-button pointer behavior | In Always visible mode, click the 32x32 black/white-× control and verify that only its source receives asynchronous `WM_CLOSE`, the source is not activated, the Sticky session remains open, and selection clears. In On hover mode, verify that a background-free white × appears only on the pointer-hovered thumbnail. Select Hidden and verify the same point activates the tile normally. |
 | Pointer hover/click/outside | Selection follows the pointer, clears outside tiles, keyboard navigation can recover selection, and a click activates exactly the intended target. |
 | Minimized/maximized and stale targets | Restored placement chooses the correct monitor; closed targets do not crash the session; activation failure remains recoverable. |
 | Mixed monitor/DPI topology | Negative origins, portrait layouts, DPI changes, resolution/orientation changes, and monitor add/remove close or rebuild safely without stale/off-screen UI. |
@@ -65,4 +65,4 @@ Both artifacts are native x64 executables and do not require a managed runtime.
 .\build.ps1 -Task Clean
 ```
 
-`Verify` and `Test` run all 44 acceptance tests serially. `Publish` repeats the Release build and green test gate before producing `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point. No CI/CD service is required by this local workflow.
+`Verify` and `Test` run all 45 acceptance tests serially. `Publish` repeats the Release build and green test gate before producing `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point. No CI/CD service is required by this local workflow.

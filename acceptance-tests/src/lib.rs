@@ -15,11 +15,11 @@ pub use fixture::{FixtureOptions, FixtureWindow};
 pub use live::{LiveSession, LiveTile};
 pub use process::{RunningFrigoTab, TrayMenuItem, WM_BEGIN_SESSION};
 pub use screen::{
-    ScreenCapture, capture_screen, capture_screen_image, enumerate_windows, find_pixel,
-    find_screen_pixel, find_window_by_pid_and_bounds, foreground_window, get_window_rect,
-    is_layered, is_window_visible, pixel_at, screen_pixel, visible_owned_layered_windows,
-    visible_owned_overlays, window_bounds, window_ex_style, window_owner, window_style,
-    window_title, windows_for_pid,
+    CursorPosition, ScreenCapture, capture_screen, capture_screen_image, enumerate_windows,
+    find_pixel, find_screen_pixel, find_window_by_pid_and_bounds, foreground_window,
+    get_window_rect, is_layered, is_window_visible, pixel_at, screen_pixel,
+    visible_owned_layered_windows, visible_owned_overlays, window_bounds, window_ex_style,
+    window_owner, window_style, window_title, windows_for_pid,
 };
 
 use std::ffi::OsStr;

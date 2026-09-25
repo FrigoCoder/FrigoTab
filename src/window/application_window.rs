@@ -16,6 +16,7 @@ use super::frigo_window::FrigoWindow;
 use super::window_handle::WindowHandle;
 use super::window_icon::WindowIcon;
 use crate::rendering::{DwmThumbnail, Font, LayerUpdater};
+use crate::switcher::CloseButtonMode;
 use windows_sys::Win32::Graphics::GdiPlus::{FontStyleBold, FontStyleRegular, PointF, RectF};
 
 const PAD: f32 = 8.0;
@@ -34,34 +35,63 @@ pub struct ApplicationWindow {
     // matching ApplicationWindow.Dispose (icon, layer, thumbnail, popup).
     window_icon: WindowIcon,
     layer_updater: Rc<RefCell<LayerUpdater>>,
-    _thumbnail: Option<DwmThumbnail>,
+    thumbnail: Option<DwmThumbnail>,
     popup: FrigoWindow,
     application: HWND,
     index: usize,
     bounds: RECT,
     selected: bool,
     selected_state: Rc<Cell<bool>>,
-    close_buttons_visible_state: Rc<Cell<bool>>,
+    hovered: bool,
+    hovered_state: Rc<Cell<bool>>,
+    close_button_mode_state: Rc<Cell<CloseButtonMode>>,
 }
 
 impl ApplicationWindow {
     pub fn new(owner: HWND, application: HWND, index: usize, bounds: RECT) -> Result<Self, String> {
-        Self::with_close_buttons(owner, application, index, bounds, true)
+        Self::with_close_button_mode(
+            owner,
+            application,
+            index,
+            bounds,
+            CloseButtonMode::AlwaysVisible,
+        )
     }
 
-    pub(crate) fn with_close_buttons(
+    pub(crate) fn with_close_button_mode(
         owner: HWND,
         application: HWND,
         index: usize,
         bounds: RECT,
-        close_buttons_visible: bool,
+        close_button_mode: CloseButtonMode,
+    ) -> Result<Self, String> {
+        Self::with_close_button_mode_and_thumbnail_visibility(
+            owner,
+            application,
+            index,
+            bounds,
+            close_button_mode,
+            true,
+        )
+    }
+
+    pub(crate) fn with_close_button_mode_and_thumbnail_visibility(
+        owner: HWND,
+        application: HWND,
+        index: usize,
+        bounds: RECT,
+        close_button_mode: CloseButtonMode,
+        thumbnail_visible: bool,
     ) -> Result<Self, String> {
         let thumbnail = match DwmThumbnail::register(owner, application) {
             Ok(thumbnail) => {
-                if thumbnail
-                    .set_destination_rect(screen_to_client_rect(owner, bounds))
-                    .is_ok()
-                {
+                let destination = screen_to_client_rect(owner, bounds);
+                let configured = if thumbnail_visible {
+                    thumbnail.set_destination_rect(destination)
+                } else {
+                    thumbnail.set_hidden_destination_rect(destination)
+                };
+                if configured.is_ok() {
                     Some(thumbnail)
                 } else {
                     None
@@ -76,8 +106,10 @@ impl ApplicationWindow {
         let callback_layer = Rc::clone(&layer_updater);
         let selected_state = Rc::new(Cell::new(false));
         let callback_selected = Rc::clone(&selected_state);
-        let close_buttons_visible_state = Rc::new(Cell::new(close_buttons_visible));
-        let callback_close_buttons_visible = Rc::clone(&close_buttons_visible_state);
+        let hovered_state = Rc::new(Cell::new(false));
+        let callback_hovered = Rc::clone(&hovered_state);
+        let close_button_mode_state = Rc::new(Cell::new(close_button_mode));
+        let callback_close_button_mode = Rc::clone(&close_button_mode_state);
         window_icon.on_changed(move || {
             let _ = icon_state.with_icon(|icon, icon_width, icon_height| {
                 let _ = render_overlay_with_icon(
@@ -88,7 +120,8 @@ impl ApplicationWindow {
                     application,
                     index,
                     callback_selected.get(),
-                    callback_close_buttons_visible.get(),
+                    callback_hovered.get(),
+                    callback_close_button_mode.get(),
                 );
             });
         });
@@ -100,10 +133,12 @@ impl ApplicationWindow {
             bounds,
             selected: false,
             selected_state,
-            close_buttons_visible_state,
+            hovered: false,
+            hovered_state,
+            close_button_mode_state,
             window_icon,
             layer_updater,
-            _thumbnail: thumbnail,
+            thumbnail,
         };
         result.render_overlay()?;
         Ok(result)
@@ -126,12 +161,11 @@ impl ApplicationWindow {
     }
 
     pub fn set_selected(&mut self, selected: bool) -> Result<(), String> {
-        if self.selected == selected {
-            return Ok(());
-        }
-        self.selected = selected;
-        self.selected_state.set(selected);
-        self.render_overlay()
+        self.set_interaction_state(selected, self.hovered)
+    }
+
+    pub fn is_hovered(&self) -> bool {
+        self.hovered
     }
 
     /// Show or hide the layered title/number overlay. The DWM thumbnail stays
@@ -139,6 +173,13 @@ impl ApplicationWindow {
     /// output until the registration is dropped.
     pub fn set_session_visible(&self, visible: bool) {
         self.popup.set_visible(visible);
+    }
+
+    pub(crate) fn set_thumbnail_visible(&self, visible: bool) -> Result<(), i32> {
+        if let Some(thumbnail) = self.thumbnail.as_ref() {
+            thumbnail.set_visible(visible)?;
+        }
+        Ok(())
     }
 
     pub fn try_activate(&self) -> bool {
@@ -152,19 +193,50 @@ impl ApplicationWindow {
             && point.y < self.bounds.bottom
     }
 
-    /// Show or hide this tile's close button and redraw its current overlay.
-    pub fn set_close_buttons_visible(&mut self, visible: bool) -> Result<(), String> {
-        if self.close_buttons_visible_state.get() == visible {
+    /// Update this tile's close-button mode and redraw its current overlay.
+    pub fn set_close_button_mode(&mut self, mode: CloseButtonMode) -> Result<(), String> {
+        if self.close_button_mode_state.get() == mode {
             return Ok(());
         }
-        self.close_buttons_visible_state.set(visible);
+        self.close_button_mode_state.set(mode);
         self.render_overlay()
+    }
+
+    /// Update whether the pointer is over this tile and redraw only when that
+    /// state changes. The hover state is kept separate from keyboard selection
+    /// so a selected tile does not show a Windows-style close glyph by itself.
+    pub fn set_hovered(&mut self, hovered: bool) -> Result<(), String> {
+        self.set_interaction_state(self.selected, hovered)
+    }
+
+    pub(crate) fn set_interaction_state(
+        &mut self,
+        selected: bool,
+        hovered: bool,
+    ) -> Result<(), String> {
+        let selection_changed = self.selected != selected;
+        let hover_changed = self.hovered != hovered;
+        if !selection_changed && !hover_changed {
+            return Ok(());
+        }
+        self.selected = selected;
+        self.selected_state.set(selected);
+        self.hovered = hovered;
+        self.hovered_state.set(hovered);
+        if selection_changed
+            || (hover_changed && self.close_button_mode_state.get() == CloseButtonMode::HoverOnly)
+        {
+            self.render_overlay()?;
+        }
+        Ok(())
     }
 
     /// Return whether a screen point is inside this tile's close button.
     pub(crate) fn close_button_hit(&self, x: i32, y: i32) -> bool {
-        if !self.close_buttons_visible_state.get() {
-            return false;
+        match self.close_button_mode_state.get() {
+            CloseButtonMode::Hidden => return false,
+            CloseButtonMode::HoverOnly if !self.hovered => return false,
+            CloseButtonMode::AlwaysVisible | CloseButtonMode::HoverOnly => {}
         }
         close_button_bounds(self.bounds).is_some_and(|button| {
             x >= button.left && x < button.right && y >= button.top && y < button.bottom
@@ -182,7 +254,8 @@ impl ApplicationWindow {
                 self.application,
                 self.index,
                 selected,
-                self.close_buttons_visible_state.get(),
+                self.hovered_state.get(),
+                self.close_button_mode_state.get(),
             )
         });
         icon_result.unwrap_or_else(|| Err("Window icon is unavailable".to_string()))
@@ -198,7 +271,8 @@ fn render_overlay_with_icon(
     application: HWND,
     index: usize,
     selected: bool,
-    close_buttons_visible: bool,
+    hovered: bool,
+    close_button_mode: CloseButtonMode,
 ) -> Result<(), String> {
     let title = WindowHandle::new(application).get_window_text();
     layer.update(|graphics| {
@@ -253,7 +327,12 @@ fn render_overlay_with_icon(
         graphics.set_text_rendering_hint()?;
         graphics.draw_string(&number, &number_font, number_background, ARGB_WHITE)?;
 
-        if close_buttons_visible
+        let close_button_visible = match close_button_mode {
+            CloseButtonMode::AlwaysVisible => true,
+            CloseButtonMode::HoverOnly => hovered,
+            CloseButtonMode::Hidden => false,
+        };
+        if close_button_visible
             && let Some(button) = close_button_bounds(RECT {
                 left: 0,
                 top: 0,
@@ -261,7 +340,11 @@ fn render_overlay_with_icon(
                 bottom: graphics.height.round() as i32,
             })
         {
-            render_close_button(graphics, button)?;
+            render_close_button(
+                graphics,
+                button,
+                close_button_mode == CloseButtonMode::AlwaysVisible,
+            )?;
         }
         Ok(())
     })
@@ -290,14 +373,17 @@ pub(crate) fn close_button_bounds(bounds: RECT) -> Option<RECT> {
 fn render_close_button(
     graphics: &mut crate::rendering::Graphics,
     button: RECT,
+    with_background: bool,
 ) -> crate::rendering::gdi_plus::Result<()> {
-    let background = RectF {
-        X: button.left as f32,
-        Y: button.top as f32,
-        Width: (button.right - button.left) as f32,
-        Height: (button.bottom - button.top) as f32,
-    };
-    graphics.fill_rect(background, ARGB_BLACK)?;
+    if with_background {
+        let background = RectF {
+            X: button.left as f32,
+            Y: button.top as f32,
+            Width: (button.right - button.left) as f32,
+            Height: (button.bottom - button.top) as f32,
+        };
+        graphics.fill_rect(background, ARGB_BLACK)?;
+    }
 
     let left = button.left as f32 + 8.0;
     let top = button.top as f32 + 8.0;

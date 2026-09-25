@@ -14,7 +14,7 @@ The behavior inventory, test boundary, and native validation checklist are docum
 - [Acceptance test matrix](docs/test-matrix.md)
 - [Architecture and test boundaries](docs/architecture.md)
 
-There are 44 automated acceptance tests in eight timestamped test families:
+There are 45 automated acceptance tests in eight timestamped test families:
 
 - 15 real switcher/session tests using actual HWNDs, window enumeration, layout, DWM, activation, and cleanup.
 - 7 real window, DWM, GDI, and shell-backdrop tests using native desktop objects.
@@ -23,7 +23,7 @@ There are 44 automated acceptance tests in eight timestamped test families:
 - 5 real switcher tests covering the selectable Sticky and Tap (classic) Alt-release behavior.
 - 4 black-box tests that open the real tray menu and verify the selectable background modes.
 - 1 real-process compositor test that verifies a live thumbnail is ready in the first published owner frame.
-- 3 real close-button tests that verify the default rendering, exact-source close behavior, sticky-session handling, hidden-button activation, and the tray toggle.
+- 4 real close-button tests that verify the default rendering, exact-source close behavior, sticky-session handling, hidden-button activation, hover rendering, live refresh, and the tray submenu.
 
 The families are the eight timestamped Rust integration-test files:
 
@@ -49,7 +49,7 @@ The timestamp and family suffix are stable identifiers. Keep them when refactori
 .\build.ps1 -Task Clean
 ```
 
-`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 44 acceptance tests serially. `Test` builds and runs the acceptance tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
+`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 45 acceptance tests serially. `Test` builds and runs the acceptance tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
 
 The direct Cargo equivalents are:
 
@@ -62,7 +62,7 @@ cargo test -p frigotab-acceptance --release -- --test-threads=1
 
 The Debug executable retains the historical ten-second `StartQuitTimer` safety timer. It is for development only; use the Release executable for sustained interactive testing. Sticky Alt release is the default: releasing Alt leaves the switcher open so the user can use Tab/Shift+Tab, a number, or the mouse, and can cancel with Escape or Alt+F4. The tray menu can select Tap (classic), which activates the current selection when Alt is released. An immediate Alt release follows the selected mode. These settings are runtime-only, are available from the tray menu only, and reset to their defaults on the next launch. Foreground activation uses the historical input nudge and does not join another application's input queue with `AttachThreadInput`.
 
-Close buttons are enabled by default and can be shown or hidden only through the tray menu. When enabled, every thumbnail has a 32x32 black close button with a white `×` in its top-right corner. Clicking it asynchronously requests `WM_CLOSE` for that thumbnail's exact source window without activating the source, keeps a Sticky session open, and clears the selection. With close buttons hidden, the same region behaves as ordinary tile activation. The setting is runtime-only and is neither persisted nor localized.
+Close buttons are selected from the tray icon's `Close buttons` submenu and are runtime-only. `Always visible` is the default: every thumbnail has a 32x32 black close button with a white `×` in its top-right corner. `On hover (Alt-Tab / Win-Tab)` uses the normal Windows-style treatment: a white `×` with no black background appears only on the thumbnail currently under the mouse pointer, independently of keyboard selection. `Hidden` removes the close affordance; the same region behaves as ordinary tile activation. Clicking a visible close affordance asynchronously requests `WM_CLOSE` for that thumbnail's exact source window without activating the source. FrigoTab waits for the source to disappear, rebuilds the live candidate list, and reflows and renumbers the remaining thumbnails while keeping the session and foreground overlay active. The setting is neither persisted nor localized.
 
 The default Full desktop backdrop is a retained snapshot of the Windows shell desktop, including wallpaper and desktop icons. FrigoTab asks Explorer's desktop host (`Progman`, or the matching `WorkerW`) to render into an off-screen native bitmap. The tray menu also offers Background image only (the desktop wallpaper/pattern without icons) and Black rectangle. None of these modes captures the screen or reconstructs a background by searching and composing it from application windows. DWM prepares the preview surfaces behind the hidden owner, then the selected backdrop is painted as the owner is shown; if shell rendering is unavailable, the overlay uses a black fallback and remains usable.
 

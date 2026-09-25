@@ -7,6 +7,7 @@ use frigotab::key_handling::KeyHandling;
 use frigotab::keyboard_input::{KeyTransition, KeyboardInput, SwitcherKey};
 use frigotab::screen_point::ScreenPoint;
 use frigotab::session_window::{BackgroundMode, SessionWindow, WM_DESKTOP_SNAPSHOT_READY};
+use frigotab::switcher::{CLOSE_REFRESH_TIMER_ID, CloseButtonMode};
 use frigotab::switcher_application::{AltTabBehavior, SwitcherApplication};
 use frigotab::switcher_state::SwitcherState;
 use windows_sys::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
@@ -16,7 +17,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow,
     GWLP_USERDATA, GetClientRect, GetWindowLongPtrW, IDC_ARROW, IDI_APPLICATION, IsWindow,
     LoadCursorW, LoadIconW, MA_NOACTIVATE, RegisterClassExW, SetWindowLongPtrW, WM_CLOSE,
-    WM_ERASEBKGND, WM_MOUSEACTIVATE, WM_NCCREATE, WM_NCDESTROY, WM_PAINT, WNDCLASSEXW,
+    WM_ERASEBKGND, WM_MOUSEACTIVATE, WM_NCCREATE, WM_NCDESTROY, WM_PAINT, WM_TIMER, WNDCLASSEXW,
     WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
@@ -156,21 +157,21 @@ impl LiveSession {
             .background_mode()
     }
 
-    pub fn set_close_buttons_visible(&mut self, visible: bool) {
+    pub fn set_close_button_mode(&mut self, mode: CloseButtonMode) {
         self.state
             .session
             .as_mut()
             .expect("live session exists")
-            .set_close_buttons_visible(visible);
+            .set_close_button_mode(mode);
         pump_messages();
     }
 
-    pub fn close_buttons_visible(&self) -> bool {
+    pub fn close_button_mode(&self) -> CloseButtonMode {
         self.state
             .session
             .as_ref()
             .expect("live session exists")
-            .close_buttons_visible()
+            .close_button_mode()
     }
 
     pub fn candidate_count(&self) -> usize {
@@ -388,6 +389,11 @@ unsafe extern "system" fn live_owner_window_proc(
             if let Some(session) = state.session.as_mut() {
                 session.publish_desktop_snapshot();
             }
+            0
+        }
+        WM_TIMER if wparam == CLOSE_REFRESH_TIMER_ID => {
+            let session = state.session.as_mut().expect("live session exists");
+            state.controller.refresh_closed_applications(session);
             0
         }
         WM_CLOSE => {

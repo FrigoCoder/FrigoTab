@@ -8,13 +8,18 @@ mod composition;
 use composition::OwnerContext;
 use frigotab::geometry::{ScreenPoint, virtual_screen_bounds};
 use frigotab::input::{KeyHook, WM_KEY_HOOK_INPUT};
-use frigotab::switcher::{SessionWindow, SwitcherState, WM_DESKTOP_SNAPSHOT_READY};
+use frigotab::switcher::{
+    CLOSE_REFRESH_TIMER_ID, SessionWindow, SwitcherState, WM_DESKTOP_SNAPSHOT_READY,
+};
 use frigotab::system::{APPLICATION_MUTEX_NAME, SingleInstanceGuard};
 use frigotab::tray::{SysTrayIcon, TRAY_CALLBACK_MESSAGE, TrayAction};
 use frigotab::window::WindowHandle;
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{BeginPaint, ClientToScreen, EndPaint, PAINTSTRUCT};
 use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    TME_LEAVE, TRACKMOUSEEVENT, TrackMouseEvent,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow,
     DispatchMessageW, GWLP_USERDATA, GetClientRect, GetWindowLongPtrW, IDC_ARROW, LoadCursorW,
@@ -22,12 +27,13 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     RegisterClassExW, SetProcessDPIAware, SetWindowLongPtrW, TranslateMessage, WM_ACTIVATEAPP,
     WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_DWMCOMPOSITIONCHANGED, WM_ENDSESSION,
     WM_ERASEBKGND, WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCCREATE, WM_NCDESTROY,
-    WM_PAINT, WM_QUERYENDSESSION, WNDCLASSEXW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    WM_PAINT, WM_QUERYENDSESSION, WM_TIMER, WNDCLASSEXW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
 const OWNER_CLASS: &str = "FrigoTab.SessionOwner";
 const OWNER_TITLE: &str = "FrigoTab";
 const WM_BEGIN_SESSION: u32 = 0x4001;
+const WM_MOUSELEAVE: u32 = 0x02A3;
 #[cfg(debug_assertions)]
 const DEBUG_TIMER_ID: usize = 1;
 
@@ -241,11 +247,12 @@ unsafe extern "system" fn owner_window_proc(
                         .unwrap_or_default(),
                     app.session
                         .as_ref()
-                        .is_none_or(SessionWindow::close_buttons_visible),
+                        .map(SessionWindow::close_button_mode)
+                        .unwrap_or_default(),
                 )
             })
         };
-        let Some((alt_tab_behavior, background_mode, close_buttons_visible)) = settings else {
+        let Some((alt_tab_behavior, background_mode, close_button_mode)) = settings else {
             return 0;
         };
         let action = SysTrayIcon::handle_callback(
@@ -253,7 +260,7 @@ unsafe extern "system" fn owner_window_proc(
             lparam,
             alt_tab_behavior,
             background_mode,
-            close_buttons_visible,
+            close_button_mode,
         );
         if WindowHandle::new(hwnd).is_valid()
             && unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OwnerContext == pointer }
@@ -269,9 +276,9 @@ unsafe extern "system" fn owner_window_proc(
                             session.set_background_mode(mode);
                         }
                     }
-                    Some(TrayAction::SetCloseButtonsVisible(visible)) => {
+                    Some(TrayAction::SetCloseButtonMode(mode)) => {
                         if let Some(session) = app.session.as_mut() {
-                            session.set_close_buttons_visible(visible);
+                            session.set_close_button_mode(mode);
                         }
                     }
                     Some(TrayAction::Exit) => {
@@ -311,8 +318,15 @@ unsafe extern "system" fn owner_window_proc(
         WM_ERASEBKGND => 1,
         WM_MOUSEACTIVATE => MA_ACTIVATE as isize,
         WM_MOUSEMOVE => {
+            track_mouse_leave(hwnd);
             if let Ok(mut app) = app.try_borrow_mut() {
                 app.handle_mouse_move(mouse_screen_point(hwnd, lparam));
+            }
+            0
+        }
+        WM_MOUSELEAVE => {
+            if let Ok(mut app) = app.try_borrow_mut() {
+                app.handle_mouse_leave();
             }
             0
         }
@@ -372,6 +386,12 @@ unsafe extern "system" fn owner_window_proc(
             }
             0
         }
+        WM_TIMER if wparam == CLOSE_REFRESH_TIMER_ID => {
+            if let Ok(mut app) = app.try_borrow_mut() {
+                app.refresh_closed_applications();
+            }
+            0
+        }
         #[cfg(debug_assertions)]
         windows_sys::Win32::UI::WindowsAndMessaging::WM_TIMER if wparam == DEBUG_TIMER_ID => {
             let can_destroy = if let Ok(mut app) = app.try_borrow_mut() {
@@ -426,6 +446,18 @@ unsafe extern "system" fn owner_window_proc(
             unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
         }
         _ => unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
+    }
+}
+
+fn track_mouse_leave(hwnd: HWND) {
+    let mut event = TRACKMOUSEEVENT {
+        cbSize: size_of::<TRACKMOUSEEVENT>() as u32,
+        dwFlags: TME_LEAVE,
+        hwndTrack: hwnd,
+        dwHoverTime: 0,
+    };
+    unsafe {
+        let _ = TrackMouseEvent(&mut event);
     }
 }
 

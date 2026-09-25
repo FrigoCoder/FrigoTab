@@ -7,6 +7,7 @@
 mod alt_tab_behavior;
 mod background_mode;
 mod background_state;
+mod close_button_mode;
 mod session_painter;
 mod snapshot_completion;
 mod switcher_session_port;
@@ -16,8 +17,10 @@ pub mod session_window;
 pub mod switcher_application;
 pub mod switcher_state;
 
+pub use close_button_mode::CloseButtonMode;
 pub use session_window::{
-    BackgroundMode, SessionPainter, SessionWindow, WM_DESKTOP_SNAPSHOT_READY,
+    BackgroundMode, CLOSE_REFRESH_TIMER_ID, SessionPainter, SessionWindow,
+    WM_DESKTOP_SNAPSHOT_READY,
 };
 pub use switcher_application::{AltTabBehavior, SwitcherApplication, SwitcherSessionPort};
 pub use switcher_state::SwitcherState;

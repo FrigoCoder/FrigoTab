@@ -21,10 +21,22 @@ pub trait SwitcherSessionPort {
     /// not over a selectable candidate.
     fn hit_test(&mut self, point: ScreenPoint) -> Result<Option<usize>, ()>;
 
+    /// Updates the thumbnail currently under the pointer independently of the
+    /// keyboard selection. Native-style close buttons use this hover state.
+    fn set_hovered(&mut self, index: Option<usize>) -> Result<(), ()>;
+
+    /// Applies pointer hover and pointer selection as one visual transition.
+    fn set_pointer_index(&mut self, index: Option<usize>) -> Result<(), ()>;
+
     /// Requests closure when the point is over an enabled close button.
     /// Returns `true` when the click belongs to that control, regardless of
     /// whether the target eventually accepts the asynchronous close request.
     fn try_close_at(&mut self, point: ScreenPoint) -> Result<bool, ()>;
+
+    /// Checks an asynchronous close request and rebuilds the live preview
+    /// graph once its source is no longer a switchable window. `None` means
+    /// that no refresh is ready; `Some(count)` publishes the replacement.
+    fn refresh_closed_applications(&mut self) -> Result<Option<usize>, ()>;
 
     /// Attempts to activate the currently selected candidate. `Ok(false)`
     /// leaves the session visible so the user can retry or cancel.

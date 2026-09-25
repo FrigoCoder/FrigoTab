@@ -63,11 +63,21 @@ impl DwmThumbnail {
     /// this does not expose a partial session. It does give DWM time to prepare
     /// the source surface before the owner is shown.
     pub fn set_destination_rect(&self, destination: RECT) -> Result<(), i32> {
+        self.set_destination_rect_visibility(destination, true)
+    }
+
+    /// Set the destination while keeping the registration hidden. This lets a
+    /// replacement preview graph be fully prepared before a live-session swap.
+    pub fn set_hidden_destination_rect(&self, destination: RECT) -> Result<(), i32> {
+        self.set_destination_rect_visibility(destination, false)
+    }
+
+    fn set_destination_rect_visibility(&self, destination: RECT, visible: bool) -> Result<(), i32> {
         let properties = DWM_THUMBNAIL_PROPERTIES {
             dwFlags: DWM_TNP_RECTDESTINATION | DWM_TNP_OPACITY | DWM_TNP_VISIBLE,
             rcDestination: destination,
             opacity: u8::MAX,
-            fVisible: 1,
+            fVisible: visible.into(),
             ..Default::default()
         };
         self.update(properties)

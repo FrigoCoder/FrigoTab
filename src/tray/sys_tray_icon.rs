@@ -12,7 +12,7 @@ use super::application_icon::ApplicationIcon;
 use super::owned_icon::OwnedIcon;
 use super::popup_menu::PopupMenu;
 
-use crate::switcher::{AltTabBehavior, BackgroundMode};
+use crate::switcher::{AltTabBehavior, BackgroundMode, CloseButtonMode};
 use windows_sys::Win32::Foundation::{GetLastError, HWND, POINT};
 use windows_sys::Win32::System::LibraryLoader::GetModuleFileNameW;
 use windows_sys::Win32::UI::Shell::{
@@ -33,8 +33,10 @@ const TAP_COMMAND: usize = 2;
 const FULL_DESKTOP_COMMAND: usize = 3;
 const IMAGE_ONLY_COMMAND: usize = 4;
 const BLACK_COMMAND: usize = 5;
-const CLOSE_BUTTONS_COMMAND: usize = 6;
-const EXIT_COMMAND: usize = 7;
+const CLOSE_BUTTONS_ALWAYS_COMMAND: usize = 6;
+const CLOSE_BUTTONS_HOVER_COMMAND: usize = 7;
+const CLOSE_BUTTONS_HIDDEN_COMMAND: usize = 8;
+const EXIT_COMMAND: usize = 9;
 
 pub use super::tray_action::TrayAction;
 
@@ -83,15 +85,12 @@ impl SysTrayIcon {
         event: isize,
         alt_tab_behavior: AltTabBehavior,
         background_mode: BackgroundMode,
-        close_buttons_visible: bool,
+        close_button_mode: CloseButtonMode,
     ) -> Option<TrayAction> {
         match event as u32 {
-            WM_RBUTTONUP | WM_CONTEXTMENU => Self::show_menu(
-                owner,
-                alt_tab_behavior,
-                background_mode,
-                close_buttons_visible,
-            ),
+            WM_RBUTTONUP | WM_CONTEXTMENU => {
+                Self::show_menu(owner, alt_tab_behavior, background_mode, close_button_mode)
+            }
             _ => None,
         }
     }
@@ -112,7 +111,7 @@ impl SysTrayIcon {
         owner: HWND,
         alt_tab_behavior: AltTabBehavior,
         background_mode: BackgroundMode,
-        close_buttons_visible: bool,
+        close_button_mode: CloseButtonMode,
     ) -> Option<TrayAction> {
         let menu = PopupMenu::new()?;
 
@@ -153,12 +152,24 @@ impl SysTrayIcon {
             return None;
         }
 
+        let close_buttons_menu = PopupMenu::new()?;
         if !append_item(
-            menu.handle(),
-            CLOSE_BUTTONS_COMMAND,
-            "Close buttons",
-            close_buttons_visible,
-        ) {
+            close_buttons_menu.handle(),
+            CLOSE_BUTTONS_ALWAYS_COMMAND,
+            "Always visible",
+            close_button_mode == CloseButtonMode::AlwaysVisible,
+        ) || !append_item(
+            close_buttons_menu.handle(),
+            CLOSE_BUTTONS_HOVER_COMMAND,
+            "On hover (Alt-Tab / Win-Tab)",
+            close_button_mode == CloseButtonMode::HoverOnly,
+        ) || !append_item(
+            close_buttons_menu.handle(),
+            CLOSE_BUTTONS_HIDDEN_COMMAND,
+            "Hidden",
+            close_button_mode == CloseButtonMode::Hidden,
+        ) || !close_buttons_menu.attach_to(menu.handle(), "Close buttons")
+        {
             return None;
         }
 
@@ -201,8 +212,14 @@ impl SysTrayIcon {
             }
             IMAGE_ONLY_COMMAND => Some(TrayAction::SetBackgroundMode(BackgroundMode::ImageOnly)),
             BLACK_COMMAND => Some(TrayAction::SetBackgroundMode(BackgroundMode::Black)),
-            CLOSE_BUTTONS_COMMAND => {
-                Some(TrayAction::SetCloseButtonsVisible(!close_buttons_visible))
+            CLOSE_BUTTONS_ALWAYS_COMMAND => Some(TrayAction::SetCloseButtonMode(
+                CloseButtonMode::AlwaysVisible,
+            )),
+            CLOSE_BUTTONS_HOVER_COMMAND => {
+                Some(TrayAction::SetCloseButtonMode(CloseButtonMode::HoverOnly))
+            }
+            CLOSE_BUTTONS_HIDDEN_COMMAND => {
+                Some(TrayAction::SetCloseButtonMode(CloseButtonMode::Hidden))
             }
             EXIT_COMMAND => Some(TrayAction::Exit),
             _ => None,

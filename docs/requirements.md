@@ -4,7 +4,7 @@ This is the observable behavior inventory of the current native Rust application
 
 ## Test policy
 
-The automated gate contains 44 green plain Rust integration acceptance tests. They use real application objects and real Windows resources:
+The automated gate contains 45 green plain Rust integration acceptance tests. They use real application objects and real Windows resources:
 
 - 15 tests exercise the actual switcher/session windows, candidate HWNDs, layout, DWM previews, pointer routing, activation, and cleanup.
 - 7 tests exercise real window classification, stale HWND/layout handling, shell desktop capture, DWM visibility, and native resource lifetime.
@@ -13,7 +13,7 @@ The automated gate contains 44 green plain Rust integration acceptance tests. Th
 - 5 tests exercise Sticky and Tap (classic) Alt-release behavior on a real session.
 - 4 tests launch the actual executable, open its real tray popup, and verify runtime background-mode selection and painting.
 - 1 test launches the actual executable and verifies that DWM publishes a live preview in the first composed owner frame.
-- 3 tests exercise optional per-thumbnail close buttons, exact-source close requests, hidden-button activation, sticky-session behavior, and the tray toggle.
+- 4 tests exercise the selectable per-thumbnail close-button modes, exact-source close requests, hidden-button activation, hover rendering, sticky-session behavior, live refresh after the source disappears, and the tray submenu.
 
 The eight timestamped integration-test files are:
 
@@ -36,7 +36,7 @@ The global hook deliberately ignores injected keyboard events. Consequently, det
 | --- | --- | --- |
 | Startup | Start a native Win32 message loop, own a per-user single-instance guard, show a tray icon, avoid a taskbar button, and keep the switcher hidden until a gesture. | Launched-process and real mutex acceptance tests; manual startup check. |
 | Tray exit | Exit closes an active session, disposes native resources, and ends the process. | Real session cleanup and process tests; manual tray check. |
-| Tray settings | The tray menu is the only settings surface. It selects Sticky (the default) or Tap (classic) Alt-release behavior, Full desktop (the default), Background image only, or Black rectangle backdrop behavior, and whether close buttons are shown (shown by default). Settings take effect at runtime and are not localized or persisted. | Real tray-menu, background, and close-button acceptance tests; manual tray check. |
+| Tray settings | The tray menu is the only settings surface. It selects Sticky (the default) or Tap (classic) Alt-release behavior, Full desktop (the default), Background image only, or Black rectangle backdrop behavior, and the Close buttons submenu: Always visible (the default), On hover (Alt-Tab / Win-Tab), or Hidden. Settings take effect at runtime and are not localized or persisted. | Real tray-menu, background, and close-button acceptance tests; manual tray check. |
 | First Alt+Tab | A successful Alt+Tab opens the overlay and selects the first eligible candidate. An empty or failed opening leaves the native gesture usable. | Real session and executable acceptance tests; physical-hook check. |
 | Sticky Alt release | In the default Sticky mode, releasing Alt deliberately leaves the overlay open for an explicit choice. Immediate release and held-then-released Alt have the same behavior. | Real session acceptance tests; physical-hook check. |
 | Tap (classic) Alt release | In selectable Tap mode, releasing Alt activates the current selection and closes the overlay. If pointer movement cleared the selection, release leaves the session available rather than activating an arbitrary window. | Real session acceptance tests; physical-hook check. |
@@ -46,7 +46,7 @@ The global hook deliberately ignores injected keyboard events. Consequently, det
 | Cancellation | Escape and Alt+F4 close only the overlay; they do not activate a target or terminate the tray process. | Real session acceptance tests; physical-hook check. |
 | Pointer selection | Hover selects the tile under the pointer. Moving outside clears selection, and keyboard navigation can select again. | Real session acceptance tests; manual layered-window hit-test check. |
 | Pointer activation | Clicking a tile activates exactly the target under the pointer and closes the overlay after a successful activation. | Real session and executable acceptance tests; manual focus check. |
-| Close buttons | With the default setting enabled, each thumbnail draws a 32x32 black button with a white `×`. Clicking its region asynchronously requests `WM_CLOSE` for the exact source HWND without activating it, keeps a Sticky session open, and clears selection. The tray-only toggle hides the buttons; then the same region follows ordinary tile activation. | Real close-button acceptance tests; manual tray/pointer check. |
+| Close buttons | The tray-only `Close buttons` submenu selects Always visible (default), On hover (Alt-Tab / Win-Tab), or Hidden. Always visible draws a 32x32 black button with a white `×`; On hover draws only a white `×` without a background on the pointer-hovered thumbnail, independently of keyboard selection; Hidden draws no close affordance and leaves the region as ordinary tile activation. A click asynchronously requests `WM_CLOSE` for the exact source HWND without activating it, keeps a Sticky session open, and clears selection. FrigoTab waits for the source HWND to disappear, then rebuilds, reflows, and renumbers the live thumbnails without closing the session or changing its foreground overlay. | Real close-button acceptance tests; manual tray/pointer/refresh check. |
 | Foreground denial | Restoring and foregrounding a target is best effort. A denial leaves the overlay usable and does not join input queues merely because focus was denied. | Real activation acceptance tests; manual UIPI/elevation/focus check. |
 | Candidate windows | Enumerate eligible visible top-level application windows and exclude invisible, disabled, cloaked, no-activate, and tool-window candidates. | Real window acceptance tests; manual shell/tool-window check. |
 | Stale candidates | A window that disappears during layout or activation is skipped or fails recoverably without invalidating the rest of the session. | Real HWND/layout and session acceptance tests; manual race check. |
@@ -65,7 +65,7 @@ The global hook deliberately ignores injected keyboard events. Consequently, det
 - The Full desktop backdrop is a static shell frame prepared while idle; applications can change behind the overlay without changing that session's wallpaper/icon image. Image-only and black modes are painted directly when the owner is shown.
 - Sticky Alt release is the default behavior. The initial candidate is not activated merely because Alt was released; choose with Tab/Shift+Tab, D1..D9, NumPad1..NumPad9, or the pointer, or cancel with Escape/Alt+F4. The tray-only Tap (classic) setting restores classic release-to-activate behavior.
 - Background selection is tray-only and runtime-only: Full desktop is the default, while Background image only and Black rectangle are opt-in alternatives. No UI text is localized because the application has no other user-facing text surface.
-- Close buttons are enabled by default, can be toggled only from the tray, and are not persisted. The enabled control is a 32x32 black square with a white `×`; its close request targets only the source HWND and does not activate it. With the control hidden, that area remains part of normal tile activation.
+- Close buttons are configured only from the tray's `Close buttons` submenu and are not persisted. Always visible is the default 32x32 black square with a white `×`. On hover follows the Alt-Tab/Win-Tab style: a white `×` without a background appears only on the pointer-hovered thumbnail and does not follow keyboard selection. Hidden removes the close affordance. A close request targets only the source HWND, does not activate it, waits for actual disappearance, then refreshes the candidate list and reflows/renumbers the live session while leaving the session and foreground overlay in place.
 - Protected, secure, unavailable, or capture-disabled surfaces may render black.
 - A display/DPI topology change may close the session rather than rebuild every native tile in place.
 - `SetForegroundWindow` can be denied by Windows focus/UIPI policy. The overlay remains admitted and usable when that happens.

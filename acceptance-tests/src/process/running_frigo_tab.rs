@@ -19,7 +19,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::tray_menu_item::TrayMenuItem;
-use crate::screen::cursor_position::CursorPosition;
+use crate::screen::CursorPosition;
 use crate::screen::window_search::{
     find_owner, visible_owned_layered_windows, window_bounds, windows_for_pid,
 };

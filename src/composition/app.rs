@@ -44,6 +44,13 @@ impl App {
         }
     }
 
+    pub(crate) fn handle_mouse_leave(&mut self) {
+        if let Some(session) = self.session.as_mut() {
+            self.controller.handle_mouse_leave(session);
+            self.sync_session_visibility();
+        }
+    }
+
     pub(crate) fn handle_mouse_click(&mut self, point: ScreenPoint) {
         if let Some(session) = self.session.as_mut() {
             self.controller.handle_mouse_click(session, point);
@@ -126,6 +133,13 @@ impl App {
     pub(crate) fn publish_snapshot(&mut self) {
         if let Some(session) = self.session.as_mut() {
             session.publish_desktop_snapshot();
+        }
+    }
+
+    pub(crate) fn refresh_closed_applications(&mut self) {
+        if let Some(session) = self.session.as_mut() {
+            self.controller.refresh_closed_applications(session);
+            self.sync_session_visibility();
         }
     }
 }
