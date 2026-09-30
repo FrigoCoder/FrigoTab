@@ -9,7 +9,7 @@ use composition::OwnerContext;
 use frigotab::geometry::{ScreenPoint, virtual_screen_bounds};
 use frigotab::input::{ACCEPT_MARKED_TEST_INPUT_ARGUMENT, KeyHook, WM_KEY_HOOK_INPUT};
 use frigotab::switcher::{
-    CLOSE_REFRESH_TIMER_ID, SessionWindow, SwitcherState, WM_DESKTOP_SNAPSHOT_READY,
+    APPLICATION_REFRESH_TIMER_ID, SessionWindow, SwitcherState, WM_DESKTOP_SNAPSHOT_READY,
 };
 use frigotab::system::{APPLICATION_MUTEX_NAME, SingleInstanceGuard};
 use frigotab::tray::{SysTrayIcon, TRAY_CALLBACK_MESSAGE, TrayAction};
@@ -383,7 +383,7 @@ unsafe extern "system" fn owner_window_proc(
             dispatch_hook_inputs(context, wparam);
             0
         }
-        WM_TIMER if wparam == CLOSE_REFRESH_TIMER_ID => {
+        WM_TIMER if wparam == APPLICATION_REFRESH_TIMER_ID => {
             if let Ok(mut app) = app.try_borrow_mut() {
                 app.refresh_closed_applications();
             }

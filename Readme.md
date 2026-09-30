@@ -14,7 +14,7 @@ The behavior inventory, test boundary, and native validation checklist are docum
 - [Acceptance test matrix](docs/test-matrix.md)
 - [Architecture and test boundaries](docs/architecture.md)
 
-There are 59 automated acceptance tests in thirteen timestamped test families:
+There are 62 automated acceptance tests in fifteen timestamped test families:
 
 - 15 tests launch the executable, drive real HWNDs through its real hook, and observe session windows, navigation, activation, cleanup, and key-up behavior.
 - 7 tests exercise real Win32, DWM, GDI, shell, layout, and native-resource objects without a controller-fed test double.
@@ -29,8 +29,10 @@ There are 59 automated acceptance tests in thirteen timestamped test families:
 - 1 test verifies held-Alt reopening after activation through the launched executable.
 - 1 test verifies the marked acceptance-input path and held-Alt reopening through the launched executable.
 - 8 native keyboard-behavior tests verify ordered balanced replay, Alt-first and Shift-first reverse suppression, native Ctrl+Alt, quarantine, and marker filtering through the launched executable, real `WH_KEYBOARD_LL` hook, and exact fixture message logs. Plain Right-Alt+Tab remains manual because `SendInput` on layouts such as Hungarian synthesizes Ctrl with `VK_RMENU` and therefore cannot prove the physical AltGr distinction.
+- 2 real-window tests verify that an active owned tool window cannot hide its application root, while an ordinary owned dialog remains the group representative.
+- 1 launched-executable test verifies that an application which closes independently is removed from the live sticky session without disturbing surviving previews.
 
-These are plain Rust acceptance tests. They do not use Cucumber/Gherkin, `LiveSession`, a controller-fed acceptance harness, or `WM_BEGIN_SESSION`; session behavior is observed only through the launched executable. The families are the thirteen timestamped Rust integration-test files:
+These are plain Rust acceptance tests. They do not use Cucumber/Gherkin, `LiveSession`, a controller-fed acceptance harness, or `WM_BEGIN_SESSION`; session behavior is observed only through the launched executable. The families are the fifteen timestamped Rust integration-test files:
 
 - `acceptance-tests/tests/t20260914t211700z_001_real_switcher_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260914t212400z_002_real_window_and_backdrop_acceptance_tests.rs`
@@ -45,6 +47,8 @@ These are plain Rust acceptance tests. They do not use Cucumber/Gherkin, `LiveSe
 - `acceptance-tests/tests/t20260930t204900z_011_held_alt_reopen_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260930t205300z_012_marked_hook_held_alt_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260930t212634z_013_native_keyboard_behavior_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260930t232302z_014_window_group_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260930t232503z_015_external_window_lifecycle_acceptance_tests.rs`
 
 The timestamp and family suffix are stable identifiers. Keep them when refactoring a family; test functions use descriptive plain Rust names.
 
@@ -59,7 +63,7 @@ The timestamp and family suffix are stable identifiers. Keep them when refactori
 .\build.ps1 -Task Clean
 ```
 
-`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 59 acceptance tests serially. `Test` builds and runs the acceptance tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
+`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 62 acceptance tests serially. `Test` builds and runs the acceptance tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
 
 The direct Cargo equivalents are:
 
@@ -72,7 +76,7 @@ cargo test -p frigotab-acceptance --release -- --test-threads=1
 
 The Debug executable retains the historical ten-second `StartQuitTimer` safety timer. It is for development only; use the Release executable for sustained interactive testing. Sticky Alt release is the default: releasing Alt leaves the switcher open so the user can use Tab/Shift+Tab, a number, or the mouse, and can cancel with Escape or Alt+F4. The tray menu can select Tap (classic), which activates the current selection when Alt is released. An immediate Alt release follows the selected mode. These settings are runtime-only, are available from the tray menu only, and reset to their defaults on the next launch. Foreground activation uses the historical input nudge and does not join another application's input queue with `AttachThreadInput`.
 
-Close buttons are selected from the tray icon's `Close buttons` submenu and are runtime-only. `Always visible` is the default: every thumbnail has a 32x32 black close button with a white `×` in its top-right corner. `On hover (Alt-Tab / Win-Tab)` uses the normal Windows-style treatment: a white `×` with no black background appears only on the thumbnail currently under the mouse pointer, independently of keyboard selection. `Hidden` removes the close affordance; the same region behaves as ordinary tile activation. Clicking a visible close affordance asynchronously requests `WM_CLOSE` for that thumbnail's exact source window without activating the source. FrigoTab waits for the source to disappear, rebuilds the live candidate list, and reflows and renumbers the remaining thumbnails while keeping the session and foreground overlay active. The setting is neither persisted nor localized.
+Close buttons are selected from the tray icon's `Close buttons` submenu and are runtime-only. `Always visible` is the default: every thumbnail has a 32x32 black close button with a white `×` in its top-right corner. `On hover (Alt-Tab / Win-Tab)` uses the normal Windows-style treatment: a white `×` with no black background appears only on the thumbnail currently under the mouse pointer, independently of keyboard selection. `Hidden` removes the close affordance; the same region behaves as ordinary tile activation. Clicking a visible close affordance asynchronously requests `WM_CLOSE` for that thumbnail's exact source window without activating the source. FrigoTab watches all sources in a visible session, so a source closed either through this button or independently is removed before the live candidate list is reflowed and renumbered. The sticky session and foreground overlay remain active. The setting is neither persisted nor localized.
 
 The default Full desktop backdrop is a retained snapshot of the Windows shell desktop, including wallpaper and desktop icons. FrigoTab asks Explorer's desktop host (`Progman`, or the matching `WorkerW`) to render into an off-screen native bitmap. The tray menu also offers Background image only (the desktop wallpaper/pattern without icons) and Black rectangle. None of these modes captures the screen or reconstructs a background by searching and composing it from application windows. DWM prepares the preview surfaces behind the hidden owner, then the selected backdrop is painted as the owner is shown; if shell rendering is unavailable, the overlay uses a black fallback and remains usable.
 
@@ -93,4 +97,4 @@ Normal production launches intentionally ignore injected and lower-integrity inj
 
 Marked `SendInput` differs from hardware in timing and typematic/autorepeat, scheduler batching, virtual-key/scan-code/extended-flag details, keyboard layout and AltGr behavior, and interaction with modifiers already held on the physical keyboard. The hook's bounded, panic-safe modifier and consumed-key ledgers, the executable readiness barrier, explicit fixture foregrounding, and per-scenario log clearing reduce those effects but do not remove them. UIPI/elevation boundaries, lower-integrity injection, secure desktop/lock screens, RDP, exclusive fullscreen, raw-HID consumers, Explorer/DWM state, hook timeout/removal, and heavy system load remain manual or special-environment checks.
 
-`PostMessage`/`SendMessage` and UI Automation are useful for deterministic window or menu setup, but bypass global input routing and `WH_KEYBOARD_LL`, so they are less realistic keyboard alternatives. A virtual HID/VHF device or signed kernel driver is closer to hardware but requires administrator access, driver signing and installation, WDK/kernel code, and Windows-version policy maintenance. A physical USB HID device or keyboard robot is the highest-fidelity option, at the cost of hardware, lab setup, and manual/non-hermetic execution. Keep the physical/special-environment matrix as a release requirement alongside the 59 local acceptance tests.
+`PostMessage`/`SendMessage` and UI Automation are useful for deterministic window or menu setup, but bypass global input routing and `WH_KEYBOARD_LL`, so they are less realistic keyboard alternatives. A virtual HID/VHF device or signed kernel driver is closer to hardware but requires administrator access, driver signing and installation, WDK/kernel code, and Windows-version policy maintenance. A physical USB HID device or keyboard robot is the highest-fidelity option, at the cost of hardware, lab setup, and manual/non-hermetic execution. Keep the physical/special-environment matrix as a release requirement alongside the 62 local acceptance tests.

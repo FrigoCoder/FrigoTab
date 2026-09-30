@@ -33,9 +33,9 @@ pub trait SwitcherSessionPort {
     /// whether the target eventually accepts the asynchronous close request.
     fn try_close_at(&mut self, point: ScreenPoint) -> Result<bool, ()>;
 
-    /// Checks an asynchronous close request and rebuilds the live preview
-    /// graph once its source is no longer a switchable window. `None` means
-    /// that no refresh is ready; `Some(count)` publishes the replacement.
+    /// Checks the visible preview graph and rebuilds it after a source window
+    /// disappears, including independently terminated applications. `None`
+    /// means that no refresh is ready; `Some(count)` publishes the replacement.
     fn refresh_closed_applications(&mut self) -> Result<Option<usize>, ()>;
 
     /// Attempts to activate the currently selected candidate. `Ok(false)`

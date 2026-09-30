@@ -4,7 +4,7 @@ This is the observable behavior inventory of the current native Rust application
 
 ## Test policy
 
-The automated gate contains 59 green plain Rust integration acceptance tests. They use real application objects and real Windows resources:
+The automated gate contains 62 green plain Rust integration acceptance tests. They use real application objects and real Windows resources:
 
 - 15 tests launch the executable and observe real switcher/session HWNDs, candidate windows, navigation, activation, cleanup, and keyboard balance through the production hook.
 - 7 tests exercise real window classification, stale HWND/layout handling, shell desktop capture, DWM visibility, and native resource lifetime.
@@ -19,8 +19,10 @@ The automated gate contains 59 green plain Rust integration acceptance tests. Th
 - 1 test exercises activation followed by a fresh Tab while the launched session still logically owns Alt.
 - 1 test exercises the same held-Alt reopen path through the launched executable and its hook using explicitly marked acceptance input.
 - 8 tests exercise ordered balanced replay, Alt-first and Shift-first reverse suppression, native Ctrl+Alt, visible-session quarantine, later native delivery, and marker filtering through the launched executable and exact fixture keyboard-message logs. Plain Right-Alt+Tab is deliberately not automated because `SendInput` with `VK_RMENU` synthesizes Ctrl on layouts such as Hungarian.
+- 2 tests exercise real owner-linked top-level windows and preserve the application root when a detached tool window becomes active without changing ordinary owned-dialog behavior.
+- 1 test closes a source independently of the launched executable and verifies that the live sticky session removes its tile, reflows, and retains surviving previews.
 
-The thirteen timestamped integration-test files are:
+The fifteen timestamped integration-test files are:
 
 - `acceptance-tests/tests/t20260914t211700z_001_real_switcher_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260914t212400z_002_real_window_and_backdrop_acceptance_tests.rs`
@@ -35,6 +37,8 @@ The thirteen timestamped integration-test files are:
 - `acceptance-tests/tests/t20260930t204900z_011_held_alt_reopen_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260930t205300z_012_marked_hook_held_alt_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260930t212634z_013_native_keyboard_behavior_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260930t232302z_014_window_group_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260930t232503z_015_external_window_lifecycle_acceptance_tests.rs`
 
 The timestamp and family suffix are stable identifiers; test functions use descriptive plain Rust names.
 
@@ -62,8 +66,8 @@ Marked `SendInput` is a realistic hook-level test boundary but not physical keyb
 | Pointer activation | Clicking a tile activates exactly the target under the pointer and closes the overlay after a successful activation. | Launched executable and real-HWND acceptance tests; manual focus check. |
 | Close buttons | The tray-only `Close buttons` submenu selects Always visible (default), On hover (Alt-Tab / Win-Tab), or Hidden. Always visible draws a 32x32 black button with a white `×`; On hover draws only a white `×` without a background on the pointer-hovered thumbnail, independently of keyboard selection; Hidden draws no close affordance and leaves the region as ordinary tile activation. A click asynchronously requests `WM_CLOSE` for the exact source HWND without activating it, keeps a Sticky session open, and clears selection. FrigoTab waits for the source HWND to disappear, then rebuilds, reflows, and renumbers the live thumbnails without closing the session or changing its foreground overlay. | Real close-button acceptance tests; manual tray/pointer/refresh check. |
 | Foreground denial | Restoring and foregrounding a target is best effort. A denial leaves the overlay usable and does not join input queues merely because focus was denied. | Real activation acceptance tests; manual UIPI/elevation/focus check. |
-| Candidate windows | Enumerate eligible visible top-level application windows and exclude invisible, disabled, cloaked, no-activate, and tool-window candidates. | Real window acceptance tests; manual shell/tool-window check. |
-| Stale candidates | A window that disappears during layout or activation is skipped or fails recoverably without invalidating the rest of the session. | Real HWND/layout and session acceptance tests; manual race check. |
+| Candidate windows | Enumerate eligible visible top-level application windows and exclude invisible, disabled, cloaked, no-activate, and tool-window candidates. An active owned tool window does not hide its eligible application root; an ordinary active owned dialog remains the group representative. | Real owner-linked window acceptance tests; manual shell/application check. |
+| Stale candidates | A window that disappears during layout or activation is skipped or fails recoverably. A source that disappears while a sticky session is visible is removed and the surviving previews are rebuilt and reflowed without closing the session. | Real HWND/layout and launched-session lifecycle acceptance tests; manual race check. |
 | Layout | Use restored placement to choose a minimized window's monitor; preserve negative origins, working-area margins, stable numbering, and source aspect ratios. | Real layout acceptance tests; manual mixed-DPI/portrait check. |
 | Full desktop backdrop | In the default Full desktop mode, render Explorer's desktop host (`Progman`, or the matching `WorkerW`) into an off-screen bitmap containing wallpaper and icons. Do not capture the screen or compose the background from application windows. | Real shell-backdrop acceptance tests; manual Explorer/restart/RDP check. |
 | Alternative backdrops | Background image only paints the desktop wallpaper/pattern without icons; Black rectangle paints a black owner background. Both are selectable from the tray and do not require shell capture. | Real tray/background acceptance tests; manual visual check. |

@@ -33,8 +33,10 @@ use super::switcher_application::SwitcherSessionPort;
 use super::window_dc::WindowDc;
 
 pub const WM_DESKTOP_SNAPSHOT_READY: u32 = WM_APP + 3;
-pub const CLOSE_REFRESH_TIMER_ID: usize = 2;
-const CLOSE_REFRESH_INTERVAL_MS: u32 = 100;
+pub const APPLICATION_REFRESH_TIMER_ID: usize = 2;
+const APPLICATION_REFRESH_INTERVAL_MS: u32 = 100;
+const APPLICATION_REFRESH_CONFIRMATION_TICKS: u8 = 2;
+const EMPTY_ENUMERATION_CONFIRMATION_TICKS: u8 = 3;
 
 /// The Win32 side of a live switcher session.
 pub struct SessionWindow {
@@ -48,6 +50,7 @@ pub struct SessionWindow {
     snapshot_worker: Option<JoinHandle<()>>,
     close_button_mode: CloseButtonMode,
     pending_closes: Vec<HWND>,
+    refresh_evidence_ticks: u8,
     activating_selection: bool,
     disposed: bool,
 }
@@ -79,6 +82,7 @@ impl SessionWindow {
             snapshot_worker: None,
             close_button_mode: CloseButtonMode::default(),
             pending_closes: Vec::new(),
+            refresh_evidence_ticks: 0,
             activating_selection: false,
             disposed: false,
         }
@@ -207,6 +211,10 @@ impl SessionWindow {
         // Publish only after every candidate has been constructed. DWM has
         // prepared the thumbnails behind this still-hidden owner.
         self.applications = Some(applications);
+        if !self.start_application_refresh() {
+            self.close_session_resources();
+            return Err(());
+        }
         unsafe {
             ShowWindow(self.hwnd, SW_SHOW);
         }
@@ -227,7 +235,7 @@ impl SessionWindow {
     }
 
     fn close_session_resources(&mut self) {
-        self.stop_close_refresh();
+        self.stop_application_refresh();
         let mut applications = self.applications.take();
         if let Some(current) = applications.as_mut() {
             current.set_visible(false);
@@ -397,24 +405,29 @@ impl SessionWindow {
         Ok(())
     }
 
-    fn refresh_closed_application_session(&mut self) -> Result<Option<usize>, ()> {
+    fn refresh_application_session(&mut self) -> Result<Option<usize>, ()> {
         if self.disposed || self.applications.is_none() {
-            self.stop_close_refresh();
+            self.stop_application_refresh();
             return Err(());
         }
-        if self.pending_closes.is_empty() {
-            self.stop_close_refresh();
-            return Ok(None);
-        }
 
-        let source_is_present = |source: HWND| {
-            WindowHandle::new(source).is_valid() && unsafe { IsWindowVisible(source) != 0 }
-        };
-        if self
+        let source_is_alive = |source: HWND| WindowHandle::new(source).is_valid();
+        let requested_close_completed = self
             .pending_closes
             .iter()
-            .all(|source| source_is_present(*source))
-        {
+            .any(|source| !source_is_alive(*source) || unsafe { IsWindowVisible(*source) == 0 });
+        let source_disappeared = self.applications.as_ref().is_some_and(|applications| {
+            applications
+                .windows()
+                .iter()
+                .any(|window| !source_is_alive(window.application()))
+        });
+        if !requested_close_completed && !source_disappeared {
+            self.refresh_evidence_ticks = 0;
+            return Ok(None);
+        }
+        self.refresh_evidence_ticks = self.refresh_evidence_ticks.saturating_add(1);
+        if self.refresh_evidence_ticks < APPLICATION_REFRESH_CONFIRMATION_TICKS {
             return Ok(None);
         }
 
@@ -423,9 +436,25 @@ impl SessionWindow {
             |source: HWND| finder.windows.contains(&WindowHandle::new(source));
 
         if finder.windows.is_empty() {
-            self.stop_close_refresh();
+            let previous_candidate_is_alive =
+                self.applications.as_ref().is_some_and(|applications| {
+                    applications.windows().iter().any(|window| {
+                        let source = window.application();
+                        source_is_alive(source)
+                            && !(self.pending_closes.contains(&source)
+                                && unsafe { IsWindowVisible(source) == 0 })
+                    })
+                });
+            if previous_candidate_is_alive {
+                return Ok(None);
+            }
+            if self.refresh_evidence_ticks < EMPTY_ENUMERATION_CONFIRMATION_TICKS {
+                return Ok(None);
+            }
+            self.refresh_evidence_ticks = 0;
             return Ok(Some(0));
         }
+        self.refresh_evidence_ticks = 0;
 
         let owner = WindowHandle::new(self.hwnd);
         let mut replacement =
@@ -461,40 +490,38 @@ impl SessionWindow {
         }
         self.pending_closes
             .retain(|source| source_is_switchable(*source));
-
-        if self.pending_closes.is_empty() {
-            unsafe {
-                KillTimer(self.hwnd, CLOSE_REFRESH_TIMER_ID);
-            }
-        }
         Ok(Some(count))
     }
 
-    fn schedule_close_refresh(&mut self, target: HWND) -> bool {
+    fn track_pending_close(&mut self, target: HWND) -> bool {
         if self.pending_closes.contains(&target) {
             return true;
         }
         self.pending_closes.push(target);
-        if unsafe {
-            SetTimer(
-                self.hwnd,
-                CLOSE_REFRESH_TIMER_ID,
-                CLOSE_REFRESH_INTERVAL_MS,
-                None,
-            )
-        } == 0
-        {
+        if !self.start_application_refresh() {
             self.pending_closes.retain(|source| *source != target);
             return false;
         }
         true
     }
 
-    fn stop_close_refresh(&mut self) {
+    fn start_application_refresh(&self) -> bool {
         unsafe {
-            KillTimer(self.hwnd, CLOSE_REFRESH_TIMER_ID);
+            SetTimer(
+                self.hwnd,
+                APPLICATION_REFRESH_TIMER_ID,
+                APPLICATION_REFRESH_INTERVAL_MS,
+                None,
+            ) != 0
+        }
+    }
+
+    fn stop_application_refresh(&mut self) {
+        unsafe {
+            KillTimer(self.hwnd, APPLICATION_REFRESH_TIMER_ID);
         }
         self.pending_closes.clear();
+        self.refresh_evidence_ticks = 0;
     }
 }
 
@@ -556,14 +583,14 @@ impl SwitcherSessionPort for SessionWindow {
         let should_refresh = posted
             || !WindowHandle::new(target).is_valid()
             || unsafe { IsWindowVisible(target) == 0 };
-        if should_refresh && !self.schedule_close_refresh(target) {
+        if should_refresh && !self.track_pending_close(target) {
             return Err(());
         }
         Ok(true)
     }
 
     fn refresh_closed_applications(&mut self) -> Result<Option<usize>, ()> {
-        self.refresh_closed_application_session()
+        self.refresh_application_session()
     }
 
     fn try_activate_selected(&mut self) -> Result<bool, ()> {

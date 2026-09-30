@@ -99,7 +99,35 @@ fn is_alt_tab_window(hwnd: WindowHandle) -> bool {
     // not replaced with a modern heuristic: this is the behavior that the
     // original application shipped.
     let root = unsafe { GetAncestor(hwnd.raw(), GA_ROOTOWNER) };
-    get_last_active_visible_popup(WindowHandle::new(root)) == hwnd
+    let root = WindowHandle::new(root);
+    let popup = get_last_active_visible_popup(root);
+
+    // An owned tool/no-activate window can become the root's last-active
+    // popup. It is not itself selectable, but it must not make the whole
+    // application disappear either. Keep the root as the representative in
+    // that case. Ordinary owned dialogs still represent their window group.
+    if popup != root && !can_represent_application(popup) {
+        root == hwnd
+    } else {
+        popup == hwnd
+    }
+}
+
+fn can_represent_application(window: WindowHandle) -> bool {
+    if !window.is_valid() || is_cloaked(window) {
+        return false;
+    }
+
+    let style = window.get_window_styles();
+    if style.contains(WindowStyles::DISABLED) || !style.contains(WindowStyles::VISIBLE) {
+        return false;
+    }
+
+    let ex_style = window.get_window_ex_styles();
+    if ex_style.contains(WindowExStyles::NO_ACTIVATE) {
+        return false;
+    }
+    ex_style.contains(WindowExStyles::APP_WINDOW) || !ex_style.contains(WindowExStyles::TOOL_WINDOW)
 }
 
 fn get_last_active_visible_popup(root: WindowHandle) -> WindowHandle {

@@ -146,7 +146,7 @@ impl FixtureWindow {
                 options.bounds.top,
                 options.bounds.right.saturating_sub(options.bounds.left),
                 options.bounds.bottom.saturating_sub(options.bounds.top),
-                null_mut(),
+                options.owner,
                 null_mut(),
                 GetModuleHandleW(null()),
                 state_pointer,

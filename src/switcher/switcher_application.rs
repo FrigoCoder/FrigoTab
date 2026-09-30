@@ -182,8 +182,8 @@ impl SwitcherApplication {
         }
     }
 
-    /// Publishes a replacement preview graph after an asynchronous close has
-    /// actually removed its source window.
+    /// Publishes a replacement preview graph after a source window disappears,
+    /// whether it was closed through FrigoTab or independently.
     pub fn refresh_closed_applications<P: SwitcherSessionPort>(&mut self, port: &mut P) {
         if self.state != SwitcherState::Visible {
             return;
