@@ -1,137 +1,128 @@
 #![cfg(windows)]
 
-//! Real acceptance coverage for the optional close button on each preview.
+//! Black-box acceptance coverage for the optional per-thumbnail close button.
 //!
-//! These scenarios use the live Win32 session and fixture HWNDs.  The close
-//! button is deliberately exercised through the same screen-space pointer
-//! path as the application, while source lifetime and foreground ownership
-//! are observed through native handles.
+//! Every scenario starts the shipped executable and drives it through the real
+//! keyboard hook, tray menu, layered preview windows, and desktop pointer. The
+//! fixtures are ordinary top-level Win32 windows; no in-process
+//! session/controller substitute is involved.
 
+use std::mem::size_of;
 use std::time::Duration;
 
 use frigotab::geometry::{Layout, ScreenPoint};
-use frigotab::input::{KeyHandling, KeyTransition, KeyboardInput, SwitcherKey};
-use frigotab::switcher::{CloseButtonMode, SwitcherState};
 use frigotab::window::{WindowFinder, WindowHandle};
 use frigotab_acceptance::{
-    CursorPosition, FixtureOptions, FixtureWindow, GREEN, LiveSession, LiveTile, MAGENTA,
-    RunningFrigoTab, ScreenCapture, capture_screen_image, color_distance, foreground_window,
-    is_window_visible, pump_messages, screen_pixel, serial_guard, set_per_monitor_dpi_awareness,
-    wait_until,
+    CursorPosition, FixtureOptions, FixtureWindow, GREEN, MAGENTA, ORANGE, RunningFrigoTab,
+    ScreenCapture, TrayMenuItem, capture_screen_image, color_distance, foreground_window,
+    pump_messages, serial_guard, set_per_monitor_dpi_awareness, wait_until, window_bounds,
 };
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::Graphics::Dwm::DwmFlush;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEINPUT, SendInput,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{IsWindow, WS_EX_APPWINDOW, WS_POPUP};
 
 const TIMEOUT: Duration = Duration::from_secs(5);
+const VK_LEFT_ALT_KEY: u16 = 0xa4;
+const VK_TAB_KEY: u16 = 0x09;
+const VK_ESCAPE_KEY: u16 = 0x1b;
 const CLOSE_BUTTON_INSET: i32 = 8;
 const CLOSE_BUTTON_SIZE: i32 = 32;
+
+#[derive(Clone, Copy)]
+struct Preview {
+    popup: HWND,
+    bounds: RECT,
+}
 
 #[test]
 fn default_close_button_closes_exact_source_and_refreshes_the_live_layout() {
     let _serial = serial_guard();
+    let _cursor = CursorPosition::capture().expect("the pointer position should be readable");
     set_per_monitor_dpi_awareness();
-    let mut session = LiveSession::new();
+    let fixtures = real_fixtures("FrigoTab default close-button");
+    let application = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab did not start in marked-input acceptance mode");
 
-    assert_eq!(CloseButtonMode::AlwaysVisible, session.close_button_mode());
-    open_session(&mut session);
-    assert!(wait_until(TIMEOUT, || foreground_window() == session.owner()));
+    open_marked_session(&application);
+    let target = wait_for_preview(&application, GREEN);
+    let _other = wait_for_preview(&application, MAGENTA);
+    let initial_overlay_count = application.visible_owned_layered_windows().len();
+    assert!(
+        initial_overlay_count >= 2,
+        "the real session has too few previews"
+    );
+    assert!(
+        close_button_is_visible_in(target.bounds),
+        "the default close button did not render its black-backed X"
+    );
 
-    let target = fixture_tiles(&session)
-        .into_iter()
-        .nth(1)
-        .expect("a second real fixture preview is required");
-    let other_source = fixture_tiles(&session)
-        .into_iter()
-        .find(|tile| tile.source != target.source)
-        .expect("another real fixture preview is required")
-        .source;
-    let stale_popup = target.popup;
-
-    assert!(wait_until(TIMEOUT, || close_button_is_visible(target)));
-    let button = close_button_center(target);
-    session.mouse_move(button);
-    assert_eq!(Some(target.source), session.selected_source());
-    session.mouse_click(button);
-
+    click_screen(close_button_center(target.bounds));
     assert!(
         wait_until(TIMEOUT, || {
-            !is_valid_window(target.source)
-                && !session
-                    .tiles()
-                    .iter()
-                    .any(|tile| tile.source == target.source)
-                && session.candidate_count() == session.tiles().len()
+            !is_valid_window(fixtures[1].handle())
+                && !is_valid_window(target.popup)
+                && wait_for_preview_optional(&application, GREEN).is_none()
+                && application.visible_owned_layered_windows().len() < initial_overlay_count
         }),
-        "the close button did not close its source and refresh the preview graph"
+        "the close button did not close its source and publish a refreshed preview graph"
     );
     assert!(
-        !is_valid_window(stale_popup),
-        "the closed source's stale overlay HWND survived the refresh"
-    );
-    assert!(
-        session.is_visible(),
-        "closing a source must keep the session open"
+        application.is_visible(),
+        "closing a source must keep the real switcher session open"
     );
     assert_eq!(
-        None,
-        session.selected_index(),
-        "closing a source must clear the stale selection"
-    );
-    assert_eq!(
-        session.owner(),
+        application.owner(),
         foreground_window(),
-        "closing a source must not activate it"
+        "closing a source must not activate the closed application"
     );
     assert!(
-        is_valid_window(other_source),
+        is_valid_window(fixtures[0].handle()),
         "closing one preview unexpectedly closed another source HWND"
     );
-    assert_fixture_tiles_match_current_layout(&session);
-
-    assert_eq!(
-        KeyHandling::Consume,
-        session.key(KeyboardInput::new(
-            SwitcherKey::Escape,
-            KeyTransition::Down,
-            false,
-            false,
-            false,
-        ))
+    assert_fixture_layout(&application, &fixtures);
+    assert!(
+        wait_for_preview_optional(&application, MAGENTA).is_some(),
+        "a surviving preview disappeared during close refresh"
     );
-    assert!(wait_until(TIMEOUT, || {
-        session.switcher_state() == SwitcherState::Idle && !is_window_visible(session.owner())
-    }));
+
+    close_marked_session(&application);
 }
 
 #[test]
 fn hidden_close_buttons_leave_the_same_point_as_normal_tile_activation() {
     let _serial = serial_guard();
+    let _cursor = CursorPosition::capture().expect("the pointer position should be readable");
     set_per_monitor_dpi_awareness();
-    let mut session = LiveSession::new();
-    session.set_close_button_mode(CloseButtonMode::Hidden);
+    let fixtures = real_fixtures("FrigoTab hidden close-button");
+    let application = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab did not start in marked-input acceptance mode");
 
-    assert_eq!(CloseButtonMode::Hidden, session.close_button_mode());
-    open_session(&mut session);
-    let target = fixture_tiles(&session)
-        .into_iter()
-        .nth(1)
-        .expect("a second real fixture preview is required");
-    let button = close_button_center(target);
+    assert!(application.select_tray_menu_item("Close buttons", "Hidden"));
+    assert_close_mode(
+        &application
+            .tray_menu()
+            .expect("the real tray popup could not be inspected after selecting Hidden"),
+        "Hidden",
+    );
+    open_marked_session(&application);
 
-    session.mouse_move(button);
-    session.mouse_click(button);
+    let target = wait_for_preview(&application, GREEN);
+    move_pointer(close_button_center(target.bounds));
+    click_screen(close_button_center(target.bounds));
 
     assert!(
-        wait_until(TIMEOUT, || !session.is_visible()),
+        application.wait_hidden(TIMEOUT),
         "a click with close buttons hidden did not follow normal tile activation"
     );
     assert!(
-        is_valid_window(target.source),
+        is_valid_window(fixtures[1].handle()),
         "the hidden close-button setting closed the source instead of activating it"
     );
     assert!(
-        wait_until(TIMEOUT, || foreground_window() == target.source),
+        wait_until(TIMEOUT, || foreground_window() == fixtures[1].handle()),
         "normal tile activation did not foreground the selected source"
     );
 }
@@ -139,50 +130,33 @@ fn hidden_close_buttons_leave_the_same_point_as_normal_tile_activation() {
 #[test]
 fn windows_style_button_is_a_transparent_white_x_only_on_the_hovered_thumbnail() {
     let _serial = serial_guard();
+    let _cursor = CursorPosition::capture().expect("the pointer position should be readable");
     set_per_monitor_dpi_awareness();
-    let mut session = LiveSession::new();
-    session.set_close_button_mode(CloseButtonMode::HoverOnly);
-    let target_fixture = borderless_fixture(
-        "FrigoTab hover close-button target",
-        MAGENTA,
-        RECT {
-            left: 180,
-            top: 140,
-            right: 820,
-            bottom: 620,
-        },
-    );
-    let other_fixture = borderless_fixture(
-        "FrigoTab hover close-button other",
-        GREEN,
-        RECT {
-            left: 880,
-            top: 180,
-            right: 1520,
-            bottom: 660,
-        },
-    );
-    pump_messages();
-    open_session(&mut session);
+    let fixtures = real_fixtures("FrigoTab hover close-button");
+    let application = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab did not start in marked-input acceptance mode");
 
-    let tiles = session.tiles();
-    let target = tiles
-        .iter()
-        .copied()
-        .find(|tile| tile.source == target_fixture.handle())
-        .expect("the borderless target fixture preview is required");
-    let other = tiles
-        .iter()
-        .copied()
-        .find(|tile| tile.source == other_fixture.handle())
-        .expect("the other borderless fixture preview is required");
+    assert!(application.select_tray_menu_item("Close buttons", "On hover (Alt-Tab / Win-Tab)"));
+    assert_close_mode(
+        &application
+            .tray_menu()
+            .expect("the real tray popup could not be inspected after selecting HoverOnly"),
+        "On hover (Alt-Tab / Win-Tab)",
+    );
 
-    session.mouse_move(ScreenPoint::new(1, 1));
+    open_marked_session_holding_alt(&application);
+    let target = wait_for_preview(&application, MAGENTA);
+    let other = wait_for_preview(&application, GREEN);
+    let third = wait_for_preview(&application, ORANGE);
+    let outside = point_outside_previews(&application);
+    move_pointer(outside);
     assert!(wait_until(TIMEOUT, || {
         close_button_surface_is_hidden(target.bounds)
+            && close_button_surface_is_hidden(other.bounds)
+            && close_button_surface_is_hidden(third.bounds)
     }));
 
-    session.mouse_move(tile_center(target));
+    move_pointer(tile_center(target.bounds));
     assert!(
         wait_until(TIMEOUT, || windows_close_button_is_visible(target.bounds)),
         "hovering a thumbnail did not reveal its transparent white close X"
@@ -192,40 +166,37 @@ fn windows_style_button_is_a_transparent_white_x_only_on_the_hovered_thumbnail()
         "hovering one thumbnail exposed a close X on another thumbnail"
     );
 
-    session.mouse_move(ScreenPoint::new(1, 1));
+    move_pointer(outside);
     assert!(
         wait_until(TIMEOUT, || close_button_surface_is_hidden(target.bounds)),
         "the Windows-style close X remained after the pointer left the thumbnail"
     );
 
-    assert_eq!(
-        KeyHandling::Consume,
-        session.key(KeyboardInput::new(
-            SwitcherKey::Tab,
-            KeyTransition::Down,
-            true,
-            false,
-            false,
-        ))
-    );
-    let keyboard_selected = session
-        .selected_tile()
-        .expect("keyboard navigation should select a real thumbnail");
-    assert!(
-        close_button_surface_is_hidden(keyboard_selected.bounds),
-        "keyboard selection incorrectly acted as pointer hover"
-    );
-
-    session.mouse_move(close_button_center(target));
-    session.mouse_click(close_button_center(target));
+    // Keyboard selection is independent from pointer hover. Keep the marked
+    // Alt transition down so this is the same held-Alt Tab gesture a user
+    // performs, rather than an in-process controller call.
+    assert!(application.send_marked_test_key(VK_TAB_KEY, false));
+    assert!(application.send_marked_test_key(VK_TAB_KEY, true));
     assert!(wait_until(TIMEOUT, || {
-        !is_valid_window(target.source)
-            && !session
-                .tiles()
-                .iter()
-                .any(|tile| tile.source == target.source)
+        close_button_surface_is_hidden(target.bounds)
+            && close_button_surface_is_hidden(other.bounds)
+            && close_button_surface_is_hidden(third.bounds)
     }));
-    assert!(session.is_visible());
+
+    move_pointer(close_button_center(target.bounds));
+    click_screen(close_button_center(target.bounds));
+    assert!(
+        wait_until(TIMEOUT, || {
+            !is_valid_window(fixtures[0].handle())
+                && !is_valid_window(target.popup)
+                && wait_for_preview_optional(&application, MAGENTA).is_none()
+        }),
+        "the hovered close X did not close the exact source"
+    );
+    assert!(application.is_visible());
+
+    assert!(application.send_marked_test_key(VK_LEFT_ALT_KEY, true));
+    close_marked_session(&application);
 }
 
 #[test]
@@ -233,155 +204,275 @@ fn close_button_modes_are_selectable_from_the_real_tray_and_redraw_a_live_sessio
     let _serial = serial_guard();
     let _cursor = CursorPosition::capture().expect("the pointer position should be readable");
     set_per_monitor_dpi_awareness();
-    let application = RunningFrigoTab::start().expect("FrigoTab did not start");
+    let fixtures = real_fixtures("FrigoTab tray close-button");
+    let application = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab did not start in marked-input acceptance mode");
 
     let menu = application
         .tray_menu()
         .expect("the real tray popup could not be inspected");
-    assert_checked_child(&menu, "Close buttons", "Always visible");
-    assert_unchecked_child(&menu, "Close buttons", "On hover (Alt-Tab / Win-Tab)");
-    assert_unchecked_child(&menu, "Close buttons", "Hidden");
+    assert_close_mode(&menu, "Always visible");
 
     assert!(application.select_tray_menu_item("Close buttons", "On hover (Alt-Tab / Win-Tab)"));
-    let menu = application
-        .tray_menu()
-        .expect("the real tray popup could not be reopened after changing close-button mode");
-    assert_checked_child(&menu, "Close buttons", "On hover (Alt-Tab / Win-Tab)");
-    assert_unchecked_child(&menu, "Close buttons", "Always visible");
-    assert_unchecked_child(&menu, "Close buttons", "Hidden");
-
-    let fixture = FixtureWindow::show_with_options(
-        "FrigoTab tray close-button fixture",
-        MAGENTA,
-        FixtureOptions {
-            bounds: RECT {
-                left: 180,
-                top: 140,
-                right: 820,
-                bottom: 620,
-            },
-            style: WS_POPUP,
-            ex_style: WS_EX_APPWINDOW,
-            activate: true,
-            ..FixtureOptions::default()
-        },
-    );
-    pump_messages();
-    let layout = Layout::new(&WindowFinder::new().windows);
-    let bounds = layout
-        .bounds
-        .get(&WindowHandle::new(fixture.handle()))
-        .copied()
-        .map(|bounds| RECT {
-            left: bounds.x,
-            top: bounds.y,
-            right: bounds.right(),
-            bottom: bounds.bottom(),
-        })
-        .expect("the real fixture should have production tile bounds");
-
-    assert!(application.open(), "the real session did not accept open");
-    assert!(application.wait_visible(TIMEOUT));
-    move_pointer(ScreenPoint::new(
-        application.bounds().left + 1,
-        application.bounds().top + 1,
-    ));
-    assert!(
-        wait_until(TIMEOUT, || tile_has_color(bounds, MAGENTA)),
-        "the solid real fixture did not appear in its DWM tile"
-    );
-    assert!(
-        close_button_surface_is_hidden(bounds),
-        "the hover-only close button was drawn without pointer hover"
+    assert_close_mode(
+        &application
+            .tray_menu()
+            .expect("the real tray popup could not be reopened after selecting HoverOnly"),
+        "On hover (Alt-Tab / Win-Tab)",
     );
 
-    move_pointer(tile_center_rect(bounds));
-    assert!(
-        wait_until(TIMEOUT, || windows_close_button_is_visible(bounds)),
-        "the tray-selected Windows close-button mode did not react to hover"
-    );
+    open_marked_session(&application);
+    let target = wait_for_preview(&application, MAGENTA);
+    let outside = point_outside_previews(&application);
+    move_pointer(outside);
+    assert!(wait_until(TIMEOUT, || {
+        close_button_surface_is_hidden(target.bounds)
+    }));
+    move_pointer(tile_center(target.bounds));
+    assert!(wait_until(TIMEOUT, || {
+        windows_close_button_is_visible(target.bounds)
+    }));
 
     assert!(application.select_tray_menu_item("Close buttons", "Hidden"));
-    let menu = application
-        .tray_menu()
-        .expect("the real tray popup could not be reopened after hiding close buttons");
-    assert_checked_child(&menu, "Close buttons", "Hidden");
-    assert_unchecked_child(&menu, "Close buttons", "Always visible");
-    assert_unchecked_child(&menu, "Close buttons", "On hover (Alt-Tab / Win-Tab)");
-    move_pointer(tile_center_rect(bounds));
-    assert!(
-        wait_until(TIMEOUT, || close_button_surface_is_hidden(bounds)),
-        "the tray-hidden close button remained in the active real session"
+    assert_close_mode(
+        &application
+            .tray_menu()
+            .expect("the real tray popup could not be reopened after selecting Hidden"),
+        "Hidden",
     );
+    move_pointer(point_outside_previews(&application));
+    assert!(wait_until(TIMEOUT, || {
+        close_button_surface_is_hidden(target.bounds)
+    }));
 
     assert!(application.select_tray_menu_item("Close buttons", "Always visible"));
-    let menu = application
-        .tray_menu()
-        .expect("the real tray popup could not be reopened after restoring close buttons");
-    assert_checked_child(&menu, "Close buttons", "Always visible");
-    assert_unchecked_child(&menu, "Close buttons", "On hover (Alt-Tab / Win-Tab)");
-    assert_unchecked_child(&menu, "Close buttons", "Hidden");
-    move_pointer(ScreenPoint::new(
-        application.bounds().left + 1,
-        application.bounds().top + 1,
-    ));
-    assert!(
-        wait_until(TIMEOUT, || close_button_is_visible_in(bounds)),
-        "the always-visible black-backed close button was not restored live"
+    assert_close_mode(
+        &application
+            .tray_menu()
+            .expect("the real tray popup could not be reopened after restoring Always visible"),
+        "Always visible",
     );
+    move_pointer(outside);
+    assert!(wait_until(TIMEOUT, || {
+        close_button_is_visible_in(target.bounds)
+    }));
+
+    // Close the real session through the same marked Escape path used by the
+    // other scenarios. The fixtures remain owned by this test process.
+    close_marked_session(&application);
+    assert!(is_valid_window(fixtures[0].handle()));
 }
 
-fn open_session(session: &mut LiveSession) {
-    assert_eq!(KeyHandling::Consume, session.open());
-    assert!(
-        session.wait_visible(TIMEOUT),
-        "the real session did not become visible"
-    );
-    assert!(
-        !session.tiles().is_empty(),
-        "the real session has no preview HWNDs"
-    );
-}
-
-fn borderless_fixture(title: &str, color: u32, bounds: RECT) -> FixtureWindow {
-    FixtureWindow::show_with_options(
-        title,
-        color,
-        FixtureOptions {
-            bounds,
-            style: WS_POPUP,
-            ex_style: WS_EX_APPWINDOW,
-            activate: true,
-            ..FixtureOptions::default()
-        },
-    )
-}
-
-fn fixture_tiles(session: &LiveSession) -> Vec<LiveTile> {
-    let fixtures = session.fixture_handles();
-    session
-        .tiles()
+fn real_fixtures(prefix: &str) -> Vec<FixtureWindow> {
+    [MAGENTA, GREEN, ORANGE]
         .into_iter()
-        .filter(|tile| fixtures.contains(&tile.source))
+        .enumerate()
+        .map(|(index, color)| {
+            FixtureWindow::show_with_options(
+                &format!("{prefix} {}", index + 1),
+                color,
+                FixtureOptions {
+                    bounds: RECT {
+                        left: 80 + index as i32 * 90,
+                        top: 80 + index as i32 * 70,
+                        right: 720 + index as i32 * 90,
+                        bottom: 560 + index as i32 * 70,
+                    },
+                    style: WS_POPUP,
+                    ex_style: WS_EX_APPWINDOW,
+                    activate: true,
+                    ..FixtureOptions::default()
+                },
+            )
+        })
         .collect()
 }
 
-fn close_button_center(tile: LiveTile) -> ScreenPoint {
+fn open_marked_session(application: &RunningFrigoTab) {
+    open_marked_session_holding_alt(application);
+    assert!(application.send_marked_test_key(VK_LEFT_ALT_KEY, true));
+}
+
+fn open_marked_session_holding_alt(application: &RunningFrigoTab) {
+    assert!(application.send_marked_test_key(VK_LEFT_ALT_KEY, false));
+    assert!(application.send_marked_test_key(VK_TAB_KEY, false));
+    assert!(
+        application.wait_visible(TIMEOUT),
+        "the marked Alt+Tab chord did not open the real session"
+    );
+    assert!(application.send_marked_test_key(VK_TAB_KEY, true));
+    assert!(wait_until(TIMEOUT, || foreground_window() == application.owner()));
+}
+
+fn close_marked_session(application: &RunningFrigoTab) {
+    assert!(application.send_marked_test_key(VK_ESCAPE_KEY, false));
+    assert!(
+        application.wait_hidden(TIMEOUT),
+        "the marked Escape did not close the real session"
+    );
+    assert!(application.send_marked_test_key(VK_ESCAPE_KEY, true));
+}
+
+fn wait_for_preview(application: &RunningFrigoTab, color: u32) -> Preview {
+    let mut preview = None;
+    assert!(
+        wait_until(TIMEOUT, || {
+            preview = wait_for_preview_optional(application, color);
+            preview.is_some()
+        }),
+        "the real preview for color {color:#08x} did not become visible; sampled scores: {:?}",
+        preview_color_scores(application, color)
+    );
+    preview.expect("preview became unavailable after the wait")
+}
+
+fn wait_for_preview_optional(application: &RunningFrigoTab, color: u32) -> Option<Preview> {
+    unsafe {
+        let _ = DwmFlush();
+    }
+    application
+        .visible_owned_layered_windows()
+        .into_iter()
+        .filter_map(|popup| {
+            let bounds = window_bounds(popup)?;
+            let image = capture_screen_image(bounds)?;
+            let samples = preview_color_samples(&image, bounds, color);
+            Some((samples, Preview { popup, bounds }))
+        })
+        .max_by_key(|(samples, _)| *samples)
+        .filter(|(samples, _)| *samples >= 100)
+        .map(|(_, preview)| preview)
+}
+
+fn preview_color_scores(application: &RunningFrigoTab, color: u32) -> Vec<(HWND, usize)> {
+    application
+        .visible_owned_layered_windows()
+        .into_iter()
+        .filter_map(|popup| {
+            let bounds = window_bounds(popup)?;
+            let image = capture_screen_image(bounds)?;
+            Some((popup, preview_color_samples(&image, bounds, color)))
+        })
+        .collect()
+}
+
+fn preview_color_samples(image: &ScreenCapture, bounds: RECT, color: u32) -> usize {
+    let selected_color = selected_overlay_color(color);
+    (bounds.top..bounds.bottom)
+        .step_by(4)
+        .flat_map(|y| (bounds.left..bounds.right).step_by(4).map(move |x| (x, y)))
+        .filter(|&(x, y)| {
+            image.pixel(x, y).is_some_and(|pixel| {
+                color_distance(pixel, color) <= 55 || color_distance(pixel, selected_color) <= 55
+            })
+        })
+        .count()
+}
+
+fn selected_overlay_color(color: u32) -> u32 {
+    // ApplicationWindow's 50%-alpha blue selection layer is composed over
+    // the DWM source. Accept both this observable color and the untinted source
+    // so a fixture remains identifiable while keyboard- or pointer-selected.
+    let red = (color & 0xff) / 2;
+    let green = ((color >> 8) & 0xff) / 2;
+    let blue = (((color >> 16) & 0xff) + 255) / 2;
+    red | (green << 8) | (blue << 16)
+}
+
+fn assert_fixture_layout(application: &RunningFrigoTab, fixtures: &[FixtureWindow]) {
+    let layout = Layout::new(&WindowFinder::new().windows);
+    for (fixture, color) in fixtures.iter().zip([MAGENTA, GREEN, ORANGE]) {
+        if !is_valid_window(fixture.handle()) {
+            continue;
+        }
+        let expected = layout
+            .bounds
+            .get(&WindowHandle::new(fixture.handle()))
+            .unwrap_or_else(|| {
+                panic!(
+                    "surviving fixture {:?} is missing from layout",
+                    fixture.handle()
+                )
+            });
+        let preview = wait_for_preview(application, color);
+        assert_eq!(expected.x, preview.bounds.left);
+        assert_eq!(expected.y, preview.bounds.top);
+        assert_eq!(expected.right(), preview.bounds.right);
+        assert_eq!(expected.bottom(), preview.bounds.bottom);
+    }
+}
+
+fn close_button_center(bounds: RECT) -> ScreenPoint {
     ScreenPoint::new(
-        tile.bounds.right - CLOSE_BUTTON_INSET - CLOSE_BUTTON_SIZE / 2,
-        tile.bounds.top + CLOSE_BUTTON_INSET + CLOSE_BUTTON_SIZE / 2,
+        bounds.right - CLOSE_BUTTON_INSET - CLOSE_BUTTON_SIZE / 2,
+        bounds.top + CLOSE_BUTTON_INSET + CLOSE_BUTTON_SIZE / 2,
     )
 }
 
-fn tile_center(tile: LiveTile) -> ScreenPoint {
-    tile_center_rect(tile.bounds)
-}
-
-fn tile_center_rect(bounds: RECT) -> ScreenPoint {
+fn tile_center(bounds: RECT) -> ScreenPoint {
     ScreenPoint::new(
         bounds.left + (bounds.right - bounds.left) / 2,
         bounds.top + (bounds.bottom - bounds.top) / 2,
     )
+}
+
+fn point_outside_previews(application: &RunningFrigoTab) -> ScreenPoint {
+    let owner = application.bounds();
+    let previews = application
+        .visible_owned_layered_windows()
+        .into_iter()
+        .filter_map(window_bounds)
+        .collect::<Vec<_>>();
+    for (x, y) in [
+        (owner.left + 2, owner.top + 2),
+        (owner.right - 3, owner.top + 2),
+        (owner.left + 2, owner.bottom - 3),
+        (owner.right - 3, owner.bottom - 3),
+    ] {
+        if previews.iter().all(|bounds| {
+            x < bounds.left || x >= bounds.right || y < bounds.top || y >= bounds.bottom
+        }) {
+            return ScreenPoint::new(x, y);
+        }
+    }
+    ScreenPoint::new(owner.left + 1, owner.top + 1)
+}
+
+fn move_pointer(point: ScreenPoint) {
+    assert!(CursorPosition::move_to(point.x, point.y));
+    pump_messages();
+}
+
+fn click_screen(point: ScreenPoint) {
+    move_pointer(point);
+    let inputs = [
+        mouse_input(MOUSEEVENTF_LEFTDOWN),
+        mouse_input(MOUSEEVENTF_LEFTUP),
+    ];
+    assert_eq!(
+        unsafe {
+            SendInput(
+                inputs.len() as u32,
+                inputs.as_ptr(),
+                size_of::<INPUT>() as i32,
+            )
+        },
+        inputs.len() as u32,
+        "Windows did not accept the real pointer click"
+    );
+    pump_messages();
+}
+
+fn mouse_input(flags: u32) -> INPUT {
+    INPUT {
+        r#type: INPUT_MOUSE,
+        Anonymous: INPUT_0 {
+            mi: MOUSEINPUT {
+                dwFlags: flags,
+                ..Default::default()
+            },
+        },
+    }
 }
 
 fn close_button_rect(bounds: RECT) -> RECT {
@@ -391,10 +482,6 @@ fn close_button_rect(bounds: RECT) -> RECT {
         right: bounds.right - CLOSE_BUTTON_INSET,
         bottom: bounds.top + CLOSE_BUTTON_INSET + CLOSE_BUTTON_SIZE,
     }
-}
-
-fn close_button_is_visible(tile: LiveTile) -> bool {
-    close_button_is_visible_in(tile.bounds)
 }
 
 fn close_button_is_visible_in(bounds: RECT) -> bool {
@@ -421,20 +508,6 @@ fn close_button_pixel_counts(bounds: RECT) -> Option<(usize, usize)> {
     ))
 }
 
-fn tile_has_color(bounds: RECT, expected: u32) -> bool {
-    unsafe {
-        let _ = DwmFlush();
-    }
-    let x = bounds.left + (bounds.right - bounds.left) * 3 / 4;
-    let y = bounds.top + (bounds.bottom - bounds.top) * 3 / 4;
-    screen_pixel(x, y).is_some_and(|actual| color_distance(actual, expected) <= 55)
-}
-
-fn move_pointer(point: ScreenPoint) {
-    assert!(CursorPosition::move_to(point.x, point.y));
-    pump_messages();
-}
-
 fn count_pixels<F>(image: &ScreenCapture, bounds: RECT, predicate: F) -> usize
 where
     F: Fn(u32) -> bool,
@@ -457,39 +530,21 @@ fn is_valid_window(hwnd: HWND) -> bool {
     !hwnd.is_null() && unsafe { IsWindow(hwnd) != 0 }
 }
 
-fn assert_checked_child(menu: &[frigotab_acceptance::TrayMenuItem], parent: &str, child: &str) {
-    let item = menu
+fn assert_close_mode(menu: &[TrayMenuItem], selected: &str) {
+    let parent = menu
         .iter()
-        .find(|item| item.label == parent)
-        .and_then(|item| item.children.iter().find(|item| item.label == child))
-        .unwrap_or_else(|| panic!("tray item {parent} / {child} was not present"));
-    assert!(item.checked, "tray item {parent} / {child} was not checked");
-}
-
-fn assert_unchecked_child(menu: &[frigotab_acceptance::TrayMenuItem], parent: &str, child: &str) {
-    let item = menu
-        .iter()
-        .find(|item| item.label == parent)
-        .and_then(|item| item.children.iter().find(|item| item.label == child))
-        .unwrap_or_else(|| panic!("tray item {parent} / {child} was not present"));
-    assert!(
-        !item.checked,
-        "tray item {parent} / {child} was unexpectedly checked"
-    );
-}
-
-fn assert_fixture_tiles_match_current_layout(session: &LiveSession) {
-    let layout = Layout::new(&WindowFinder::new().windows);
-    for tile in fixture_tiles(session) {
-        let expected = layout
-            .bounds
-            .get(&WindowHandle::new(tile.source))
-            .unwrap_or_else(|| {
-                panic!("surviving fixture {:?} is missing from layout", tile.source)
-            });
-        assert_eq!(expected.x, tile.bounds.left);
-        assert_eq!(expected.y, tile.bounds.top);
-        assert_eq!(expected.right(), tile.bounds.right);
-        assert_eq!(expected.bottom(), tile.bounds.bottom);
+        .find(|item| item.label == "Close buttons")
+        .unwrap_or_else(|| panic!("the Close buttons submenu was not present"));
+    for label in ["Always visible", "On hover (Alt-Tab / Win-Tab)", "Hidden"] {
+        let item = parent
+            .children
+            .iter()
+            .find(|item| item.label == label)
+            .unwrap_or_else(|| panic!("tray item Close buttons / {label} was not present"));
+        assert_eq!(
+            item.checked,
+            label == selected,
+            "tray item Close buttons / {label} had the wrong check state"
+        );
     }
 }

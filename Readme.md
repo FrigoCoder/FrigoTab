@@ -14,18 +14,23 @@ The behavior inventory, test boundary, and native validation checklist are docum
 - [Acceptance test matrix](docs/test-matrix.md)
 - [Architecture and test boundaries](docs/architecture.md)
 
-There are 45 automated acceptance tests in eight timestamped test families:
+There are 59 automated acceptance tests in thirteen timestamped test families:
 
-- 15 real switcher/session tests using actual HWNDs, window enumeration, layout, DWM, activation, and cleanup.
-- 7 real window, DWM, GDI, and shell-backdrop tests using native desktop objects.
-- 6 black-box tests that start the real executable and inspect its process, session HWND, and first visible frame.
-- 3 real visual-parity tests that inspect the owned layered preview windows and their rendered pixels.
-- 5 real switcher tests covering the selectable Sticky and Tap (classic) Alt-release behavior.
-- 4 black-box tests that open the real tray menu and verify the selectable background modes.
-- 1 real-process compositor test that verifies a live thumbnail is ready in the first published owner frame.
-- 4 real close-button tests that verify the default rendering, exact-source close behavior, sticky-session handling, hidden-button activation, hover rendering, live refresh, and the tray submenu.
+- 15 tests launch the executable, drive real HWNDs through its real hook, and observe session windows, navigation, activation, cleanup, and key-up behavior.
+- 7 tests exercise real Win32, DWM, GDI, shell, layout, and native-resource objects without a controller-fed test double.
+- 6 tests launch the executable and inspect startup, single-instance behavior, session ownership, pointer activation, and the first desktop frame.
+- 3 tests inspect the launched executable's real layered preview windows and rendered pixels.
+- 5 tests verify Sticky and Tap (classic) Alt-release behavior through the executable and tray.
+- 4 tests open the real tray popup and verify runtime backdrop selection and painting.
+- 1 test verifies that a live DWM thumbnail is ready in the first composed owner frame.
+- 4 tests verify close-button rendering, exact-source close, hover and hidden modes, live refresh, and the tray submenu.
+- 2 tests verify immediate Tab-up handling and recovery for a second rapid Alt+Tab gesture through the launched executable and real hook.
+- 2 tests verify complete Sticky and Tap Alt chords through the launched executable and real hook.
+- 1 test verifies held-Alt reopening after activation through the launched executable.
+- 1 test verifies the marked acceptance-input path and held-Alt reopening through the launched executable.
+- 8 native keyboard-behavior tests verify ordered balanced replay, Alt-first and Shift-first reverse suppression, native Ctrl+Alt, quarantine, and marker filtering through the launched executable, real `WH_KEYBOARD_LL` hook, and exact fixture message logs. Plain Right-Alt+Tab remains manual because `SendInput` on layouts such as Hungarian synthesizes Ctrl with `VK_RMENU` and therefore cannot prove the physical AltGr distinction.
 
-The families are the eight timestamped Rust integration-test files:
+These are plain Rust acceptance tests. They do not use Cucumber/Gherkin, `LiveSession`, a controller-fed acceptance harness, or `WM_BEGIN_SESSION`; session behavior is observed only through the launched executable. The families are the thirteen timestamped Rust integration-test files:
 
 - `acceptance-tests/tests/t20260914t211700z_001_real_switcher_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260914t212400z_002_real_window_and_backdrop_acceptance_tests.rs`
@@ -35,6 +40,11 @@ The families are the eight timestamped Rust integration-test files:
 - `acceptance-tests/tests/t20260915t175100z_006_tray_and_background_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260915t212300z_007_thumbnail_reveal_performance_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260925t203500z_008_close_button_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260930t183700z_009_rapid_alt_tab_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260930t195100z_010_alt_chord_isolation_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260930t204900z_011_held_alt_reopen_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260930t205300z_012_marked_hook_held_alt_acceptance_tests.rs`
+- `acceptance-tests/tests/t20260930t212634z_013_native_keyboard_behavior_acceptance_tests.rs`
 
 The timestamp and family suffix are stable identifiers. Keep them when refactoring a family; test functions use descriptive plain Rust names.
 
@@ -49,7 +59,7 @@ The timestamp and family suffix are stable identifiers. Keep them when refactori
 .\build.ps1 -Task Clean
 ```
 
-`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 45 acceptance tests serially. `Test` builds and runs the acceptance tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
+`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 59 acceptance tests serially. `Test` builds and runs the acceptance tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
 
 The direct Cargo equivalents are:
 
@@ -79,4 +89,8 @@ The executable embeds the application icon and Windows manifest. There are no lo
 
 ## Native validation
 
-Injected keyboard input is intentionally ignored by the production low-level hook, so an automated test cannot impersonate every physical Alt/Tab transition. The automated suite covers the real HWND and executable behavior that can be made deterministic; the manual matrix records the remaining physical-hook checks: ordinary and elevated applications, modifier transitions, UIPI, focus denial, mixed-DPI monitors, Explorer restart, protected surfaces, lock/unlock, and repeated resource cleanup.
+Normal production launches intentionally ignore injected and lower-integrity injected keyboard input. The explicit `--accept-marked-test-input` acceptance launch admits only test `SendInput` events carrying FrigoTab's marker; FrigoTab's own unmarked replay remains ignored, so the test mode cannot recurse through recovery. The marker is an `LLKHF_INJECTED` provenance filter for acceptance coverage, not a security boundary. The suite therefore exercises the real `WH_KEYBOARD_LL` callback, real executable/session HWNDs, and exact fixture `WM_KEY*` logs, but it cannot claim to emulate a physical keyboard completely.
+
+Marked `SendInput` differs from hardware in timing and typematic/autorepeat, scheduler batching, virtual-key/scan-code/extended-flag details, keyboard layout and AltGr behavior, and interaction with modifiers already held on the physical keyboard. The hook's bounded, panic-safe modifier and consumed-key ledgers, the executable readiness barrier, explicit fixture foregrounding, and per-scenario log clearing reduce those effects but do not remove them. UIPI/elevation boundaries, lower-integrity injection, secure desktop/lock screens, RDP, exclusive fullscreen, raw-HID consumers, Explorer/DWM state, hook timeout/removal, and heavy system load remain manual or special-environment checks.
+
+`PostMessage`/`SendMessage` and UI Automation are useful for deterministic window or menu setup, but bypass global input routing and `WH_KEYBOARD_LL`, so they are less realistic keyboard alternatives. A virtual HID/VHF device or signed kernel driver is closer to hardware but requires administrator access, driver signing and installation, WDK/kernel code, and Windows-version policy maintenance. A physical USB HID device or keyboard robot is the highest-fidelity option, at the cost of hardware, lab setup, and manual/non-hermetic execution. Keep the physical/special-environment matrix as a release requirement alongside the 59 local acceptance tests.

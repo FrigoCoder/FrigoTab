@@ -9,10 +9,10 @@ pub struct AltTabRecoveryPlan {
 }
 
 impl AltTabRecoveryPlan {
-    pub fn create(alt_still_down: bool, reverse: bool, shift_still_down: bool) -> Self {
-        let synthetic_alt = !alt_still_down;
-        let synthetic_shift = reverse && !shift_still_down;
-        let temporarily_release_shift = !reverse && shift_still_down;
+    pub fn create(alt_reached_target: bool, reverse: bool, shift_reached_target: bool) -> Self {
+        let synthetic_alt = !alt_reached_target;
+        let synthetic_shift = reverse && !shift_reached_target;
+        let temporarily_release_shift = !reverse && shift_reached_target;
 
         let shift_before = if synthetic_shift {
             Some(input(SwitcherKey::Shift, KeyTransition::Down))

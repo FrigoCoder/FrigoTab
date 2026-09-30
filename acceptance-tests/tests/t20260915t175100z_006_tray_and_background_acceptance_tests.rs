@@ -20,6 +20,9 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 const TIMEOUT: Duration = Duration::from_secs(5);
+const VK_LEFT_ALT_KEY: u16 = 0xa4;
+const VK_TAB_KEY: u16 = 0x09;
+const VK_ESCAPE_KEY: u16 = 0x1b;
 
 #[test]
 fn real_tray_menu_checks_sticky_and_full_desktop_by_default() {
@@ -63,15 +66,15 @@ fn selecting_black_from_the_real_tray_menu_paints_a_black_next_session() {
     let _serial = serial_guard();
     set_per_monitor_dpi_awareness();
     let fixture = full_desktop_fixture("FrigoTab black backdrop fixture");
-    let application = RunningFrigoTab::start().expect("FrigoTab did not start");
+    let application = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab did not start in marked-input acceptance mode");
 
     assert!(application.select_tray_menu_item("Background", "Black rectangle"));
     let menu = application
         .tray_menu()
         .expect("the real tray popup could not be reopened");
     assert_checked_child(&menu, "Background", "Black rectangle");
-    assert!(application.open(), "the real session did not accept open");
-    assert!(application.wait_visible(TIMEOUT));
+    open_marked_session(&application);
 
     let sample_points = background_sample_points(&application);
     assert!(
@@ -92,6 +95,8 @@ fn selecting_black_from_the_real_tray_menu_paints_a_black_next_session() {
     assert_checked_child(&menu, "Background", "Full desktop");
     assert_unchecked_child(&menu, "Background", "Black rectangle");
 
+    close_marked_session(&application);
+
     drop(fixture);
 }
 
@@ -101,15 +106,15 @@ fn selecting_image_only_from_the_real_tray_menu_hides_fixture_pixels() {
     set_per_monitor_dpi_awareness();
     let painted_desktop = capture_painted_desktop(virtual_desktop_bounds());
     let fixture = full_desktop_fixture("FrigoTab image-only backdrop fixture");
-    let application = RunningFrigoTab::start().expect("FrigoTab did not start");
+    let application = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab did not start in marked-input acceptance mode");
 
     assert!(application.select_tray_menu_item("Background", "Background image only"));
     let menu = application
         .tray_menu()
         .expect("the real tray popup could not be reopened");
     assert_checked_child(&menu, "Background", "Background image only");
-    assert!(application.open(), "the real session did not accept open");
-    assert!(application.wait_visible(TIMEOUT));
+    open_marked_session(&application);
 
     let sample_points = background_sample_points(&application);
     assert!(
@@ -131,7 +136,28 @@ fn selecting_image_only_from_the_real_tray_menu_hides_fixture_pixels() {
         "the image-only backdrop did not match Windows' painted desktop"
     );
 
+    close_marked_session(&application);
     drop(fixture);
+}
+
+fn open_marked_session(application: &RunningFrigoTab) {
+    assert!(application.send_marked_test_key(VK_LEFT_ALT_KEY, false));
+    assert!(application.send_marked_test_key(VK_TAB_KEY, false));
+    assert!(
+        application.wait_visible(TIMEOUT),
+        "the marked Alt+Tab chord did not open the real session"
+    );
+    assert!(application.send_marked_test_key(VK_TAB_KEY, true));
+    assert!(application.send_marked_test_key(VK_LEFT_ALT_KEY, true));
+}
+
+fn close_marked_session(application: &RunningFrigoTab) {
+    assert!(application.send_marked_test_key(VK_ESCAPE_KEY, false));
+    assert!(
+        application.wait_hidden(TIMEOUT),
+        "the marked Escape did not close the real session"
+    );
+    assert!(application.send_marked_test_key(VK_ESCAPE_KEY, true));
 }
 
 /// Paint a temporary topmost window using the same User32 operation as the

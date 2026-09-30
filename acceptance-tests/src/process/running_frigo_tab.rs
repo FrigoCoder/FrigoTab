@@ -2,20 +2,24 @@ use std::io;
 use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus};
 use std::ptr::null_mut;
+use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use super::test_key_input::TestKeyInput;
+use frigotab::input::{ACCEPT_MARKED_TEST_INPUT_ARGUMENT, MARKED_TEST_INPUT_EXTRA_INFO};
 use frigotab::sys_tray_icon::TRAY_CALLBACK_MESSAGE;
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEINPUT, SendInput,
-    VK_ESCAPE,
+    INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
+    KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEINPUT,
+    SendInput, VK_ESCAPE,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetClassNameW, GetMenuItemCount, GetMenuItemInfoW, GetMenuItemRect, GetSubMenu, HMENU,
     IsWindow, MENUITEMINFOW, MFS_CHECKED, MIIM_FTYPE, MIIM_STATE, MIIM_STRING, MIIM_SUBMENU,
-    MN_GETHMENU, PostMessageW, SendMessageW, SetCursorPos, WM_CLOSE, WM_KEYDOWN, WM_KEYUP,
-    WM_RBUTTONUP,
+    MN_GETHMENU, PostMessageW, SMTO_ABORTIFHUNG, SMTO_ERRORONEXIT, SendMessageTimeoutW,
+    SendMessageW, SetCursorPos, WM_CLOSE, WM_KEYDOWN, WM_KEYUP, WM_NULL, WM_RBUTTONUP,
 };
 
 use super::tray_menu_item::TrayMenuItem;
@@ -25,23 +29,46 @@ use crate::screen::window_search::{
 };
 use crate::{is_window_visible, pump_messages, set_per_monitor_dpi_awareness, wait_until};
 
-pub const WM_BEGIN_SESSION: u32 = 0x4001;
-
 pub struct RunningFrigoTab {
     process: Child,
     owner: HWND,
+    pressed_test_keys: Mutex<Vec<TestKeyInput>>,
 }
 
 impl RunningFrigoTab {
     pub fn start() -> io::Result<Self> {
+        Self::start_inner(false)
+    }
+
+    /// Starts the real executable with acceptance-marked `SendInput` events
+    /// enabled. Normal launches continue to ignore all injected keyboard input.
+    pub fn start_accepting_marked_test_input() -> io::Result<Self> {
+        Self::start_inner(true)
+    }
+
+    fn start_inner(accept_marked_test_input: bool) -> io::Result<Self> {
         set_per_monitor_dpi_awareness();
-        let mut process = Command::new(executable_path()?).spawn()?;
+        let mut command = Command::new(executable_path()?);
+        if accept_marked_test_input {
+            command.arg(ACCEPT_MARKED_TEST_INPUT_ARGUMENT);
+        }
+        let mut process = command.spawn()?;
         let pid = process.id();
         let deadline = Instant::now() + Duration::from_secs(8);
         loop {
             pump_messages();
             if let Some(owner) = find_owner(pid) {
-                return Ok(Self { process, owner });
+                // The owner is created before the hook and tray are fully
+                // initialized.  A synchronous benign message gives the
+                // startup path a deterministic readiness barrier, so callers
+                // never need a timing sleep before the first test input.
+                if owner_is_ready(owner) {
+                    return Ok(Self {
+                        process,
+                        owner,
+                        pressed_test_keys: Mutex::new(Vec::new()),
+                    });
+                }
             }
             if let Some(status) = process.try_wait()? {
                 return Err(io::Error::other(format!(
@@ -96,12 +123,6 @@ impl RunningFrigoTab {
         Ok(self.process.try_wait()?.and_then(|s| s.code()))
     }
 
-    pub fn open(&self) -> bool {
-        self.post(WM_BEGIN_SESSION, 0)
-    }
-    pub fn begin_session(&self) -> bool {
-        self.open()
-    }
     pub fn is_visible(&self) -> bool {
         is_window_visible(self.owner)
     }
@@ -114,6 +135,87 @@ impl RunningFrigoTab {
     pub fn wait_hidden(&self, timeout: Duration) -> bool {
         wait_until(timeout, || !self.is_visible())
     }
+
+    /// Sends one keyboard transition through the real low-level hook using
+    /// the marker accepted only by the explicit acceptance-test launch mode.
+    pub fn send_marked_test_key(&self, virtual_key: u16, key_up: bool) -> bool {
+        self.send_test_key(TestKeyInput::marked(
+            virtual_key,
+            key_up,
+            MARKED_TEST_INPUT_EXTRA_INFO,
+        ))
+    }
+
+    /// Sends one caller-configured transition through the real low-level hook.
+    pub fn send_test_key(&self, input: TestKeyInput) -> bool {
+        self.send_test_key_sequence(std::slice::from_ref(&input)) == 1
+    }
+
+    /// Sends a sequence as one `SendInput` call, preserving the ordering seen
+    /// by the real hook and returning the number accepted by Windows.
+    pub fn send_test_key_sequence(&self, inputs: &[TestKeyInput]) -> usize {
+        if inputs.is_empty() {
+            return 0;
+        }
+        let native: Vec<INPUT> = inputs.iter().copied().map(native_test_input).collect();
+        let sent = unsafe {
+            SendInput(
+                native.len() as u32,
+                native.as_ptr(),
+                size_of::<INPUT>() as i32,
+            ) as usize
+        };
+        let mut pressed_test_keys = self
+            .pressed_test_keys
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        for input in inputs.iter().copied().take(sent) {
+            if input.key_up {
+                if let Some(index) = pressed_test_keys
+                    .iter()
+                    .rposition(|down| same_test_key(down, &input))
+                {
+                    pressed_test_keys.remove(index);
+                }
+            } else if !pressed_test_keys
+                .iter()
+                .any(|down| same_test_key(down, &input))
+            {
+                // Repeated downs are typematic transitions for one physical
+                // key. One matching up balances the key; retaining duplicate
+                // entries would make Drop inject surplus ups.
+                pressed_test_keys.push(input);
+            }
+        }
+        sent
+    }
+
+    /// Moves the real system pointer and sends a left-button click through
+    /// the normal mouse input stream. This intentionally avoids posting
+    /// `WM_MOUSE*` messages directly to FrigoTab's owner window.
+    pub fn click_at(&self, x: i32, y: i32) -> bool {
+        if unsafe { SetCursorPos(x, y) } == 0 {
+            return false;
+        }
+        let inputs = [
+            mouse_input(MOUSEEVENTF_LEFTDOWN),
+            mouse_input(MOUSEEVENTF_LEFTUP),
+        ];
+        unsafe {
+            SendInput(
+                inputs.len() as u32,
+                inputs.as_ptr(),
+                size_of::<INPUT>() as i32,
+            ) == inputs.len() as u32
+        }
+    }
+
+    /// Moves the real system pointer so normal foreground hit-testing and
+    /// `WM_MOUSEMOVE` generation are exercised by visual acceptance tests.
+    pub fn move_pointer_to(&self, x: i32, y: i32) -> bool {
+        unsafe { SetCursorPos(x, y) != 0 }
+    }
+
     pub fn bounds(&self) -> RECT {
         window_bounds(self.owner).unwrap_or_default()
     }
@@ -242,14 +344,32 @@ impl RunningFrigoTab {
             thread::sleep(Duration::from_millis(10));
         }
     }
-
-    fn post(&self, message: u32, value: usize) -> bool {
-        !self.owner.is_null() && unsafe { PostMessageW(self.owner, message, value, 0) != 0 }
-    }
 }
 
 impl Drop for RunningFrigoTab {
     fn drop(&mut self) {
+        // A failed assertion must not leave a synthetic modifier held in the
+        // user's desktop. Release only transitions that this driver knows
+        // SendInput accepted, preserving their scan/extended/provenance data.
+        for _ in 0..4 {
+            let cleanup: Vec<TestKeyInput> = self
+                .pressed_test_keys
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .iter()
+                .rev()
+                .map(|input| TestKeyInput {
+                    key_up: true,
+                    ..*input
+                })
+                .collect();
+            if cleanup.is_empty() {
+                break;
+            }
+            if self.send_test_key_sequence(&cleanup) == 0 {
+                break;
+            }
+        }
         if !self.owner.is_null() && unsafe { IsWindow(self.owner) } != 0 {
             unsafe { PostMessageW(self.owner, WM_CLOSE, 0, 0) };
         }
@@ -258,6 +378,12 @@ impl Drop for RunningFrigoTab {
             let _ = self.process.wait();
         }
     }
+}
+
+fn same_test_key(first: &TestKeyInput, second: &TestKeyInput) -> bool {
+    first.virtual_key == second.virtual_key
+        && first.scan_code == second.scan_code
+        && first.extended == second.extended
 }
 
 fn executable_path() -> io::Result<PathBuf> {
@@ -281,6 +407,50 @@ fn executable_path() -> io::Result<PathBuf> {
     .into_iter()
     .find(|path| path.is_file())
     .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "FrigoTab.exe was not built"))
+}
+
+fn owner_is_ready(owner: HWND) -> bool {
+    let mut result = 0usize;
+    unsafe {
+        SendMessageTimeoutW(
+            owner,
+            WM_NULL,
+            0,
+            0,
+            SMTO_ABORTIFHUNG | SMTO_ERRORONEXIT,
+            2_000,
+            &mut result,
+        ) != 0
+    }
+}
+
+fn native_test_input(input: TestKeyInput) -> INPUT {
+    let mut flags = 0;
+    if input.key_up {
+        flags |= KEYEVENTF_KEYUP;
+    }
+    if input.extended {
+        flags |= KEYEVENTF_EXTENDEDKEY;
+    }
+    let (virtual_key, scan_code) = match input.scan_code {
+        Some(scan_code) => {
+            flags |= KEYEVENTF_SCANCODE;
+            (0, scan_code)
+        }
+        None => (input.virtual_key, 0),
+    };
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: virtual_key,
+                wScan: scan_code,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: input.extra_info,
+            },
+        },
+    }
 }
 
 fn find_tray_popup(pid: u32) -> Option<HWND> {

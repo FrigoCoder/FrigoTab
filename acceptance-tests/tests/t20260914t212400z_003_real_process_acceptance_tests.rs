@@ -27,8 +27,11 @@ use windows_sys::Win32::Graphics::Gdi::{
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     HWND_NOTOPMOST, PostMessageW, SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN,
     SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowPos,
-    WM_CLOSE, WM_LBUTTONDOWN, WM_MOUSEMOVE, WS_EX_TOPMOST, WS_POPUP,
+    WM_CLOSE, WS_EX_TOPMOST, WS_POPUP,
 };
+
+const MARKED_ALT_KEY: u16 = 0xa4;
+const MARKED_TAB_KEY: u16 = 0x09;
 
 #[test]
 fn executable_starts_resident_without_showing_a_window() {
@@ -99,13 +102,10 @@ fn executable_opens_a_real_full_desktop_session() {
             ..FixtureOptions::default()
         },
     );
-    let application = RunningFrigoTab::start().expect("FrigoTab did not start");
+    let application = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab did not start in marked-input acceptance mode");
 
-    assert!(application.open(), "the session-open message was rejected");
-    assert!(
-        application.wait_visible(Duration::from_secs(5)),
-        "the real session did not become visible"
-    );
+    open_with_marked_alt_tab(&application);
     let bounds = application.bounds();
     let expected = virtual_desktop_bounds();
     assert_rect_eq(
@@ -145,16 +145,16 @@ fn pointer_click_on_a_real_preview_closes_the_executable_session() {
             ..FixtureOptions::default()
         },
     );
-    let mut application = RunningFrigoTab::start().expect("FrigoTab did not start");
-    assert!(application.open(), "the session-open message was rejected");
-    assert!(application.wait_visible(Duration::from_secs(5)));
+    let mut application = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab did not start in marked-input acceptance mode");
+    open_with_marked_alt_tab(&application);
 
-    let owner_bounds = application.bounds();
     let point = wait_for_lime_preview(&application, Duration::from_secs(5))
         .expect("the real fixture preview did not become visible");
-    let packed = pack_client_point(owner_bounds, point);
-    assert!(unsafe { PostMessageW(application.owner(), WM_MOUSEMOVE, 0, packed) } != 0);
-    assert!(unsafe { PostMessageW(application.owner(), WM_LBUTTONDOWN, 1, packed) } != 0);
+    assert!(
+        application.click_at(point.x, point.y),
+        "the real pointer click could not be sent through the system input stream"
+    );
 
     assert!(
         wait_until(Duration::from_secs(5), || {
@@ -214,7 +214,8 @@ fn first_visible_frame_uses_the_desktop_instead_of_the_covering_application() {
             .unwrap_or(false)
     }));
 
-    let application = RunningFrigoTab::start().expect("FrigoTab did not start");
+    let application = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab did not start in marked-input acceptance mode");
     // Keep the sentinel visible while moving it below FrigoTab's future
     // topmost owner. A screen-copy implementation would retain its pixels;
     // an Explorer desktop capture will not.
@@ -233,8 +234,7 @@ fn first_visible_frame_uses_the_desktop_instead_of_the_covering_application() {
     );
     pump_messages();
 
-    assert!(application.open(), "the session-open message was rejected");
-    assert!(application.wait_visible(Duration::from_secs(5)));
+    open_with_marked_alt_tab(&application);
     unsafe {
         DwmFlush();
     }
@@ -253,6 +253,27 @@ fn first_visible_frame_uses_the_desktop_instead_of_the_covering_application() {
         "the background changed after opening: first={first_frame:#08x}, settled={settled_frame:#08x}"
     );
     drop(fixture);
+}
+
+fn open_with_marked_alt_tab(application: &RunningFrigoTab) {
+    // RunningFrigoTab's responsive-owner barrier completes only after the
+    // production hook has been installed and the UI message loop is running.
+    let alt_down = application.send_marked_test_key(MARKED_ALT_KEY, false);
+    let tab_down = application.send_marked_test_key(MARKED_TAB_KEY, false);
+    let opened = alt_down && tab_down && application.wait_visible(Duration::from_secs(5));
+    // Complete the physical chord and balance both key-up transitions. The
+    // default Sticky behavior intentionally leaves the session visible after
+    // Alt-up, so later assertions still observe the open session.
+    let tab_up = application.send_marked_test_key(MARKED_TAB_KEY, true);
+    let alt_up = application.send_marked_test_key(MARKED_ALT_KEY, true);
+    assert!(alt_down, "marked Alt-down was rejected");
+    assert!(tab_down, "marked Tab-down was rejected");
+    assert!(tab_up, "marked Tab-up was rejected");
+    assert!(alt_up, "marked Alt-up was rejected");
+    assert!(
+        opened,
+        "the marked Alt+Tab chord did not open the real session"
+    );
 }
 
 fn wait_for_child(child: &mut Child, timeout: Duration) -> Option<ExitStatus> {
@@ -276,18 +297,27 @@ fn wait_for_lime_preview(application: &RunningFrigoTab, timeout: Duration) -> Op
     loop {
         let point = visible_owned_layered_windows(application.owner())
             .into_iter()
-            .filter_map(window_bounds)
-            .find_map(|bounds| {
-                capture_screen_image(bounds).and_then(|image| {
-                    (bounds.top..bounds.bottom).step_by(4).find_map(|y| {
-                        (bounds.left..bounds.right).step_by(4).find_map(|x| {
-                            image
-                                .pixel(x, y)
-                                .filter(|color| is_lime(*color))
-                                .map(|_| POINT { x, y })
+            .filter_map(|overlay| {
+                let bounds = window_bounds(overlay)?;
+                let image = capture_screen_image(bounds)?;
+                let selected_green = 0x007f_7f00;
+                let samples = (bounds.top..bounds.bottom)
+                    .step_by(4)
+                    .flat_map(|y| (bounds.left..bounds.right).step_by(4).map(move |x| (x, y)))
+                    .filter(|&(x, y)| {
+                        image.pixel(x, y).is_some_and(|pixel| {
+                            color_distance(pixel, GREEN) <= 55
+                                || color_distance(pixel, selected_green) <= 55
                         })
                     })
-                })
+                    .count();
+                Some((samples, bounds))
+            })
+            .max_by_key(|(samples, _)| *samples)
+            .filter(|(samples, _)| *samples >= 100)
+            .map(|(_, bounds)| POINT {
+                x: bounds.left + (bounds.right - bounds.left) / 2,
+                y: bounds.top + (bounds.bottom - bounds.top) / 2,
             });
         if point.is_some() {
             return point;
@@ -298,16 +328,6 @@ fn wait_for_lime_preview(application: &RunningFrigoTab, timeout: Duration) -> Op
         }
         thread::sleep(Duration::from_millis(50));
     }
-}
-
-fn is_lime(color: u32) -> bool {
-    color & 0xff < 80 && (color >> 8) & 0xff > 200 && (color >> 16) & 0xff < 80
-}
-
-fn pack_client_point(owner: RECT, point: POINT) -> isize {
-    let x = (point.x - owner.left) as i16 as u16 as usize;
-    let y = (point.y - owner.top) as i16 as u16 as usize;
-    ((y << 16) | x) as isize
 }
 
 struct ShellImage {

@@ -245,10 +245,10 @@ impl SwitcherApplication {
             if self.alt_tab_behavior == AltTabBehavior::Tap {
                 self.try_commit_selection(port);
             }
-            // The physical Alt-down event was allowed through before the
-            // switcher opened. Pass its release through as well so the
-            // foreground application cannot be left with a stuck modifier.
-            return KeyHandling::PassThrough;
+            // The native hook gates the physical Alt-down before it can reach
+            // the previous application. Its matching release belongs to the
+            // same intercepted gesture in both Sticky and Tap modes.
+            return KeyHandling::Consume;
         }
         KeyHandling::PassThrough
     }

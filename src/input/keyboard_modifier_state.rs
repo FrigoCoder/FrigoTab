@@ -36,6 +36,26 @@ impl KeyboardModifierState {
             != 0
     }
 
+    pub fn control_down(&self) -> bool {
+        self.state
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .control
+            != 0
+    }
+
+    pub(crate) fn pressed_shift_keys(&self) -> [Option<KeyboardModifierKey>; 3] {
+        let state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        [
+            (state.shift & modifier_bit(KeyboardModifierKey::Shift) != 0)
+                .then_some(KeyboardModifierKey::Shift),
+            (state.shift & modifier_bit(KeyboardModifierKey::LeftShift) != 0)
+                .then_some(KeyboardModifierKey::LeftShift),
+            (state.shift & modifier_bit(KeyboardModifierKey::RightShift) != 0)
+                .then_some(KeyboardModifierKey::RightShift),
+        ]
+    }
+
     pub fn create_input_with_modifier(
         &self,
         key: SwitcherKey,
@@ -59,6 +79,8 @@ impl KeyboardModifierState {
         if is_alt(physical_modifier) {
             if is_down {
                 state.alt |= modifier_bit(physical_modifier);
+            } else if physical_modifier == KeyboardModifierKey::Alt {
+                state.alt = 0;
             } else {
                 state.alt &= !modifier_bit(physical_modifier);
                 // The generic Alt entry represents the LLKHF_ALTDOWN recovery
@@ -68,8 +90,20 @@ impl KeyboardModifierState {
         } else if is_shift(physical_modifier) {
             if is_down {
                 state.shift |= modifier_bit(physical_modifier);
+            } else if physical_modifier == KeyboardModifierKey::Shift {
+                state.shift = 0;
             } else {
                 state.shift &= !modifier_bit(physical_modifier);
+                state.shift &= !modifier_bit(KeyboardModifierKey::Shift);
+            }
+        } else if is_control(physical_modifier) {
+            if is_down {
+                state.control |= modifier_bit(physical_modifier);
+            } else if physical_modifier == KeyboardModifierKey::Control {
+                state.control = 0;
+            } else {
+                state.control &= !modifier_bit(physical_modifier);
+                state.control &= !modifier_bit(KeyboardModifierKey::Control);
             }
         }
         if native_alt_down && state.alt == 0 && !is_alt(physical_modifier) {
@@ -84,6 +118,7 @@ impl KeyboardModifierState {
         let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         state.alt = 0;
         state.shift = 0;
+        state.control = 0;
     }
 }
 
@@ -109,6 +144,15 @@ fn is_shift(modifier: KeyboardModifierKey) -> bool {
     )
 }
 
+fn is_control(modifier: KeyboardModifierKey) -> bool {
+    matches!(
+        modifier,
+        KeyboardModifierKey::Control
+            | KeyboardModifierKey::LeftControl
+            | KeyboardModifierKey::RightControl
+    )
+}
+
 fn modifier_bit(modifier: KeyboardModifierKey) -> u8 {
     match modifier {
         KeyboardModifierKey::Alt => 1 << 0,
@@ -117,6 +161,9 @@ fn modifier_bit(modifier: KeyboardModifierKey) -> u8 {
         KeyboardModifierKey::Shift => 1 << 0,
         KeyboardModifierKey::LeftShift => 1 << 1,
         KeyboardModifierKey::RightShift => 1 << 2,
+        KeyboardModifierKey::Control => 1 << 0,
+        KeyboardModifierKey::LeftControl => 1 << 1,
+        KeyboardModifierKey::RightControl => 1 << 2,
         KeyboardModifierKey::None => 0,
     }
 }

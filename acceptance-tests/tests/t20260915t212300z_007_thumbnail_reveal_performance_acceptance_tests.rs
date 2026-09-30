@@ -20,13 +20,17 @@ use windows_sys::Win32::Graphics::Dwm::DwmFlush;
 use windows_sys::Win32::UI::WindowsAndMessaging::{WS_EX_APPWINDOW, WS_POPUP};
 
 const TIMEOUT: Duration = Duration::from_secs(3);
+const VK_LEFT_ALT_KEY: u16 = 0xa4;
+const VK_TAB_KEY: u16 = 0x09;
+const VK_ESCAPE_KEY: u16 = 0x1b;
 
 #[test]
 fn a_real_thumbnail_is_ready_on_its_first_composed_owner_frame() {
     let _guard = serial_guard();
     set_per_monitor_dpi_awareness();
     let fixtures = create_fixtures();
-    let application = RunningFrigoTab::start().expect("FrigoTab.exe should start");
+    let application = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab.exe should start in marked-input acceptance mode");
     let finder = WindowFinder::new();
     let layout = Layout::new(&finder.windows);
     let green_bounds = layout
@@ -40,7 +44,8 @@ fn a_real_thumbnail_is_ready_on_its_first_composed_owner_frame() {
     );
 
     let started = Instant::now();
-    assert!(application.open(), "the real session should accept open");
+    assert!(application.send_marked_test_key(VK_LEFT_ALT_KEY, false));
+    assert!(application.send_marked_test_key(VK_TAB_KEY, false));
 
     let deadline = started + TIMEOUT;
     let mut history = Vec::new();
@@ -84,6 +89,15 @@ fn a_real_thumbnail_is_ready_on_its_first_composed_owner_frame() {
         near(GREEN, first_color, 55),
         "the first composed owner frame contained a placeholder instead of the real thumbnail: {history:?}"
     );
+
+    assert!(application.send_marked_test_key(VK_TAB_KEY, true));
+    assert!(application.send_marked_test_key(VK_LEFT_ALT_KEY, true));
+    assert!(application.send_marked_test_key(VK_ESCAPE_KEY, false));
+    assert!(
+        application.wait_hidden(TIMEOUT),
+        "the marked Escape did not close the real session"
+    );
+    assert!(application.send_marked_test_key(VK_ESCAPE_KEY, true));
 }
 
 fn create_fixtures() -> Vec<FixtureWindow> {

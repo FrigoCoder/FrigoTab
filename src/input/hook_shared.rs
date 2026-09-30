@@ -12,6 +12,7 @@ pub(crate) struct HookShared {
     pub(crate) callbacks: Arc<CallbackQueue>,
     pub(crate) delivered: Arc<DeliveredInputs>,
     pub(crate) disposed: AtomicBool,
+    pub(crate) accept_marked_test_input: bool,
     pub(crate) thread_id: AtomicU32,
     pub(crate) hook_id: AtomicPtr<std::ffi::c_void>,
 }

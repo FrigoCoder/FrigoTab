@@ -30,6 +30,11 @@ impl KeyboardSuppressionState {
             self.consumed_keys &= !key_bit;
             return (true, 0);
         }
+        if input.is_down() && !self.session_active_or_pending && self.consumed_keys & key_bit != 0 {
+            // The session can close before key-repeat stops. Keep repeats
+            // suppressed until the one physical up clears this ledger entry.
+            return (true, 0);
+        }
         if !input.is_down() {
             return (false, 0);
         }
@@ -47,10 +52,11 @@ impl KeyboardSuppressionState {
             }
             false
         } else {
-            (input.key == SwitcherKey::Tab && input.alt)
-                || input.key == SwitcherKey::Escape
-                || (input.key == SwitcherKey::F4 && input.alt)
-                || is_digit(input.key)
+            // Once FrigoTab owns a gesture, every known physical key belongs
+            // to that gesture until its matching release. This prevents keys
+            // typed while the UI message is still pending from reaching the
+            // old foreground application.
+            input.key != SwitcherKey::Unknown
         };
 
         if consume {
@@ -64,16 +70,39 @@ impl KeyboardSuppressionState {
         self.pending_admission_token = 0;
     }
 
-    /// Cancels only an admission that has not reached the UI.  The consumed
-    /// ledger for a visible session is intentionally left untouched.
+    /// Cancels only an admission that has not reached the UI. The physical
+    /// key-down was already suppressed, so its consumed-key entry must remain
+    /// until the matching key-up even when native Alt+Tab recovery is needed.
     pub fn abort_pending_admission(&mut self, admission_token: i64) -> bool {
         if admission_token == 0 || admission_token != self.pending_admission_token {
             return false;
         }
         self.pending_admission_token = 0;
         self.session_active_or_pending = false;
-        self.consumed_keys &= !SwitcherKey::Tab.bit();
         true
+    }
+
+    pub(crate) fn session_active_or_pending(&self) -> bool {
+        self.session_active_or_pending
+    }
+
+    pub(crate) fn consume_matching_release(&mut self, key: SwitcherKey) {
+        self.consumed_keys |= key.bit();
+    }
+
+    pub(crate) fn consumes_matching_release(&self, key: SwitcherKey) -> bool {
+        self.consumed_keys & key.bit() != 0
+    }
+
+    pub(crate) fn forget_matching_release(&mut self, key: SwitcherKey) {
+        self.consumed_keys &= !key.bit();
+    }
+
+    /// Reset the active admission without exposing releases for key-downs the
+    /// hook already suppressed. Full shutdown uses `reset` instead.
+    pub(crate) fn reset_session_state(&mut self) {
+        self.session_active_or_pending = false;
+        self.pending_admission_token = 0;
     }
 
     pub fn reset(&mut self) {
@@ -86,28 +115,4 @@ impl KeyboardSuppressionState {
 fn next_token(previous: i64) -> i64 {
     let next = previous.wrapping_add(1);
     if next == 0 { 1 } else { next }
-}
-
-fn is_digit(key: SwitcherKey) -> bool {
-    matches!(
-        key,
-        SwitcherKey::D1
-            | SwitcherKey::D2
-            | SwitcherKey::D3
-            | SwitcherKey::D4
-            | SwitcherKey::D5
-            | SwitcherKey::D6
-            | SwitcherKey::D7
-            | SwitcherKey::D8
-            | SwitcherKey::D9
-            | SwitcherKey::NumPad1
-            | SwitcherKey::NumPad2
-            | SwitcherKey::NumPad3
-            | SwitcherKey::NumPad4
-            | SwitcherKey::NumPad5
-            | SwitcherKey::NumPad6
-            | SwitcherKey::NumPad7
-            | SwitcherKey::NumPad8
-            | SwitcherKey::NumPad9
-    )
 }

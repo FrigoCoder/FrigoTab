@@ -1,4 +1,7 @@
+use std::collections::VecDeque;
 use std::ptr::{null, null_mut};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::Graphics::Gdi::UpdateWindow;
@@ -14,8 +17,106 @@ use crate::{
     window_title,
 };
 
+pub(crate) struct FixtureWindowState {
+    pub(crate) color: Color,
+    keyboard_messages: Mutex<VecDeque<KeyboardMessage>>,
+    keyboard_message_log_overflowed: AtomicBool,
+}
+
+/// A keyboard message delivered to a real fixture HWND.
+///
+/// The fields mirror the documented bit layout of a keyboard message's
+/// `lParam`.  Keeping the raw Win32 message alongside the decoded flags lets
+/// acceptance tests distinguish replayed `WM_SYSKEY*` messages from ordinary
+/// key messages and verify exact down/up ordering without inspecting private
+/// application state.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct KeyboardMessage {
+    pub message: u32,
+    pub virtual_key: u16,
+    pub foreground_window: usize,
+    pub repeat_count: u16,
+    pub scan_code: u8,
+    pub extended: bool,
+    pub alt_context: bool,
+    pub previous_state: bool,
+    pub transition: bool,
+}
+
+const MAX_KEYBOARD_MESSAGES: usize = 512;
+
+impl FixtureWindowState {
+    fn new(color: Color) -> Self {
+        Self {
+            color,
+            keyboard_messages: Mutex::new(VecDeque::with_capacity(MAX_KEYBOARD_MESSAGES)),
+            keyboard_message_log_overflowed: AtomicBool::new(false),
+        }
+    }
+
+    fn clear_keyboard_messages(&self) {
+        self.keyboard_messages
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clear();
+        self.keyboard_message_log_overflowed
+            .store(false, Ordering::Release);
+    }
+
+    pub(crate) fn record_keyboard_message(
+        &self,
+        message: u32,
+        virtual_key: usize,
+        lparam: isize,
+        foreground_window: usize,
+    ) {
+        let bits = lparam as u32;
+        let mut messages = self
+            .keyboard_messages
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if messages.len() >= MAX_KEYBOARD_MESSAGES {
+            self.keyboard_message_log_overflowed
+                .store(true, Ordering::Release);
+            return;
+        }
+        messages.push_back(KeyboardMessage {
+            message,
+            virtual_key: virtual_key as u16,
+            foreground_window,
+            repeat_count: (bits & 0xffff) as u16,
+            scan_code: ((bits >> 16) & 0xff) as u8,
+            extended: bits & (1 << 24) != 0,
+            alt_context: bits & (1 << 29) != 0,
+            previous_state: bits & (1 << 30) != 0,
+            transition: bits & (1 << 31) != 0,
+        });
+    }
+
+    fn keyboard_message_count(&self) -> usize {
+        self.keyboard_messages
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .len()
+    }
+
+    fn keyboard_messages(&self) -> Vec<KeyboardMessage> {
+        self.keyboard_messages
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .iter()
+            .copied()
+            .collect()
+    }
+
+    fn keyboard_message_log_overflowed(&self) -> bool {
+        self.keyboard_message_log_overflowed.load(Ordering::Acquire)
+    }
+}
+
 pub struct FixtureWindow {
     hwnd: HWND,
+    state: Box<FixtureWindowState>,
 }
 
 impl FixtureWindow {
@@ -33,6 +134,8 @@ impl FixtureWindow {
     pub fn show_with_options(title: &str, color: Color, options: FixtureOptions) -> Self {
         register_fixture_class();
         let title = wide(title);
+        let state = Box::new(FixtureWindowState::new(color));
+        let state_pointer = state.as_ref() as *const FixtureWindowState as *mut _;
         let hwnd = unsafe {
             CreateWindowExW(
                 options.ex_style,
@@ -46,7 +149,7 @@ impl FixtureWindow {
                 null_mut(),
                 null_mut(),
                 GetModuleHandleW(null()),
-                color as usize as *mut _,
+                state_pointer,
             )
         };
         assert!(!hwnd.is_null(), "CreateWindowExW failed for fixture window");
@@ -67,7 +170,7 @@ impl FixtureWindow {
             };
         }
         pump_messages();
-        Self { hwnd }
+        Self { hwnd, state }
     }
 
     pub fn handle(&self) -> HWND {
@@ -99,6 +202,32 @@ impl FixtureWindow {
 
     pub fn title(&self) -> String {
         window_title(self.hwnd)
+    }
+
+    pub fn clear_keyboard_messages(&self) {
+        pump_messages();
+        self.state.clear_keyboard_messages();
+    }
+
+    pub fn keyboard_message_count(&self) -> usize {
+        pump_messages();
+        self.state.keyboard_message_count()
+    }
+
+    /// Returns the exact bounded sequence delivered to this fixture HWND.
+    /// Call [`Self::keyboard_message_log_overflowed`] before relying on the
+    /// sequence for an exhaustive assertion.
+    pub fn keyboard_messages(&self) -> Vec<KeyboardMessage> {
+        pump_messages();
+        self.state.keyboard_messages()
+    }
+
+    /// Reports whether more messages arrived than the bounded acceptance log
+    /// can retain.  Tests should fail or clear the log before making an exact
+    /// sequence assertion when this is true.
+    pub fn keyboard_message_log_overflowed(&self) -> bool {
+        pump_messages();
+        self.state.keyboard_message_log_overflowed()
     }
 
     pub fn set_title(&self, title: &str) -> bool {

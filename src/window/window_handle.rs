@@ -1,9 +1,10 @@
 //! A thin value wrapper over an `HWND`.
 //!
 //! These methods deliberately mirror the native calls made by the original
-//! `WindowHandle` struct.  There is no input-queue attachment or synthetic
-//! key transition: activation is the historical zero-value `keybd_event`
-//! nudge followed by `SetForegroundWindow`.
+//! `WindowHandle` struct. There is no input-queue attachment: activation uses
+//! the historical zero-value `keybd_event` nudge followed by
+//! `SetForegroundWindow`. FrigoTab tags and consumes that no-op transition in
+//! its own hook so it cannot become an application keyboard message.
 
 use std::mem::size_of;
 
@@ -21,6 +22,13 @@ use crate::geometry::Rectangle;
 // module path as well as their dedicated modules.
 pub use super::window_ex_styles::WindowExStyles;
 pub use super::window_styles::WindowStyles;
+
+/// `dwExtraInfo` tag carried by FrigoTab's zero-key foreground-activation
+/// nudge. The nudge exists solely to give `SetForegroundWindow` recent-input
+/// context; it must not become a keyboard message in the previous foreground
+/// application. This is not a security boundary: a same-value injected event
+/// from another process is indistinguishable from our own at this layer.
+pub(crate) const FOREGROUND_NUDGE_EXTRA_INFO: usize = 0x4652_4e47;
 
 /// A native window handle with the value semantics of the original wrapper.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -66,10 +74,12 @@ impl WindowHandle {
             }
         }
 
-        // SAFETY: This is the exact no-op keybd_event nudge used by the
-        // original application.
+        // SAFETY: This is the no-op keybd_event nudge used by the original
+        // application. The private marker lets FrigoTab's global hook consume
+        // this event before it can become a keyboard message in the previous
+        // foreground application.
         unsafe {
-            keybd_event(0, 0, 0, 0);
+            keybd_event(0, 0, 0, FOREGROUND_NUDGE_EXTRA_INFO);
             SetForegroundWindow(self.0) != 0
         }
     }

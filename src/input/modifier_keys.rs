@@ -4,4 +4,5 @@ pub(crate) struct ModifierKeys {
     // these as masks avoids a HashSet allocation in the low-level hook.
     pub(crate) alt: u8,
     pub(crate) shift: u8,
+    pub(crate) control: u8,
 }

@@ -2,43 +2,41 @@
 
 //! Real visual acceptance checks for the Rust executable.
 //!
-//! These tests deliberately start the built executable and inspect its real
-//! owned HWNDs and composed screen pixels.  They do not construct a substitute
-//! switcher graph or use test-only production hooks.
+//! These tests deliberately start the built executable, enter through its real
+//! low-level keyboard hook, and inspect its owned HWNDs and composed pixels.
+//! They do not construct a substitute switcher graph.
 
 use std::time::Duration;
 
 use frigotab_acceptance::{
-    FixtureOptions, FixtureWindow, GREEN, MAGENTA, RED, RunningFrigoTab, ScreenCapture,
-    capture_screen_image, color_distance, is_window_visible, pump_messages, screen_pixel,
-    serial_guard, set_per_monitor_dpi_awareness, wait_until, window_bounds, window_ex_style,
-    window_owner,
+    CursorPosition, FixtureOptions, FixtureWindow, GREEN, MAGENTA, RED, RunningFrigoTab,
+    ScreenCapture, capture_screen_image, color_distance, is_window_visible, pump_messages,
+    screen_pixel, serial_guard, set_per_monitor_dpi_awareness, wait_until, window_bounds,
+    window_ex_style, window_owner,
 };
-use windows_sys::Win32::Foundation::{HWND, LPARAM, RECT};
+use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::Graphics::Dwm::DwmFlush;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    PostMessageW, WM_MOUSEMOVE, WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_EX_TRANSPARENT, WS_POPUP,
 };
 
 const TILE_EXTENDED_STYLES: u32 =
     WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_NOACTIVATE;
+const VK_LEFT_ALT_KEY: u16 = 0xa4;
+const VK_TAB_KEY: u16 = 0x09;
+const VK_ESCAPE_KEY: u16 = 0x1b;
 
 #[test]
 fn every_real_preview_uses_the_original_owned_layered_window_topology() {
     let _guard = serial_guard();
+    let _cursor = park_cursor();
     set_per_monitor_dpi_awareness();
     let _fixtures = create_visual_fixtures();
-    let session = RunningFrigoTab::start().expect("FrigoTab.exe should start");
+    let session = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab.exe should start in marked-input acceptance mode");
 
-    assert!(
-        session.open(),
-        "the real session owner should accept WM_BEGIN_SESSION"
-    );
-    assert!(
-        session.wait_visible(Duration::from_secs(5)),
-        "the real owner should become visible"
-    );
+    open_marked_session(&session);
     assert!(
         wait_until(Duration::from_secs(5), || session
             .visible_owned_layered_windows()
@@ -47,7 +45,7 @@ fn every_real_preview_uses_the_original_owned_layered_window_topology() {
         "the real session should create one layered tile for each fixture"
     );
 
-    post_owner_mouse_point(session.owner(), 1, 1);
+    move_owner_pointer(&session, 1, 1);
     let mut fixture_tiles = vec![
         wait_for_tile_color(&session, RED).0,
         wait_for_tile_color(&session, GREEN).0,
@@ -73,21 +71,20 @@ fn every_real_preview_uses_the_original_owned_layered_window_topology() {
             "tile HWND did not preserve the original tool/topmost/transparent/layered/no-activate styles"
         );
     }
+    cancel_marked_session(&session);
 }
 
 #[test]
 fn dwm_preview_fills_the_real_tile_and_selected_tile_keeps_the_blue_alpha_overlay() {
     let _guard = serial_guard();
+    let _cursor = park_cursor();
     set_per_monitor_dpi_awareness();
     let _fixtures = create_visual_fixtures();
-    let session = RunningFrigoTab::start().expect("FrigoTab.exe should start");
+    let session = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab.exe should start in marked-input acceptance mode");
 
-    assert!(
-        session.open(),
-        "the real session owner should accept WM_BEGIN_SESSION"
-    );
-    assert!(session.wait_visible(Duration::from_secs(5)));
-    post_owner_mouse_point(session.owner(), 1, 1);
+    open_marked_session(&session);
+    move_owner_pointer(&session, 1, 1);
     let (red_tile, red_bounds) = wait_for_tile_color(&session, RED);
     let (_green_tile, green_bounds) = wait_for_tile_color(&session, GREEN);
 
@@ -113,7 +110,7 @@ fn dwm_preview_fills_the_real_tile_and_selected_tile_keeps_the_blue_alpha_overla
         "the DWM image did not reach the tile's right edge: {right_edge:#08x}"
     );
 
-    post_mouse_move(session.owner(), red_bounds);
+    move_pointer_to_tile(&session, red_bounds);
     let expected_blue_blend = frigotab_acceptance::rgb(127, 0, 128);
     assert!(
         wait_until(Duration::from_secs(5), || {
@@ -129,23 +126,22 @@ fn dwm_preview_fills_the_real_tile_and_selected_tile_keeps_the_blue_alpha_overla
     // Keep the handle live through the assertion so the test documents that
     // the selected tile was found as a real owned window, not just a pixel.
     assert!(!red_tile.is_null());
+    cancel_marked_session(&session);
 }
 
 #[test]
 fn real_overlay_keeps_the_measured_title_and_large_centered_number() {
     let _guard = serial_guard();
+    let _cursor = park_cursor();
     set_per_monitor_dpi_awareness();
     let _fixtures = create_visual_fixtures();
-    let session = RunningFrigoTab::start().expect("FrigoTab.exe should start");
+    let session = RunningFrigoTab::start_accepting_marked_test_input()
+        .expect("FrigoTab.exe should start in marked-input acceptance mode");
 
-    assert!(
-        session.open(),
-        "the real session owner should accept WM_BEGIN_SESSION"
-    );
-    assert!(session.wait_visible(Duration::from_secs(5)));
-    post_owner_mouse_point(session.owner(), 1, 1);
+    open_marked_session(&session);
+    move_owner_pointer(&session, 1, 1);
     let (_red_tile, red_bounds) = wait_for_tile_color(&session, RED);
-    post_mouse_move(session.owner(), red_bounds);
+    move_pointer_to_tile(&session, red_bounds);
     assert!(wait_until(Duration::from_secs(5), || {
         near(
             tile_sample(red_bounds),
@@ -228,6 +224,46 @@ fn real_overlay_keeps_the_measured_title_and_large_centered_number() {
         number_black > 100,
         "the centered number lost its tight black backing rectangle"
     );
+    cancel_marked_session(&session);
+}
+
+fn open_marked_session(session: &RunningFrigoTab) {
+    // The explicit launch mode admits only this marker, while the sequence
+    // still travels through the real low-level hook and UI dispatch path.
+    let alt_down = session.send_marked_test_key(VK_LEFT_ALT_KEY, false);
+    let tab_down = session.send_marked_test_key(VK_TAB_KEY, false);
+    let visible = session.wait_visible(Duration::from_secs(5));
+    let tab_up = session.send_marked_test_key(VK_TAB_KEY, true);
+    let alt_up = session.send_marked_test_key(VK_LEFT_ALT_KEY, true);
+    assert!(alt_down, "the marked Alt-down transition was not accepted");
+    assert!(tab_down, "the marked Tab-down transition was not accepted");
+    assert!(
+        visible,
+        "the real Alt+Tab session owner should become visible"
+    );
+    assert!(tab_up, "the marked Tab-up transition was not accepted");
+    assert!(alt_up, "the marked Alt-up transition was not accepted");
+}
+
+fn cancel_marked_session(session: &RunningFrigoTab) {
+    // Sticky mode intentionally remains open after Alt release. Escape closes
+    // it through the hook, and its matching release balances the suppression
+    // ledger before the process is dropped.
+    let escape_down = session.send_marked_test_key(VK_ESCAPE_KEY, false);
+    let hidden = session.wait_hidden(Duration::from_secs(5));
+    let escape_up = session.send_marked_test_key(VK_ESCAPE_KEY, true);
+    assert!(
+        escape_down,
+        "the marked Escape-down transition was not accepted"
+    );
+    assert!(
+        hidden,
+        "the marked Escape key did not cancel the real session"
+    );
+    assert!(
+        escape_up,
+        "the marked Escape-up transition was not accepted"
+    );
 }
 
 fn create_visual_fixtures() -> Vec<FixtureWindow> {
@@ -268,6 +304,15 @@ fn wait_for_tile_color(session: &RunningFrigoTab, expected: u32) -> (HWND, RECT)
     found.expect("wait_until reported a missing tile")
 }
 
+fn park_cursor() -> CursorPosition {
+    let cursor = CursorPosition::capture().expect("the pointer position should be readable");
+    assert!(
+        CursorPosition::move_to(1, 1),
+        "the pointer could not be moved away from the preview fixtures"
+    );
+    cursor
+}
+
 fn tile_sample(bounds: RECT) -> u32 {
     flush_composition();
     let x = bounds.left + (bounds.right - bounds.left) * 3 / 4;
@@ -275,19 +320,15 @@ fn tile_sample(bounds: RECT) -> u32 {
     screen_pixel(x, y).unwrap_or(u32::MAX)
 }
 
-fn post_mouse_move(owner: HWND, tile: RECT) {
-    let owner_bounds = window_bounds(owner).expect("session owner should have screen bounds");
-    let x = tile.left + (tile.right - tile.left) / 2 - owner_bounds.left;
-    let y = tile.top + (tile.bottom - tile.top) / 2 - owner_bounds.top;
-    let packed = ((y as i16 as u16 as u32) << 16) | (x as i16 as u16 as u32);
-    assert!(unsafe { PostMessageW(owner, WM_MOUSEMOVE, 0, packed as LPARAM) } != 0);
-    pump_messages();
+fn move_pointer_to_tile(session: &RunningFrigoTab, tile: RECT) {
+    let x = tile.left + (tile.right - tile.left) / 2;
+    let y = tile.top + (tile.bottom - tile.top) / 2;
+    assert!(session.move_pointer_to(x, y));
 }
 
-fn post_owner_mouse_point(owner: HWND, x: i32, y: i32) {
-    let packed = ((y as i16 as u16 as u32) << 16) | (x as i16 as u16 as u32);
-    assert!(unsafe { PostMessageW(owner, WM_MOUSEMOVE, 0, packed as LPARAM) } != 0);
-    pump_messages();
+fn move_owner_pointer(session: &RunningFrigoTab, x: i32, y: i32) {
+    let owner = session.bounds();
+    assert!(session.move_pointer_to(owner.left + x, owner.top + y));
 }
 
 fn capture_pixel_count<F>(

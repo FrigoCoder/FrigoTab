@@ -10,4 +10,7 @@ pub enum KeyboardModifierKey {
     Shift,
     LeftShift,
     RightShift,
+    Control,
+    LeftControl,
+    RightControl,
 }

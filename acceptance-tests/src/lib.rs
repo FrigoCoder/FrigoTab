@@ -3,17 +3,15 @@
 //! Real Win32 drivers shared by the acceptance tests.
 //!
 //! This module contains real fixture HWNDs, a child process running the real
-//! executable, bounded native polling, and the production objects needed by
-//! the in-process scenarios. It has no substitute session or fake window API.
+//! executable, bounded native polling, and real foreground input observation.
+//! It has no substitute session, controller driver, or fake window API.
 
 pub mod fixture;
-pub mod live;
 pub mod process;
 pub mod screen;
 
-pub use fixture::{FixtureOptions, FixtureWindow};
-pub use live::{LiveSession, LiveTile};
-pub use process::{RunningFrigoTab, TrayMenuItem, WM_BEGIN_SESSION};
+pub use fixture::{FixtureOptions, FixtureWindow, KeyboardMessage};
+pub use process::{RunningFrigoTab, TestKeyInput, TrayMenuItem};
 pub use screen::{
     CursorPosition, ScreenCapture, capture_screen, capture_screen_image, enumerate_windows,
     find_pixel, find_screen_pixel, find_window_by_pid_and_bounds, foreground_window,
@@ -21,6 +19,8 @@ pub use screen::{
     visible_owned_layered_windows, visible_owned_overlays, window_bounds, window_ex_style,
     window_owner, window_style, window_title, windows_for_pid,
 };
+
+use fixture::fixture_window::FixtureWindowState;
 
 use std::ffi::OsStr;
 use std::iter::once;
@@ -41,9 +41,10 @@ use windows_sys::Win32::UI::HiDpi::{
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, DefWindowProcW, DispatchMessageW, GWLP_USERDATA,
-    GetClientRect, GetWindowLongPtrW, IDC_ARROW, IDI_APPLICATION, LoadCursorW, LoadIconW, MSG,
-    PM_REMOVE, PeekMessageW, RegisterClassExW, SetWindowLongPtrW, TranslateMessage, WM_ERASEBKGND,
-    WM_NCCREATE, WM_NCDESTROY, WM_PAINT, WNDCLASSEXW,
+    GetClientRect, GetForegroundWindow, GetWindowLongPtrW, IDC_ARROW, IDI_APPLICATION, LoadCursorW,
+    LoadIconW, MSG, PM_REMOVE, PeekMessageW, RegisterClassExW, SetWindowLongPtrW, TranslateMessage,
+    WM_ERASEBKGND, WM_KEYDOWN, WM_KEYUP, WM_NCCREATE, WM_NCDESTROY, WM_PAINT, WM_SYSKEYDOWN,
+    WM_SYSKEYUP, WNDCLASSEXW,
 };
 
 pub type Color = u32;
@@ -148,7 +149,14 @@ unsafe extern "system" fn fixture_window_proc(
             let hdc = unsafe { BeginPaint(hwnd, &mut paint) };
             let mut client = RECT::default();
             unsafe { GetClientRect(hwnd, &mut client) };
-            let brush = unsafe { CreateSolidBrush(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as u32) };
+            let state =
+                unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const FixtureWindowState };
+            let color = if state.is_null() {
+                0
+            } else {
+                unsafe { (*state).color }
+            };
+            let brush = unsafe { CreateSolidBrush(color) };
             if !brush.is_null() {
                 unsafe {
                     FillRect(hdc, &client, brush);
@@ -157,6 +165,21 @@ unsafe extern "system" fn fixture_window_proc(
             }
             unsafe { EndPaint(hwnd, &paint) };
             0
+        }
+        WM_KEYDOWN | WM_KEYUP | WM_SYSKEYDOWN | WM_SYSKEYUP => {
+            let state =
+                unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const FixtureWindowState };
+            if !state.is_null() {
+                unsafe {
+                    (*state).record_keyboard_message(
+                        message,
+                        wparam,
+                        lparam,
+                        GetForegroundWindow() as usize,
+                    )
+                };
+            }
+            unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
         }
         WM_ERASEBKGND => 1,
         WM_NCDESTROY => unsafe {

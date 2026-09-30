@@ -20,7 +20,10 @@ pub mod switcher_key;
 pub use alt_tab_recovery_plan::AltTabRecoveryPlan;
 pub use deferred_keyboard_dispatcher::{DeferredKeyboardDispatcher, PostedCallback};
 pub use key_handling::KeyHandling;
-pub use key_hook::{KeyHook, KeyHookError, WM_KEY_HOOK_INPUT};
+pub use key_hook::{
+    ACCEPT_MARKED_TEST_INPUT_ARGUMENT, KeyHook, KeyHookError, MARKED_TEST_INPUT_EXTRA_INFO,
+    WM_KEY_HOOK_INPUT,
+};
 pub use key_transition::KeyTransition;
 pub use keyboard_input::KeyboardInput;
 pub use keyboard_modifier_key::KeyboardModifierKey;

@@ -7,7 +7,7 @@ mod composition;
 
 use composition::OwnerContext;
 use frigotab::geometry::{ScreenPoint, virtual_screen_bounds};
-use frigotab::input::{KeyHook, WM_KEY_HOOK_INPUT};
+use frigotab::input::{ACCEPT_MARKED_TEST_INPUT_ARGUMENT, KeyHook, WM_KEY_HOOK_INPUT};
 use frigotab::switcher::{
     CLOSE_REFRESH_TIMER_ID, SessionWindow, SwitcherState, WM_DESKTOP_SNAPSHOT_READY,
 };
@@ -32,7 +32,6 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 const OWNER_CLASS: &str = "FrigoTab.SessionOwner";
 const OWNER_TITLE: &str = "FrigoTab";
-const WM_BEGIN_SESSION: u32 = 0x4001;
 const WM_MOUSELEAVE: u32 = 0x02A3;
 #[cfg(debug_assertions)]
 const DEBUG_TIMER_ID: usize = 1;
@@ -109,7 +108,13 @@ fn main() {
         }
     };
     app.borrow_mut().tray = Some(tray);
-    let hook = match KeyHook::start(owner) {
+    let accept_marked_test_input = std::env::args_os()
+        .any(|argument| argument == std::ffi::OsStr::new(ACCEPT_MARKED_TEST_INPUT_ARGUMENT));
+    let hook = match if accept_marked_test_input {
+        KeyHook::start_accepting_marked_test_input(owner)
+    } else {
+        KeyHook::start(owner)
+    } {
         Ok(hook) => hook,
         Err(error) => {
             show_error(&format!(
@@ -345,7 +350,7 @@ unsafe extern "system" fn owner_window_proc(
                     .as_ref()
                     .is_some_and(SessionWindow::activating_selection);
                 if app.controller.state() == SwitcherState::Visible && !activating {
-                    app.interrupt();
+                    app.deactivate_session();
                 }
             }
             0
@@ -368,12 +373,6 @@ unsafe extern "system" fn owner_window_proc(
             }
             1
         }
-        WM_BEGIN_SESSION => {
-            if let Ok(mut app) = app.try_borrow_mut() {
-                app.begin_session();
-            }
-            0
-        }
         WM_DESKTOP_SNAPSHOT_READY => {
             if let Ok(mut app) = app.try_borrow_mut() {
                 app.publish_snapshot();
@@ -381,9 +380,7 @@ unsafe extern "system" fn owner_window_proc(
             0
         }
         WM_KEY_HOOK_INPUT => {
-            if let Ok(mut app) = app.try_borrow_mut() {
-                app.dispatch_hook_message(wparam);
-            }
+            dispatch_hook_inputs(context, wparam);
             0
         }
         WM_TIMER if wparam == CLOSE_REFRESH_TIMER_ID => {
@@ -446,6 +443,23 @@ unsafe extern "system" fn owner_window_proc(
             unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
         }
         _ => unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
+    }
+}
+
+/// Preserve hook callback slots across synchronous Win32 re-entrancy. The
+/// outer dispatch drains anything that arrived while it held App's RefMut, so
+/// a rapid key-up cannot strand a slot and eventually fill the bounded queue.
+fn dispatch_hook_inputs(context: &OwnerContext, wparam: WPARAM) {
+    context.pending_hook_inputs.borrow_mut().push_back(wparam);
+    loop {
+        let Some(slot) = context.pending_hook_inputs.borrow_mut().pop_front() else {
+            return;
+        };
+        let Ok(mut app) = context.app.try_borrow_mut() else {
+            context.pending_hook_inputs.borrow_mut().push_front(slot);
+            return;
+        };
+        app.dispatch_hook_message(slot);
     }
 }
 

@@ -1,4 +1,7 @@
 use std::cell::RefCell;
+use std::collections::VecDeque;
+
+use windows_sys::Win32::Foundation::WPARAM;
 
 use frigotab::switcher::SessionPainter;
 
@@ -10,6 +13,7 @@ use super::App;
 pub(crate) struct OwnerContext {
     pub(crate) app: RefCell<App>,
     pub(crate) painter: Option<SessionPainter>,
+    pub(crate) pending_hook_inputs: RefCell<VecDeque<WPARAM>>,
 }
 
 impl OwnerContext {
@@ -17,6 +21,7 @@ impl OwnerContext {
         Self {
             app: RefCell::new(App::new()),
             painter: None,
+            pending_hook_inputs: RefCell::new(VecDeque::new()),
         }
     }
 }

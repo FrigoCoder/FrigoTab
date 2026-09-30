@@ -1,5 +1,5 @@
 use frigotab::geometry::ScreenPoint;
-use frigotab::input::{KeyHandling, KeyHook, KeyTransition, KeyboardInput, SwitcherKey};
+use frigotab::input::{KeyHandling, KeyHook, KeyboardInput};
 use frigotab::switcher::{SessionWindow, SwitcherApplication, SwitcherState};
 use frigotab::tray::SysTrayIcon;
 use windows_sys::Win32::Foundation::WPARAM;
@@ -58,11 +58,6 @@ impl App {
         }
     }
 
-    pub(crate) fn begin_session(&mut self) {
-        let input = KeyboardInput::new(SwitcherKey::Tab, KeyTransition::Down, true, false, false);
-        let _ = self.handle_keyboard(input);
-    }
-
     pub(crate) fn dispatch_hook_message(&mut self, wparam: WPARAM) {
         let Some(hook) = self.hook.as_ref() else {
             return;
@@ -92,6 +87,16 @@ impl App {
         }
         if let Some(hook) = self.hook.as_ref() {
             hook.reset_input_state();
+        }
+        self.sync_session_visibility();
+    }
+
+    /// Close after ordinary foreground loss without erasing the hook's
+    /// consumed-key ledger. A matching key-up can arrive after Windows sends
+    /// WM_ACTIVATEAPP(FALSE), especially during a fast Alt+Tab gesture.
+    pub(crate) fn deactivate_session(&mut self) {
+        if let Some(session) = self.session.as_mut() {
+            self.controller.close(session);
         }
         self.sync_session_visibility();
     }
