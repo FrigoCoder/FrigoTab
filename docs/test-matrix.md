@@ -4,7 +4,7 @@ The matrix separates deterministic acceptance tests from native-desktop checks t
 
 ## Automated suite
 
-The suite is made up of plain Rust integration tests. All 65 tests execute against real application objects, native Windows resources, or the launched executable. Session behavior is always observed through an external `FrigoTab.exe` process, its real `WH_KEYBOARD_LL` hook, real session/preview HWNDs, exact fixture message logs, and screen pixels. The low-level non-keyboard families use real Win32, DWM, GDI, shell, and tray objects. There is no BDD/Gherkin layer, feature file, `LiveSession`, controller-fed acceptance harness, `WM_BEGIN_SESSION` path, fake session, or intentionally-red lane. Marked input exercises the production hook ledger but does not impersonate physical delivery to the previous foreground HWND; that boundary remains in the manual matrix. Every process scenario waits for the owner-window ready barrier before input and clears fixture logs after startup foreground changes.
+The suite is made up of plain Rust integration tests. All 64 default tests execute against real application objects, native Windows resources, or the launched executable. Session behavior is always observed through an external `FrigoTab.exe` process, its real `WH_KEYBOARD_LL` hook, real session/preview HWNDs, exact fixture message logs, and screen pixels. The low-level non-keyboard families use real Win32, DWM, GDI, shell, and tray objects. There is no BDD/Gherkin layer, feature file, `LiveSession`, controller-fed acceptance harness, `WM_BEGIN_SESSION` path, fake session, or intentionally-red lane. Marked input exercises the production hook ledger but does not impersonate physical delivery to the previous foreground HWND; that boundary remains in the manual matrix. Every process scenario waits for the owner-window ready barrier before input and clears fixture logs after startup foreground changes. A 65th cursor-confinement scenario is compiled but explicitly ignored because it mutates a resource shared with the interactive desktop.
 
 | Timestamped family | Count | Evidence boundary | Coverage |
 | --- | ---: | --- | --- |
@@ -23,8 +23,8 @@ The suite is made up of plain Rust integration tests. All 65 tests execute again
 | `t20260930t212634z_013_native_keyboard_behavior_acceptance_tests` | 8 | Launched `FrigoTab.exe`, explicit marked `SendInput`, real `WH_KEYBOARD_LL`, fixture HWNDs, and exact `KeyboardMessage` logs | Bare-Alt and Alt+ordinary-key replay; Alt+Shift replay; Alt-first and Shift-first reverse suppression; native Ctrl+Alt; visible-session key quarantine; later native delivery; and wrong-marker rejection. Plain Right-Alt+Tab is intentionally manual because `SendInput` with `VK_RMENU` synthesizes Ctrl on layouts such as Hungarian. |
 | `t20260930t232302z_014_window_group_acceptance_tests` | 2 | Real owner-linked Win32 top-level windows and production `WindowFinder` | An active detached tool window leaves its application root selectable and remains excluded itself; an ordinary active owned dialog remains the application-group representative. |
 | `t20260930t232503z_015_external_window_lifecycle_acceptance_tests` | 1 | Launched `FrigoTab.exe`, real source HWNDs, DWM previews, hook input, foreground state, and screen pixels | A source destroyed independently of FrigoTab is removed from the visible sticky session; the preview graph is rebuilt and reflowed while surviving applications and foreground ownership remain intact. |
-| `t20261001t075200z_016_fullscreen_application_acceptance_tests` | 3 | Launched executable, real hook, real Win32 messages, cursor clip, source HWNDs, and layered fallback | A burst of display/compositor notifications is debounced into an in-place relayout without closing Sticky; an active system cursor clip is released repeatedly while the session remains visible; a no-redirection-style source keeps a usable icon/title tile and closes through native `SC_CLOSE` without leaving a stale tile. |
-| **Total** | **65** |  | **All automated tests pass before a publish is accepted.** |
+| `t20261001t075200z_016_fullscreen_application_acceptance_tests` | 2 + 1 attended | Launched executable, real hook, real Win32 messages, source HWNDs, and layered fallback; the ignored attended scenario additionally uses the shared cursor clip | The default tests cover debounced in-place relayout and no-redirection fallback/native close. The explicitly ignored attended scenario verifies that an active cursor clip is released while the session remains visible. |
+| **Automated total** | **64** |  | **All non-disruptive automated tests pass before a publish is accepted.** |
 
 The file prefixes are UTC timestamps recording when a family was introduced. Keep the prefix when refactoring a family; test functions remain descriptive plain Rust names. The process tests accept `FRIGOTAB_EXE` when a different built executable is being compared with the current Rust build. `RunningFrigoTab` starts the production executable and waits for its owner HWND to answer the ready barrier; `FixtureWindow` records the exact message, virtual-key, repeat, scan-code, extended, Alt-context, previous-state, and transition fields needed by the keyboard assertions.
 
@@ -41,7 +41,7 @@ Family 013 and the marked portions of families 009–012 use real `SendInput` ev
 
 ## Manual Windows release matrix
 
-Run these checks on each supported Windows configuration. Record the OS build, x64 architecture, DPI scale, monitor arrangement, DWM status, target elevation, and artifact used. Normal production launches ignore injected and lower-integrity injected keyboard events; the explicit `--accept-marked-test-input` mode accepts only the acceptance marker and is not a substitute for physical previous-foreground HWND delivery checks. Keep the physical/special matrix even when all 65 automated tests are green.
+Run these checks on each supported Windows configuration. Record the OS build, x64 architecture, DPI scale, monitor arrangement, DWM status, target elevation, and artifact used. Normal production launches ignore injected and lower-integrity injected keyboard events; the explicit `--accept-marked-test-input` mode accepts only the acceptance marker and is not a substitute for physical previous-foreground HWND delivery checks. Keep the physical/special matrix even when all 64 automated tests are green.
 
 The Debug executable retains the historical ten-second `StartQuitTimer` safety timer. Use a Release artifact for sustained testing:
 
@@ -85,4 +85,10 @@ Both artifacts are native x64 executables and do not require a managed runtime.
 .\build.ps1 -Task Clean
 ```
 
-`Verify` and `Test` run all 65 acceptance tests serially. `Publish` repeats the Release build and green test gate before producing `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point. No CI/CD service is required by this local workflow.
+`Verify` and `Test` run all 64 non-disruptive acceptance tests serially and compile but skip the attended cursor-confinement scenario. `Publish` repeats the Release build and green test gate before producing `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point. No CI/CD service is required by this local workflow.
+
+The cursor-confinement scenario is deliberately absent from those commands because it briefly restricts the real interactive-desktop pointer. Run it only as an attended manual check, with no fullscreen application active. Normal completion and panic unwinding call `ClipCursor(NULL)`; forcibly terminating the test process can bypass all in-process cleanup and must be avoided:
+
+```powershell
+cargo test -p frigotab-acceptance --release --test t20261001t075200z_016_fullscreen_application_acceptance_tests the_visible_switcher_releases_a_reapplied_system_cursor_clip -- --exact --ignored --test-threads=1
+```

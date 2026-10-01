@@ -165,9 +165,10 @@ impl SessionWindow {
         self.applications.as_ref()
     }
 
-    /// True only while foreground activation is being handed to the selected
-    /// application.  WM_ACTIVATEAPP(FALSE) during this small window is the
-    /// expected handoff and must not interrupt the session.
+    /// True while foreground activation is being handed to the selected
+    /// application and until the session cleanup which follows a successful
+    /// handoff. WM_ACTIVATEAPP(FALSE) during this small window is expected and
+    /// must not interrupt the session.
     pub fn activating_selection(&self) -> bool {
         self.activating_selection
     }
@@ -346,6 +347,12 @@ impl SessionWindow {
     }
 
     fn close_session_resources(&mut self) {
+        // Clear confinement left by the application we are leaving when the
+        // session is cancelled/interrupted. A successful selection releases
+        // the old clip before activation and then preserves any new clip the
+        // selected application establishes for itself.
+        let selected_application_was_activated = self.activating_selection;
+        self.activating_selection = false;
         self.stop_display_relayout();
         self.stop_application_refresh();
         let mut applications = self.applications.take();
@@ -357,6 +364,9 @@ impl SessionWindow {
         }
         if let Some(current) = applications.as_mut() {
             current.dispose();
+        }
+        if applications.is_some() && !selected_application_was_activated {
+            release_cursor_clip();
         }
         if applications.is_some() && !self.disposed {
             self.queue_desktop_snapshot_refresh_current();
@@ -836,9 +846,15 @@ impl SwitcherSessionPort for SessionWindow {
         let Some(applications) = self.applications.as_ref() else {
             return Ok(false);
         };
+        // Release the previous foreground application's confinement before
+        // activating the selected target. Cleanup must not subsequently clear
+        // a new clip legitimately established by that target.
+        release_cursor_clip();
         self.activating_selection = true;
         let result = applications.try_activate_selected();
-        self.activating_selection = false;
+        if !result {
+            self.activating_selection = false;
+        }
         Ok(result)
     }
 

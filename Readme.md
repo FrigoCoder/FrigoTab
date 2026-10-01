@@ -14,7 +14,7 @@ The behavior inventory, test boundary, and native validation checklist are docum
 - [Acceptance test matrix](docs/test-matrix.md)
 - [Architecture and test boundaries](docs/architecture.md)
 
-There are 65 automated acceptance tests in sixteen timestamped test families:
+There are 64 automated acceptance tests in sixteen timestamped test families, plus one explicitly ignored attended check that exercises Windows' shared cursor confinement:
 
 - 15 tests launch the executable, drive real HWNDs through its real hook, and observe session windows, navigation, activation, cleanup, and key-up behavior.
 - 7 tests exercise real Win32, DWM, GDI, shell, layout, and native-resource objects without a controller-fed test double.
@@ -31,7 +31,7 @@ There are 65 automated acceptance tests in sixteen timestamped test families:
 - 8 native keyboard-behavior tests verify ordered balanced replay, Alt-first and Shift-first reverse suppression, native Ctrl+Alt, quarantine, and marker filtering through the launched executable, real `WH_KEYBOARD_LL` hook, and exact fixture message logs. Plain Right-Alt+Tab remains manual because `SendInput` on layouts such as Hungarian synthesizes Ctrl with `VK_RMENU` and therefore cannot prove the physical AltGr distinction.
 - 2 real-window tests verify that an active owned tool window cannot hide its application root, while an ordinary owned dialog remains the group representative.
 - 1 launched-executable test verifies that an application which closes independently is removed from the live sticky session without disturbing surviving previews.
-- 3 launched-executable tests cover fullscreen-application boundaries: debounced in-place display relayout, periodic clearing of an active system cursor clip, and a usable icon/title tile plus native close handling for a no-redirection-style source.
+- 2 automated launched-executable tests cover fullscreen-application boundaries: debounced in-place display relayout and a usable icon/title tile plus native close handling for a no-redirection-style source. A third, attended-only test verifies clearing an active system cursor clip; the default suite never confines the user's real pointer.
 
 These are plain Rust acceptance tests. They do not use Cucumber/Gherkin, `LiveSession`, a controller-fed acceptance harness, or `WM_BEGIN_SESSION`; session behavior is observed only through the launched executable. The families are the sixteen timestamped Rust integration-test files:
 
@@ -65,7 +65,7 @@ The timestamp and family suffix are stable identifiers. Keep them when refactori
 .\build.ps1 -Task Clean
 ```
 
-`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 65 acceptance tests serially. `Test` builds and runs the acceptance tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
+`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 64 non-disruptive acceptance tests serially. `Test` builds and runs the same tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. The attended cursor-confinement test is compiled but ignored by these commands. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
 
 The direct Cargo equivalents are:
 
@@ -82,7 +82,7 @@ Close buttons are selected from the tray icon's `Close buttons` submenu and are 
 
 The default Full desktop backdrop is a retained snapshot of the Windows shell desktop, including wallpaper and desktop icons. FrigoTab asks Explorer's desktop host (`Progman`, or the matching `WorkerW`) to render into an off-screen native bitmap. The retained frame's geometry is stable: a transient fullscreen display-mode size is not allowed to replace a matching normal-desktop frame. A burst of display/DPI/composition notifications while the session is visible is debounced and relaid out in place after the display settles, so the sticky overlay is not repeatedly torn down. The tray menu also offers Background image only (the desktop wallpaper/pattern without icons) and Black rectangle. None of these modes captures the screen or reconstructs a background by searching and composing it from application windows. DWM prepares the preview surfaces behind the hidden owner, then the selected backdrop is painted as the owner is shown; if shell rendering is unavailable, the overlay uses a black fallback and remains usable.
 
-While the session is visible, FrigoTab periodically releases any system cursor clip left behind by a fullscreen source, allowing the pointer to leave the former game bounds. If a source has no DWM redirection surface, its preview remains usable through the icon/title fallback and can still be closed with the native system close command. True exclusive display-mode/game transitions remain part of the manual Windows release matrix; the automated fullscreen family exercises the surrounding real Win32 boundaries without changing the machine's display mode.
+While the session is visible, FrigoTab periodically releases any system cursor clip left behind by a fullscreen source, allowing the pointer to leave the former game bounds. Because cursor confinement is shared by the interactive Windows desktop, the default automated suite never creates a real clip; that destructive boundary is an explicitly ignored attended check. If a source has no DWM redirection surface, its preview remains usable through the icon/title fallback and can still be closed with the native system close command. True exclusive display-mode/game transitions remain part of the manual Windows release matrix; the automated fullscreen family exercises the surrounding real Win32 boundaries without changing the machine's display mode.
 
 ## Runtime and distribution
 
@@ -101,4 +101,4 @@ Normal production launches intentionally ignore injected and lower-integrity inj
 
 Marked `SendInput` differs from hardware in timing and typematic/autorepeat, scheduler batching, virtual-key/scan-code/extended-flag details, keyboard layout and AltGr behavior, and interaction with modifiers already held on the physical keyboard. The hook's bounded, panic-safe modifier and consumed-key ledgers, the executable readiness barrier, explicit fixture foregrounding, and per-scenario log clearing reduce those effects but do not remove them. UIPI/elevation boundaries, lower-integrity injection, secure desktop/lock screens, RDP, true exclusive fullscreen/display-mode transitions, raw-HID consumers, Explorer/DWM state, hook timeout/removal, and heavy system load remain manual or special-environment checks.
 
-`PostMessage`/`SendMessage` and UI Automation are useful for deterministic window or menu setup, but bypass global input routing and `WH_KEYBOARD_LL`, so they are less realistic keyboard alternatives. A virtual HID/VHF device or signed kernel driver is closer to hardware but requires administrator access, driver signing and installation, WDK/kernel code, and Windows-version policy maintenance. A physical USB HID device or keyboard robot is the highest-fidelity option, at the cost of hardware, lab setup, and manual/non-hermetic execution. Keep the physical/special-environment matrix as a release requirement alongside the 65 local acceptance tests.
+`PostMessage`/`SendMessage` and UI Automation are useful for deterministic window or menu setup, but bypass global input routing and `WH_KEYBOARD_LL`, so they are less realistic keyboard alternatives. A virtual HID/VHF device or signed kernel driver is closer to hardware but requires administrator access, driver signing and installation, WDK/kernel code, and Windows-version policy maintenance. A physical USB HID device or keyboard robot is the highest-fidelity option, at the cost of hardware, lab setup, and manual/non-hermetic execution. Keep the physical/special-environment matrix as a release requirement alongside the 64 non-disruptive local acceptance tests.

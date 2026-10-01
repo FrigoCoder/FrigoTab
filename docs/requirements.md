@@ -4,7 +4,7 @@ This is the observable behavior inventory of the current native Rust application
 
 ## Test policy
 
-The automated gate contains 65 green plain Rust integration acceptance tests. They use real application objects and real Windows resources:
+The automated gate contains 64 green plain Rust integration acceptance tests. They use real application objects and real Windows resources:
 
 - 15 tests launch the executable and observe real switcher/session HWNDs, candidate windows, navigation, activation, cleanup, and keyboard balance through the production hook.
 - 7 tests exercise real window classification, stale HWND/layout handling, shell desktop capture, DWM visibility, and native resource lifetime.
@@ -21,7 +21,7 @@ The automated gate contains 65 green plain Rust integration acceptance tests. Th
 - 8 tests exercise ordered balanced replay, Alt-first and Shift-first reverse suppression, native Ctrl+Alt, visible-session quarantine, later native delivery, and marker filtering through the launched executable and exact fixture keyboard-message logs. Plain Right-Alt+Tab is deliberately not automated because `SendInput` with `VK_RMENU` synthesizes Ctrl on layouts such as Hungarian.
 - 2 tests exercise real owner-linked top-level windows and preserve the application root when a detached tool window becomes active without changing ordinary owned-dialog behavior.
 - 1 test closes a source independently of the launched executable and verifies that the live sticky session removes its tile, reflows, and retains surviving previews.
-- 3 tests exercise fullscreen-application boundaries through the launched executable: debounced in-place display relayout, periodic clearing of an active system cursor clip, and a usable icon/title tile plus native close handling for a no-redirection-style source.
+- 2 automated tests exercise fullscreen-application boundaries through the launched executable: debounced in-place display relayout and a usable icon/title tile plus native close handling for a no-redirection-style source. One additional ignored, attended-only test covers clearing a real system cursor clip because that resource is shared with the user's desktop.
 
 The sixteen timestamped integration-test files are:
 
@@ -78,7 +78,7 @@ Marked `SendInput` is a realistic hook-level test boundary but not physical keyb
 | DWM previews | Configure destination geometry and make each thumbnail ready while its owner remains hidden, surface native failures, and unregister deterministically. This must not defer per-thumbnail source preparation until after the owner is visible. If a source has no DWM redirection surface, retain the icon/title fallback so it remains usable and closable. | Real DWM and fullscreen-boundary/thumbnail-reveal acceptance tests; manual DWM-disabled/protected-surface check. |
 | Resource lifetime | Windows, thumbnails, icons, fonts, bitmaps, hook handles, tray resources, and mutexes are released on normal close, failed construction, and process exit. | Real cleanup/resource acceptance tests; manual repeated-session handle check. |
 | Activation handoff | Restore minimized targets and attempt foreground activation without `AttachThreadInput`. The intentional deactivation during handoff is not treated as an external interruption. The historical zero-key foreground nudge is tagged and consumed by FrigoTab's own hook before it can become an application keyboard message. | Real activation and marked-hook acceptance tests; manual focus/taskbar check. |
-| Display transition | Coalesce bursts of display/DPI/composition notifications, keep a visible Sticky session and its retained snapshot geometry, then rebuild the preview graph in place after the display settles. Retry a temporarily empty enumeration; deactivate only when the owner has genuinely lost foreground or relayout fails. While visible, periodically release a fullscreen source's system cursor clip. | Real fullscreen-boundary acceptance tests; true exclusive display-mode/game transition remains manual. |
+| Display transition | Coalesce bursts of display/DPI/composition notifications, keep a visible Sticky session and its retained snapshot geometry, then rebuild the preview graph in place after the display settles. Retry a temporarily empty enumeration; deactivate only when the owner has genuinely lost foreground or relayout fails. While visible, periodically release a fullscreen source's system cursor clip. | Real non-disruptive fullscreen-boundary acceptance tests; cursor confinement and true exclusive display-mode/game transitions remain attended manual checks. |
 | Interruption | Lock/unlock, tray exit, genuine desktop deactivation, and unrecoverable display/compositor failure reset or safely close the current session and input state. | Manual Windows matrix; selected real-session cleanup coverage. |
 
 ## Explicit caveats

@@ -2,10 +2,11 @@
 
 //! Black-box coverage for native behaviors exposed by fullscreen applications.
 //!
-//! The scenarios use the shipped executable, real Win32 source windows, the
-//! production hook, the system cursor clip, and the owner's actual Windows
-//! messages. They deliberately do not change the machine's display mode; a
-//! true exclusive-mode transition remains in the manual release matrix.
+//! The default scenarios use the shipped executable, real Win32 source
+//! windows, the production hook, and the owner's actual Windows messages.
+//! They deliberately do not change the machine's display mode or shared
+//! cursor confinement. The cursor-clip scenario is explicitly ignored and is
+//! available only as an attended manual check.
 
 use std::thread;
 use std::time::{Duration, Instant};
@@ -134,12 +135,16 @@ fn a_display_notification_burst_rebuilds_the_real_sticky_session_in_place() {
 }
 
 #[test]
+#[ignore = "changes the interactive desktop's shared cursor confinement; attended manual check only"]
 fn the_visible_switcher_releases_a_reapplied_system_cursor_clip() {
     let _serial = serial_guard();
     let _cursor = CursorPosition::capture().expect("the pointer position should be readable");
-    let _clip = CursorClip::capture();
     let fixtures = real_fixtures("FrigoTab fullscreen cursor clip");
     let source_clip = fixtures[1].bounds();
+    // This guard is established before the first mutating call. Normal test
+    // runs never execute this ignored scenario; an attended run always leaves
+    // the shared cursor free instead of restoring a possibly stale rectangle.
+    let _clip_release = CursorClipRelease;
     assert_ne!(unsafe { ClipCursor(&source_clip) }, 0);
     assert!(same_rect(source_clip, cursor_clip()));
 
@@ -164,7 +169,14 @@ fn the_visible_switcher_releases_a_reapplied_system_cursor_clip() {
     assert_ne!(unsafe { GetCursorPos(&mut actual) }, 0);
     assert_eq!((outside.x, outside.y), (actual.x, actual.y));
 
+    // A game can race the final visible timer and reapply confinement just as
+    // the user cancels. Session cleanup must release that last rectangle too.
+    assert_ne!(unsafe { ClipCursor(&source_clip) }, 0);
     close_session(&application);
+    assert!(
+        wait_until(TIMEOUT, || !same_rect(cursor_clip(), source_clip)),
+        "closing FrigoTab left the previous application's cursor clip active"
+    );
 }
 
 #[test]
@@ -361,18 +373,12 @@ const fn rect(left: i32, top: i32, right: i32, bottom: i32) -> RECT {
     }
 }
 
-struct CursorClip(RECT);
+struct CursorClipRelease;
 
-impl CursorClip {
-    fn capture() -> Self {
-        Self(cursor_clip())
-    }
-}
-
-impl Drop for CursorClip {
+impl Drop for CursorClipRelease {
     fn drop(&mut self) {
         unsafe {
-            ClipCursor(&self.0);
+            ClipCursor(std::ptr::null());
         }
     }
 }
