@@ -42,9 +42,9 @@ use windows_sys::Win32::UI::HiDpi::{
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, DefWindowProcW, DispatchMessageW, GWLP_USERDATA,
     GetClientRect, GetForegroundWindow, GetWindowLongPtrW, IDC_ARROW, IDI_APPLICATION, LoadCursorW,
-    LoadIconW, MSG, PM_REMOVE, PeekMessageW, RegisterClassExW, SetWindowLongPtrW, TranslateMessage,
-    WM_ERASEBKGND, WM_KEYDOWN, WM_KEYUP, WM_NCCREATE, WM_NCDESTROY, WM_PAINT, WM_SYSKEYDOWN,
-    WM_SYSKEYUP, WNDCLASSEXW,
+    LoadIconW, MSG, PM_REMOVE, PeekMessageW, RegisterClassExW, SC_CLOSE, SetWindowLongPtrW,
+    TranslateMessage, WM_ERASEBKGND, WM_KEYDOWN, WM_KEYUP, WM_NCCREATE, WM_NCDESTROY, WM_PAINT,
+    WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW,
 };
 
 pub type Color = u32;
@@ -178,6 +178,14 @@ unsafe extern "system" fn fixture_window_proc(
                         GetForegroundWindow() as usize,
                     )
                 };
+            }
+            unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
+        }
+        WM_SYSCOMMAND if wparam & 0xfff0 == SC_CLOSE as usize => {
+            let state =
+                unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const FixtureWindowState };
+            if !state.is_null() {
+                unsafe { (*state).record_system_close_request() };
             }
             unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
         }

@@ -9,7 +9,8 @@ use composition::OwnerContext;
 use frigotab::geometry::{ScreenPoint, virtual_screen_bounds};
 use frigotab::input::{ACCEPT_MARKED_TEST_INPUT_ARGUMENT, KeyHook, WM_KEY_HOOK_INPUT};
 use frigotab::switcher::{
-    APPLICATION_REFRESH_TIMER_ID, SessionWindow, SwitcherState, WM_DESKTOP_SNAPSHOT_READY,
+    APPLICATION_REFRESH_TIMER_ID, DISPLAY_RELAYOUT_TIMER_ID, SessionWindow, SwitcherState,
+    WM_DESKTOP_SNAPSHOT_READY,
 };
 use frigotab::system::{APPLICATION_MUTEX_NAME, SingleInstanceGuard};
 use frigotab::tray::{SysTrayIcon, TRAY_CALLBACK_MESSAGE, TrayAction};
@@ -22,12 +23,13 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    DispatchMessageW, GWLP_USERDATA, GetClientRect, GetWindowLongPtrW, IDC_ARROW, LoadCursorW,
-    MA_ACTIVATE, MB_ICONERROR, MB_OK, MSG, MessageBoxW, PostMessageW, PostQuitMessage,
-    RegisterClassExW, SetProcessDPIAware, SetWindowLongPtrW, TranslateMessage, WM_ACTIVATEAPP,
-    WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_DWMCOMPOSITIONCHANGED, WM_ENDSESSION,
-    WM_ERASEBKGND, WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCCREATE, WM_NCDESTROY,
-    WM_PAINT, WM_QUERYENDSESSION, WM_TIMER, WNDCLASSEXW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    DispatchMessageW, GWLP_USERDATA, GetClientRect, GetForegroundWindow, GetWindowLongPtrW,
+    IDC_ARROW, LoadCursorW, MA_ACTIVATE, MB_ICONERROR, MB_OK, MSG, MessageBoxW, PostMessageW,
+    PostQuitMessage, RegisterClassExW, SetProcessDPIAware, SetWindowLongPtrW, TranslateMessage,
+    WM_ACTIVATEAPP, WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE, WM_DPICHANGED,
+    WM_DWMCOMPOSITIONCHANGED, WM_ENDSESSION, WM_ERASEBKGND, WM_LBUTTONDOWN, WM_MOUSEACTIVATE,
+    WM_MOUSEMOVE, WM_NCCREATE, WM_NCDESTROY, WM_PAINT, WM_QUERYENDSESSION, WM_TIMER, WNDCLASSEXW,
+    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
 const OWNER_CLASS: &str = "FrigoTab.SessionOwner";
@@ -342,22 +344,41 @@ unsafe extern "system" fn owner_window_proc(
             0
         }
         WM_ACTIVATEAPP => {
-            if wparam == 0
-                && let Ok(mut app) = app.try_borrow_mut()
-            {
-                let activating = app
-                    .session
-                    .as_ref()
-                    .is_some_and(SessionWindow::activating_selection);
-                if app.controller.state() == SwitcherState::Visible && !activating {
-                    app.deactivate_session();
+            if wparam == 0 {
+                if let Ok(mut app) = app.try_borrow_mut() {
+                    let activating = app
+                        .session
+                        .as_ref()
+                        .is_some_and(SessionWindow::activating_selection);
+                    let display_transition = app
+                        .session
+                        .as_ref()
+                        .is_some_and(SessionWindow::display_relayout_pending);
+                    if app.controller.state() == SwitcherState::Visible
+                        && !activating
+                        && !display_transition
+                        && unsafe { GetForegroundWindow() } != hwnd
+                    {
+                        app.deactivate_session();
+                    }
+                } else {
+                    unsafe {
+                        PostMessageW(hwnd, message, wparam, lparam);
+                    }
                 }
             }
             0
         }
         WM_DISPLAYCHANGE | WM_DPICHANGED | WM_DWMCOMPOSITIONCHANGED => {
             if let Ok(mut app) = app.try_borrow_mut() {
-                app.relayout();
+                app.display_environment_changed();
+            } else {
+                unsafe {
+                    // WM_DPICHANGED carries a pointer valid only for the
+                    // original dispatch. This handler only needs the message
+                    // kind, so never repost that transient pointer.
+                    PostMessageW(hwnd, message, 0, 0);
+                }
             }
             0
         }
@@ -386,6 +407,30 @@ unsafe extern "system" fn owner_window_proc(
         WM_TIMER if wparam == APPLICATION_REFRESH_TIMER_ID => {
             if let Ok(mut app) = app.try_borrow_mut() {
                 app.refresh_closed_applications();
+            }
+            0
+        }
+        WM_TIMER if wparam == DISPLAY_RELAYOUT_TIMER_ID => {
+            if let Ok(mut app) = app.try_borrow_mut() {
+                let ready = app
+                    .session
+                    .as_mut()
+                    .is_some_and(SessionWindow::display_relayout_ready);
+                if !ready {
+                    return 0;
+                }
+                if app.controller.state() == SwitcherState::Visible {
+                    if unsafe { GetForegroundWindow() } != hwnd {
+                        let _ = WindowHandle::new(hwnd).set_foreground();
+                    }
+                    app.relayout();
+                } else if let Some(session) = app.session.as_mut() {
+                    session.refresh_snapshot_after_display_change();
+                }
+            } else {
+                unsafe {
+                    PostMessageW(hwnd, message, wparam, lparam);
+                }
             }
             0
         }

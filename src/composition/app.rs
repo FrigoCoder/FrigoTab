@@ -120,6 +120,22 @@ impl App {
         drop(self.tray.take());
     }
 
+    /// Coalesce a live fullscreen display transition without replacing the
+    /// retained normal-desktop snapshot with the game's temporary mode.
+    pub(crate) fn display_environment_changed(&mut self) {
+        let scheduled = self
+            .session
+            .as_mut()
+            .is_some_and(|session| session.schedule_display_relayout(true));
+        if !scheduled {
+            if self.controller.state() == SwitcherState::Visible {
+                self.relayout();
+            } else if let Some(session) = self.session.as_mut() {
+                session.queue_desktop_snapshot_refresh_current();
+            }
+        }
+    }
+
     pub(crate) fn relayout(&mut self) {
         let was_visible = self.controller.state() == SwitcherState::Visible;
         if let Some(session) = self.session.as_mut() {
@@ -130,7 +146,6 @@ impl App {
             {
                 hook.reset_input_state();
             }
-            session.queue_desktop_snapshot_refresh_current();
         }
         self.sync_session_visibility();
     }

@@ -45,6 +45,14 @@ impl SessionPainter {
         state.desktop_snapshot.is_some() && same_rect(state.desktop_snapshot_bounds, bounds)
     }
 
+    pub(super) fn snapshot_bounds(&self) -> Option<RECT> {
+        let state = self.0.borrow();
+        state
+            .desktop_snapshot
+            .as_ref()
+            .map(|_| state.desktop_snapshot_bounds)
+    }
+
     pub(super) fn set_owner_bounds(&self, bounds: RECT) {
         self.0.borrow_mut().owner_bounds = bounds;
     }

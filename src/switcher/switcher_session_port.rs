@@ -46,6 +46,7 @@ pub trait SwitcherSessionPort {
     /// after a partial or failed open.
     fn close(&mut self);
 
-    /// Recalculates the session for the current display topology and DPI.
-    fn relayout(&mut self) -> Result<(), ()>;
+    /// Recalculates the session for the current display topology and DPI and
+    /// returns the number of candidates in the replacement preview graph.
+    fn relayout(&mut self) -> Result<usize, ()>;
 }

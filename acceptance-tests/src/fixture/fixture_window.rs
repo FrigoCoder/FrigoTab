@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::ptr::{null, null_mut};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::Graphics::Gdi::UpdateWindow;
@@ -21,6 +21,7 @@ pub(crate) struct FixtureWindowState {
     pub(crate) color: Color,
     keyboard_messages: Mutex<VecDeque<KeyboardMessage>>,
     keyboard_message_log_overflowed: AtomicBool,
+    system_close_requests: AtomicUsize,
 }
 
 /// A keyboard message delivered to a real fixture HWND.
@@ -51,6 +52,7 @@ impl FixtureWindowState {
             color,
             keyboard_messages: Mutex::new(VecDeque::with_capacity(MAX_KEYBOARD_MESSAGES)),
             keyboard_message_log_overflowed: AtomicBool::new(false),
+            system_close_requests: AtomicUsize::new(0),
         }
     }
 
@@ -111,6 +113,14 @@ impl FixtureWindowState {
 
     fn keyboard_message_log_overflowed(&self) -> bool {
         self.keyboard_message_log_overflowed.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn record_system_close_request(&self) {
+        self.system_close_requests.fetch_add(1, Ordering::AcqRel);
+    }
+
+    fn system_close_request_count(&self) -> usize {
+        self.system_close_requests.load(Ordering::Acquire)
     }
 }
 
@@ -228,6 +238,15 @@ impl FixtureWindow {
     pub fn keyboard_message_log_overflowed(&self) -> bool {
         pump_messages();
         self.state.keyboard_message_log_overflowed()
+    }
+
+    /// Counts title-bar/system-menu close commands delivered to this real
+    /// fixture HWND. This distinguishes native `SC_CLOSE` behavior from a
+    /// synthetic `WM_CLOSE` message while keeping normal DefWindowProc
+    /// destruction intact.
+    pub fn system_close_request_count(&self) -> usize {
+        pump_messages();
+        self.state.system_close_request_count()
     }
 
     pub fn set_title(&self, title: &str) -> bool {

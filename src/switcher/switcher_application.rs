@@ -172,13 +172,18 @@ impl SwitcherApplication {
     }
 
     /// Recalculates the visible session after a display/DPI topology change.
-    /// A failed relayout closes the session and clears its consumed ledger.
+    /// A failed or empty relayout closes the session and clears its consumed
+    /// ledger; a replacement preserves the nearest valid selection.
     pub fn relayout<P: SwitcherSessionPort>(&mut self, port: &mut P) {
         if self.state != SwitcherState::Visible {
             return;
         }
-        if port.relayout().is_err() {
-            self.interrupt(port);
+        match port.relayout() {
+            Ok(count) if count > 0 => {
+                self.candidate_count = count;
+                self.selected_index = self.selected_index.map(|index| index.min(count - 1));
+            }
+            Ok(_) | Err(()) => self.interrupt(port),
         }
     }
 

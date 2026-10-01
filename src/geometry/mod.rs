@@ -1,3 +1,4 @@
+pub mod display_mode;
 pub mod layout;
 pub mod rect;
 pub mod screen_point;
@@ -10,6 +11,7 @@ pub mod screen_rectangle;
 
 mod monitor_native_info;
 
+pub use display_mode::current_display_geometry_is_persisted;
 pub use grid_layout::GridLayout;
 pub use layout::Layout;
 pub use layout_input_error::LayoutInputError;

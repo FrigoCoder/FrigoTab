@@ -152,10 +152,20 @@ impl ApplicationWindows {
         if self.disposed {
             return Ok(());
         }
+        let mut first_error = None;
         for window in &self.windows {
-            window.set_thumbnail_visible(visible)?;
+            if let Err(error) = window.set_thumbnail_visible(visible) {
+                first_error.get_or_insert(error);
+                debug_log(&format!(
+                    "Could not update one DWM thumbnail's visibility: {error}"
+                ));
+            }
         }
-        Ok(())
+        if let Some(error) = first_error {
+            Err(error)
+        } else {
+            Ok(())
+        }
     }
 
     /// Update the per-tile close-button mode and redraw current overlays.

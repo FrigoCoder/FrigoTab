@@ -19,8 +19,8 @@ pub mod switcher_state;
 
 pub use close_button_mode::CloseButtonMode;
 pub use session_window::{
-    APPLICATION_REFRESH_TIMER_ID, BackgroundMode, SessionPainter, SessionWindow,
-    WM_DESKTOP_SNAPSHOT_READY,
+    APPLICATION_REFRESH_TIMER_ID, BackgroundMode, DISPLAY_RELAYOUT_TIMER_ID, SessionPainter,
+    SessionWindow, WM_DESKTOP_SNAPSHOT_READY,
 };
 pub use switcher_application::{AltTabBehavior, SwitcherApplication, SwitcherSessionPort};
 pub use switcher_state::SwitcherState;
