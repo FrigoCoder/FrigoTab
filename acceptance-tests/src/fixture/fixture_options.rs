@@ -11,10 +11,6 @@ pub struct FixtureOptions {
     pub owner: HWND,
     pub activate: bool,
     pub initially_visible: bool,
-    /// Model fullscreen renderers which discard their presentation surface
-    /// when another application takes the foreground. The real HWND remains
-    /// switchable, but becomes a black 1x1 window until it is reactivated.
-    pub collapse_on_deactivate: bool,
 }
 
 impl Default for FixtureOptions {
@@ -31,7 +27,6 @@ impl Default for FixtureOptions {
             owner: null_mut(),
             activate: false,
             initially_visible: true,
-            collapse_on_deactivate: false,
         }
     }
 }

@@ -204,16 +204,15 @@ fn first_visible_frame_uses_the_desktop_instead_of_the_covering_application() {
     unsafe {
         DwmFlush();
     }
-    let sentinel_visible = wait_until(Duration::from_secs(2), || {
-        pixel_at(sample.x, sample.y)
-            .map(|color| color_distance(color, MAGENTA) <= 55)
+    let sentinel_center = POINT {
+        x: (primary.left + primary.right) / 2,
+        y: (primary.top + primary.bottom) / 2,
+    };
+    assert!(wait_until(Duration::from_secs(2), || {
+        pixel_at(sentinel_center.x, sentinel_center.y)
+            .map(|color| color_distance(color, MAGENTA) <= 10)
             .unwrap_or(false)
-    });
-    assert!(
-        sentinel_visible,
-        "the fullscreen sentinel was not visible at the background sample: actual={:?}",
-        pixel_at(sample.x, sample.y)
-    );
+    }));
 
     let application = RunningFrigoTab::start_accepting_marked_test_input()
         .expect("FrigoTab did not start in marked-input acceptance mode");
@@ -236,32 +235,22 @@ fn first_visible_frame_uses_the_desktop_instead_of_the_covering_application() {
     pump_messages();
 
     open_with_marked_alt_tab(&application);
-    // A fullscreen source can make DWM color-blend the first composition even
-    // though FrigoTab has already painted its owner. Wait only for that short
-    // compositor transition, not for any asynchronous background replacement.
-    let mut first_frame = None;
+    unsafe {
+        DwmFlush();
+    }
+    let first_frame = pixel_at(sample.x, sample.y).expect("could not read first frame pixel");
     assert!(
-        wait_until(Duration::from_millis(750), || {
-            unsafe {
-                let _ = DwmFlush();
-            }
-            first_frame = pixel_at(sample.x, sample.y);
-            first_frame.is_some_and(|color| color_distance(desktop_pixel, color) <= 45)
-        }),
-        "the composed owner did not replace application pixels: desktop={desktop_pixel:#08x}, observed={first_frame:?}"
+        color_distance(desktop_pixel, first_frame) <= 45,
+        "the first frame copied application pixels: desktop={desktop_pixel:#08x}, first={first_frame:#08x}"
     );
-    let first_frame = first_frame.expect("the composed owner pixel disappeared after the wait");
     thread::sleep(Duration::from_millis(300));
     unsafe {
         DwmFlush();
     }
     let settled_frame = pixel_at(sample.x, sample.y).expect("could not read settled frame pixel");
-    // DWM may color-adjust the composed pixel slightly after a top-level
-    // transition. Both observations must remain close to the retained shell
-    // pixel; the magenta application sentinel is hundreds of units away.
     assert!(
-        color_distance(desktop_pixel, settled_frame) <= 60,
-        "the settled frame copied application pixels: desktop={desktop_pixel:#08x}, first={first_frame:#08x}, settled={settled_frame:#08x}"
+        color_distance(first_frame, settled_frame) <= 20,
+        "the background changed after opening: first={first_frame:#08x}, settled={settled_frame:#08x}"
     );
     drop(fixture);
 }
@@ -284,12 +273,6 @@ fn open_with_marked_alt_tab(application: &RunningFrigoTab) {
     assert!(
         opened,
         "the marked Alt+Tab chord did not open the real session"
-    );
-    assert!(
-        wait_until(Duration::from_secs(5), || {
-            frigotab_acceptance::foreground_window() == application.owner()
-        }),
-        "the visible session did not finish its foreground handoff"
     );
 }
 
@@ -446,29 +429,23 @@ fn capture_shell_desktop(bounds: RECT) -> Option<ShellImage> {
 }
 
 fn desktop_sample(image: &ShellImage, monitor: RECT, desktop: RECT) -> Option<(POINT, u32)> {
-    // Preview tiles start at a 0.5% layout margin. Sample halfway through that
-    // margin and away from DWM's animated/rounded outer corners so the pixel
-    // belongs to the owner background on current and older Windows versions.
-    let inset_x = ((monitor.right - monitor.left) / 400).max(2);
-    let inset_y = ((monitor.bottom - monitor.top) / 400).max(2);
-    let center_x = monitor.left + (monitor.right - monitor.left) / 2;
-    let center_y = monitor.top + (monitor.bottom - monitor.top) / 2;
+    const INSET: i32 = 2;
     let candidates = [
         POINT {
-            x: monitor.left + inset_x,
-            y: center_y,
+            x: monitor.left + INSET,
+            y: monitor.top + INSET,
         },
         POINT {
-            x: monitor.right - inset_x - 1,
-            y: center_y,
+            x: monitor.right - INSET - 1,
+            y: monitor.top + INSET,
         },
         POINT {
-            x: center_x,
-            y: monitor.top + inset_y,
+            x: monitor.left + INSET,
+            y: monitor.bottom - INSET - 1,
         },
         POINT {
-            x: center_x,
-            y: monitor.bottom - inset_y - 1,
+            x: monitor.right - INSET - 1,
+            y: monitor.bottom - INSET - 1,
         },
     ];
     candidates.into_iter().find_map(|point| {

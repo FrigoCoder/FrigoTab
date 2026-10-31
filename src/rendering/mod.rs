@@ -11,7 +11,6 @@ pub mod gdi_plus;
 pub mod graphics;
 pub mod layer_updater;
 pub mod thumbnail;
-pub mod window_snapshot;
 
 pub use error::{Error, Result};
 pub use font::Font;
@@ -19,7 +18,6 @@ pub use graphics::Graphics;
 pub use layer_updater::LayerUpdater;
 pub use startup::ensure_started;
 pub use thumbnail::DwmThumbnail;
-pub use window_snapshot::WindowSnapshot;
 
 mod font_family;
 mod graphics_dc;

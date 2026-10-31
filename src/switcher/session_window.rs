@@ -12,9 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
 use windows_sys::Win32::Foundation::{HWND, POINT, RECT};
-use windows_sys::Win32::Graphics::Dwm::{
-    DWMWA_TRANSITIONS_FORCEDISABLED, DwmFlush, DwmSetWindowAttribute,
-};
+use windows_sys::Win32::Graphics::Dwm::DwmFlush;
 use windows_sys::Win32::Graphics::Gdi::{
     GetMonitorInfoW, HDC, InvalidateRect, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow,
     UpdateWindow,
@@ -29,7 +27,6 @@ use crate::desktop::shell_desktop_snapshot::ShellDesktopSnapshot;
 use crate::geometry::display_mode::current_display_geometry_is_persisted;
 use crate::geometry::rect::virtual_screen_bounds;
 use crate::geometry::screen_point::ScreenPoint;
-use crate::rendering::WindowSnapshot;
 use crate::window::{ApplicationWindows, WindowFinder, WindowHandle};
 
 pub use super::background_mode::BackgroundMode;
@@ -55,7 +52,6 @@ pub struct SessionWindow {
     painter: SessionPainter,
     owner_bounds: RECT,
     applications: Option<ApplicationWindows>,
-    fullscreen_snapshot: Option<(HWND, WindowSnapshot)>,
     snapshot_completion: Arc<Mutex<Option<SnapshotCompletion>>>,
     snapshot_refresh_running: Arc<AtomicBool>,
     disposal_requested: Arc<AtomicBool>,
@@ -74,27 +70,15 @@ pub struct SessionWindow {
 
 impl SessionWindow {
     /// Create the hidden owner and capture the shell frame before the hook is
-    /// installed whenever Windows reports persisted display geometry. Shell
-    /// rendering does not copy the foreground fullscreen application, so a
-    /// monitor-covering window is not a reason to omit the desktop frame.
-    #[allow(clippy::not_unsafe_ptr_arg_deref)] // HWND is an opaque window identity.
+    /// installed when the foreground/display state is a normal desktop. The
+    /// caller creates/registers the HWND so its WndProc can be installed in
+    /// the same way as the original `FrigoForm`.
     pub fn new(hwnd: HWND) -> Self {
-        // FrigoTab paints the complete owner before showing it. Suppress the
-        // optional DWM show animation so it does not prolong blending with the
-        // fullscreen application beneath the prepared owner surface.
-        let transitions_disabled: i32 = 1;
-        unsafe {
-            let _ = DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_TRANSITIONS_FORCEDISABLED as u32,
-                (&transitions_disabled as *const i32).cast(),
-                std::mem::size_of_val(&transitions_disabled) as u32,
-            );
-        }
         let bounds = virtual_screen_bounds();
-        let snapshot = (current_display_geometry_is_persisted() != Some(false))
-            .then(|| ShellDesktopSnapshot::capture(bounds))
-            .filter(ShellDesktopSnapshot::is_available);
+        let snapshot = (current_display_geometry_is_persisted() != Some(false)
+            && !window_covers_monitor(unsafe { GetForegroundWindow() }))
+        .then(|| ShellDesktopSnapshot::capture(bounds))
+        .filter(ShellDesktopSnapshot::is_available);
         let snapshot_available = snapshot.is_some();
         let painter = SessionPainter::new(
             snapshot,
@@ -109,7 +93,6 @@ impl SessionWindow {
             painter,
             owner_bounds: RECT::default(),
             applications: None,
-            fullscreen_snapshot: None,
             snapshot_completion: Arc::new(Mutex::new(None)),
             snapshot_refresh_running: Arc::new(AtomicBool::new(false)),
             disposal_requested: Arc::new(AtomicBool::new(false)),
@@ -323,18 +306,11 @@ impl SessionWindow {
         }
 
         let owner = WindowHandle::new(self.hwnd);
-        let applications = ApplicationWindows::with_close_button_mode_and_snapshot_source(
-            owner,
-            &finder,
-            self.close_button_mode,
-            fullscreen_source.then_some(previous_foreground),
-        );
+        let applications =
+            ApplicationWindows::with_close_button_mode(owner, &finder, self.close_button_mode);
         if applications.is_empty() {
             return Ok(0);
         }
-        self.fullscreen_snapshot = applications
-            .snapshot_for(previous_foreground)
-            .map(|snapshot| (previous_foreground, snapshot));
 
         // Publish only after every candidate has been constructed. DWM has
         // prepared the thumbnails behind this still-hidden owner.
@@ -343,14 +319,10 @@ impl SessionWindow {
             self.close_session_resources();
             return Err(());
         }
-        // Seed the hidden owner's real window surface before exposing it.
-        // IsWindowVisible becomes observable to other processes as soon as
-        // ShowWindow runs, so painting afterwards permits one composed frame
-        // of the application that was underneath the owner.
-        self.paint_owner_synchronously();
         unsafe {
             ShowWindow(self.hwnd, SW_SHOW);
         }
+        self.paint_owner_synchronously();
         if let Some(applications) = self.applications.as_mut() {
             set_pointer_hover(applications);
             applications.set_visible(true);
@@ -393,7 +365,6 @@ impl SessionWindow {
         if let Some(current) = applications.as_mut() {
             current.dispose();
         }
-        self.fullscreen_snapshot = None;
         if applications.is_some() && !selected_application_was_activated {
             release_cursor_clip();
         }
@@ -629,12 +600,8 @@ impl SessionWindow {
         self.paint_owner_synchronously();
 
         let owner = WindowHandle::new(self.hwnd);
-        let mut replacement = ApplicationWindows::prepared_hidden_with_snapshot(
-            owner,
-            &finder,
-            self.close_button_mode,
-            self.fullscreen_snapshot.clone(),
-        );
+        let mut replacement =
+            ApplicationWindows::prepared_hidden(owner, &finder, self.close_button_mode);
         if replacement.is_empty() {
             let _ = self.set_owner_bounds(previous_bounds);
             self.paint_owner_synchronously();
@@ -728,12 +695,8 @@ impl SessionWindow {
         self.refresh_evidence_ticks = 0;
 
         let owner = WindowHandle::new(self.hwnd);
-        let mut replacement = ApplicationWindows::prepared_hidden_with_snapshot(
-            owner,
-            &finder,
-            self.close_button_mode,
-            self.fullscreen_snapshot.clone(),
-        );
+        let mut replacement =
+            ApplicationWindows::prepared_hidden(owner, &finder, self.close_button_mode);
         if replacement.is_empty() {
             return Err(());
         }

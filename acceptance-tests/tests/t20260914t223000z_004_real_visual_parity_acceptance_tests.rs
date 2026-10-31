@@ -26,9 +26,6 @@ const TILE_EXTENDED_STYLES: u32 =
 const VK_LEFT_ALT_KEY: u16 = 0xa4;
 const VK_TAB_KEY: u16 = 0x09;
 const VK_ESCAPE_KEY: u16 = 0x1b;
-// Fullscreen/HDR color-space transitions can tone-map saturated fixture
-// pixels while preserving their identity and geometry.
-const SOLID_COLOR_TOLERANCE: u32 = 80;
 
 #[test]
 fn every_real_preview_uses_the_original_owned_layered_window_topology() {
@@ -94,22 +91,22 @@ fn dwm_preview_fills_the_real_tile_and_selected_tile_keeps_the_blue_alpha_overla
     let red_sample = tile_sample(red_bounds);
     let green_sample = tile_sample(green_bounds);
     assert!(
-        near(RED, red_sample, SOLID_COLOR_TOLERANCE),
+        near(RED, red_sample, 55),
         "red DWM source did not fill its tile: {red_sample:#08x}"
     );
     assert!(
-        near(GREEN, green_sample, SOLID_COLOR_TOLERANCE),
+        near(GREEN, green_sample, 55),
         "green DWM source did not fill its tile: {green_sample:#08x}"
     );
     let edge_y = green_bounds.top + (green_bounds.bottom - green_bounds.top) * 3 / 4;
     let left_edge = screen_pixel(green_bounds.left + 1, edge_y).unwrap_or(u32::MAX);
     let right_edge = screen_pixel(green_bounds.right - 2, edge_y).unwrap_or(u32::MAX);
     assert!(
-        near(GREEN, left_edge, SOLID_COLOR_TOLERANCE),
+        near(GREEN, left_edge, 55),
         "the DWM image did not reach the tile's left edge: {left_edge:#08x}"
     );
     assert!(
-        near(GREEN, right_edge, SOLID_COLOR_TOLERANCE),
+        near(GREEN, right_edge, 55),
         "the DWM image did not reach the tile's right edge: {right_edge:#08x}"
     );
 
@@ -122,7 +119,7 @@ fn dwm_preview_fills_the_real_tile_and_selected_tile_keeps_the_blue_alpha_overla
         "the selected real tile lost the original half-transparent blue overlay"
     );
     assert!(
-        near(tile_sample(green_bounds), GREEN, SOLID_COLOR_TOLERANCE),
+        near(tile_sample(green_bounds), GREEN, 55),
         "an unselected real preview was unexpectedly tinted"
     );
 
@@ -299,7 +296,7 @@ fn wait_for_tile_color(session: &RunningFrigoTab, expected: u32) -> (HWND, RECT)
                 .visible_owned_layered_windows()
                 .into_iter()
                 .filter_map(|tile| window_bounds(tile).map(|bounds| (tile, bounds)))
-                .find(|(_, bounds)| near(tile_sample(*bounds), expected, SOLID_COLOR_TOLERANCE));
+                .find(|(_, bounds)| near(tile_sample(*bounds), expected, 55));
             found.is_some()
         }),
         "the real DWM preview did not expose the expected fixture color"

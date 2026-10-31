@@ -1,15 +1,14 @@
 use std::collections::VecDeque;
 use std::ptr::{null, null_mut};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use windows_sys::Win32::Foundation::{HWND, RECT};
-use windows_sys::Win32::Graphics::Dwm::DwmFlush;
-use windows_sys::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
+use windows_sys::Win32::Graphics::Gdi::UpdateWindow;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DestroyWindow, IsWindow, SW_HIDE, SW_MINIMIZE, SW_RESTORE, SW_SHOWNA,
-    SWP_NOACTIVATE, SWP_NOZORDER, SetForegroundWindow, SetWindowPos, SetWindowTextW, ShowWindow,
+    SWP_NOACTIVATE, SetForegroundWindow, SetWindowPos, SetWindowTextW, ShowWindow,
 };
 
 use super::fixture_options::FixtureOptions;
@@ -19,11 +18,7 @@ use crate::{
 };
 
 pub(crate) struct FixtureWindowState {
-    color: AtomicU32,
-    original_color: Color,
-    original_bounds: RECT,
-    collapse_on_deactivate: bool,
-    collapsed: AtomicBool,
+    pub(crate) color: Color,
     keyboard_messages: Mutex<VecDeque<KeyboardMessage>>,
     keyboard_message_log_overflowed: AtomicBool,
     system_close_requests: AtomicUsize,
@@ -52,70 +47,12 @@ pub struct KeyboardMessage {
 const MAX_KEYBOARD_MESSAGES: usize = 512;
 
 impl FixtureWindowState {
-    fn new(color: Color, bounds: RECT, collapse_on_deactivate: bool) -> Self {
+    fn new(color: Color) -> Self {
         Self {
-            color: AtomicU32::new(color),
-            original_color: color,
-            original_bounds: bounds,
-            collapse_on_deactivate,
-            collapsed: AtomicBool::new(false),
+            color,
             keyboard_messages: Mutex::new(VecDeque::with_capacity(MAX_KEYBOARD_MESSAGES)),
             keyboard_message_log_overflowed: AtomicBool::new(false),
             system_close_requests: AtomicUsize::new(0),
-        }
-    }
-
-    pub(crate) fn color(&self) -> Color {
-        self.color.load(Ordering::Acquire)
-    }
-
-    /// Reproduce the observable lifecycle of fullscreen render windows such as
-    /// League of Legends: loss of foreground keeps the HWND alive and
-    /// switchable while its presentation surface collapses to a black 1x1
-    /// window. Reactivation restores the original surface and geometry.
-    pub(crate) fn handle_activation(&self, hwnd: HWND, active: bool) {
-        if !self.collapse_on_deactivate {
-            return;
-        }
-
-        if active {
-            if !self.collapsed.swap(false, Ordering::AcqRel) {
-                return;
-            }
-            self.color.store(self.original_color, Ordering::Release);
-            unsafe {
-                SetWindowPos(
-                    hwnd,
-                    null_mut(),
-                    self.original_bounds.left,
-                    self.original_bounds.top,
-                    self.original_bounds.right - self.original_bounds.left,
-                    self.original_bounds.bottom - self.original_bounds.top,
-                    SWP_NOACTIVATE | SWP_NOZORDER,
-                );
-            }
-        } else {
-            if self.collapsed.swap(true, Ordering::AcqRel) {
-                return;
-            }
-            self.color.store(0, Ordering::Release);
-            unsafe {
-                // Commit a black full-sized frame before shrinking. This
-                // prevents DWM from satisfying the regression test with a
-                // cached copy of the fixture's previous green frame.
-                InvalidateRect(hwnd, null(), 0);
-                UpdateWindow(hwnd);
-                let _ = DwmFlush();
-                SetWindowPos(
-                    hwnd,
-                    null_mut(),
-                    self.original_bounds.left,
-                    self.original_bounds.top,
-                    1,
-                    1,
-                    SWP_NOACTIVATE | SWP_NOZORDER,
-                );
-            }
         }
     }
 
@@ -207,11 +144,7 @@ impl FixtureWindow {
     pub fn show_with_options(title: &str, color: Color, options: FixtureOptions) -> Self {
         register_fixture_class();
         let title = wide(title);
-        let state = Box::new(FixtureWindowState::new(
-            color,
-            options.bounds,
-            options.collapse_on_deactivate,
-        ));
+        let state = Box::new(FixtureWindowState::new(color));
         let state_pointer = state.as_ref() as *const FixtureWindowState as *mut _;
         let hwnd = unsafe {
             CreateWindowExW(
