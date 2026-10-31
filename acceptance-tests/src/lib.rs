@@ -43,8 +43,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, DefWindowProcW, DispatchMessageW, GWLP_USERDATA,
     GetClientRect, GetForegroundWindow, GetWindowLongPtrW, IDC_ARROW, IDI_APPLICATION, LoadCursorW,
     LoadIconW, MSG, PM_REMOVE, PeekMessageW, RegisterClassExW, SC_CLOSE, SetWindowLongPtrW,
-    TranslateMessage, WM_ERASEBKGND, WM_KEYDOWN, WM_KEYUP, WM_NCCREATE, WM_NCDESTROY, WM_PAINT,
-    WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW,
+    TranslateMessage, WM_ACTIVATEAPP, WM_ERASEBKGND, WM_KEYDOWN, WM_KEYUP, WM_NCCREATE,
+    WM_NCDESTROY, WM_PAINT, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDCLASSEXW,
 };
 
 pub type Color = u32;
@@ -154,7 +154,7 @@ unsafe extern "system" fn fixture_window_proc(
             let color = if state.is_null() {
                 0
             } else {
-                unsafe { (*state).color }
+                unsafe { (*state).color() }
             };
             let brush = unsafe { CreateSolidBrush(color) };
             if !brush.is_null() {
@@ -165,6 +165,14 @@ unsafe extern "system" fn fixture_window_proc(
             }
             unsafe { EndPaint(hwnd, &paint) };
             0
+        }
+        WM_ACTIVATEAPP => {
+            let state =
+                unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const FixtureWindowState };
+            if !state.is_null() {
+                unsafe { (*state).handle_activation(hwnd, wparam != 0) };
+            }
+            unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
         }
         WM_KEYDOWN | WM_KEYUP | WM_SYSKEYDOWN | WM_SYSKEYUP => {
             let state =

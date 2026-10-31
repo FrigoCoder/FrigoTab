@@ -12,7 +12,7 @@ use frigotab::switcher::{
     APPLICATION_REFRESH_TIMER_ID, DISPLAY_RELAYOUT_TIMER_ID, SessionWindow, SwitcherState,
     WM_DESKTOP_SNAPSHOT_READY,
 };
-use frigotab::system::{APPLICATION_MUTEX_NAME, SingleInstanceGuard};
+use frigotab::system::{APPLICATION_MUTEX_NAME, SingleInstanceGuard, WM_APPLICATION_READY};
 use frigotab::tray::{SysTrayIcon, TRAY_CALLBACK_MESSAGE, TrayAction};
 use frigotab::window::WindowHandle;
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
@@ -400,6 +400,10 @@ unsafe extern "system" fn owner_window_proc(
             }
             0
         }
+        WM_APPLICATION_READY => app
+            .try_borrow()
+            .is_ok_and(|app| app.session.is_some() && app.tray.is_some() && app.hook.is_some())
+            as isize,
         WM_KEY_HOOK_INPUT => {
             dispatch_hook_inputs(context, wparam);
             0

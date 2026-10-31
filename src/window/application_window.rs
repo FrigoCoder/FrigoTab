@@ -1,8 +1,9 @@
 //! One application preview and its title/number overlay.
 //!
-//! This follows the original `ApplicationWindow` contract: the DWM thumbnail
-//! is registered against the session owner, while this separate owned popup
-//! contains only the transparent/layered GDI+ overlay.
+//! This follows the original `ApplicationWindow` contract: a live DWM
+//! thumbnail is registered against the session owner, while a separate owned
+//! popup carries the title/number overlay. A foreground fullscreen source may
+//! instead use a captured frame in that popup when its DWM surface collapses.
 
 use std::{
     cell::{Cell, RefCell},
@@ -15,7 +16,7 @@ use windows_sys::Win32::Graphics::Gdi::ScreenToClient;
 use super::frigo_window::FrigoWindow;
 use super::window_handle::WindowHandle;
 use super::window_icon::WindowIcon;
-use crate::rendering::{DwmThumbnail, Font, LayerUpdater};
+use crate::rendering::{DwmThumbnail, Font, LayerUpdater, WindowSnapshot};
 use crate::switcher::CloseButtonMode;
 use windows_sys::Win32::Graphics::GdiPlus::{FontStyleBold, FontStyleRegular, PointF, RectF};
 
@@ -36,6 +37,7 @@ pub struct ApplicationWindow {
     window_icon: WindowIcon,
     layer_updater: Rc<RefCell<LayerUpdater>>,
     thumbnail: Option<DwmThumbnail>,
+    snapshot: Option<WindowSnapshot>,
     popup: FrigoWindow,
     application: HWND,
     index: usize,
@@ -72,6 +74,7 @@ impl ApplicationWindow {
             bounds,
             close_button_mode,
             true,
+            None,
         )
     }
 
@@ -82,22 +85,27 @@ impl ApplicationWindow {
         bounds: RECT,
         close_button_mode: CloseButtonMode,
         thumbnail_visible: bool,
+        snapshot: Option<WindowSnapshot>,
     ) -> Result<Self, String> {
-        let thumbnail = match DwmThumbnail::register(owner, application) {
-            Ok(thumbnail) => {
-                let destination = screen_to_client_rect(owner, bounds);
-                let configured = if thumbnail_visible {
-                    thumbnail.set_destination_rect(destination)
-                } else {
-                    thumbnail.set_hidden_destination_rect(destination)
-                };
-                if configured.is_ok() {
-                    Some(thumbnail)
-                } else {
-                    None
+        let thumbnail = if snapshot.is_some() {
+            None
+        } else {
+            match DwmThumbnail::register(owner, application) {
+                Ok(thumbnail) => {
+                    let destination = screen_to_client_rect(owner, bounds);
+                    let configured = if thumbnail_visible {
+                        thumbnail.set_destination_rect(destination)
+                    } else {
+                        thumbnail.set_hidden_destination_rect(destination)
+                    };
+                    if configured.is_ok() {
+                        Some(thumbnail)
+                    } else {
+                        None
+                    }
                 }
+                Err(_) => None,
             }
-            Err(_) => None,
         };
         let popup = FrigoWindow::new(owner, bounds)?;
         let layer_updater = Rc::new(RefCell::new(LayerUpdater::new(popup.hwnd(), bounds)?));
@@ -110,6 +118,7 @@ impl ApplicationWindow {
         let callback_hovered = Rc::clone(&hovered_state);
         let close_button_mode_state = Rc::new(Cell::new(close_button_mode));
         let callback_close_button_mode = Rc::clone(&close_button_mode_state);
+        let callback_snapshot = snapshot.clone();
         window_icon.on_changed(move || {
             let _ = icon_state.with_icon(|icon, icon_width, icon_height| {
                 let _ = render_overlay_with_icon(
@@ -122,6 +131,7 @@ impl ApplicationWindow {
                     callback_selected.get(),
                     callback_hovered.get(),
                     callback_close_button_mode.get(),
+                    callback_snapshot.as_ref(),
                 );
             });
         });
@@ -139,6 +149,7 @@ impl ApplicationWindow {
             window_icon,
             layer_updater,
             thumbnail,
+            snapshot,
         };
         result.render_overlay()?;
         Ok(result)
@@ -150,6 +161,10 @@ impl ApplicationWindow {
 
     pub fn application(&self) -> HWND {
         self.application
+    }
+
+    pub(crate) fn snapshot(&self) -> Option<WindowSnapshot> {
+        self.snapshot.clone()
     }
 
     pub fn bounds(&self) -> RECT {
@@ -256,6 +271,7 @@ impl ApplicationWindow {
                 selected,
                 self.hovered_state.get(),
                 self.close_button_mode_state.get(),
+                self.snapshot.as_ref(),
             )
         });
         icon_result.unwrap_or_else(|| Err("Window icon is unavailable".to_string()))
@@ -273,9 +289,13 @@ fn render_overlay_with_icon(
     selected: bool,
     hovered: bool,
     close_button_mode: CloseButtonMode,
+    snapshot: Option<&WindowSnapshot>,
 ) -> Result<(), String> {
     let title = WindowHandle::new(application).get_window_text();
     layer.update(|graphics| {
+        if let Some(snapshot) = snapshot {
+            snapshot.draw(graphics)?;
+        }
         graphics.set_overlay_quality()?;
         if selected {
             graphics.fill_rect(

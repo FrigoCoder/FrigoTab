@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use super::test_key_input::TestKeyInput;
 use frigotab::input::{ACCEPT_MARKED_TEST_INPUT_ARGUMENT, MARKED_TEST_INPUT_EXTRA_INFO};
 use frigotab::sys_tray_icon::TRAY_CALLBACK_MESSAGE;
+use frigotab::system::WM_APPLICATION_READY;
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
@@ -19,7 +20,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetClassNameW, GetMenuItemCount, GetMenuItemInfoW, GetMenuItemRect, GetSubMenu, HMENU,
     IsWindow, MENUITEMINFOW, MFS_CHECKED, MIIM_FTYPE, MIIM_STATE, MIIM_STRING, MIIM_SUBMENU,
     MN_GETHMENU, PostMessageW, SMTO_ABORTIFHUNG, SMTO_ERRORONEXIT, SendMessageTimeoutW,
-    SendMessageW, SetCursorPos, WM_CLOSE, WM_KEYDOWN, WM_KEYUP, WM_NULL, WM_RBUTTONUP,
+    SendMessageW, SetCursorPos, WM_CLOSE, WM_KEYDOWN, WM_KEYUP, WM_RBUTTONUP,
 };
 
 use super::tray_menu_item::TrayMenuItem;
@@ -58,10 +59,9 @@ impl RunningFrigoTab {
         loop {
             pump_messages();
             if let Some(owner) = find_owner(pid) {
-                // The owner is created before the hook and tray are fully
-                // initialized.  A synchronous benign message gives the
-                // startup path a deterministic readiness barrier, so callers
-                // never need a timing sleep before the first test input.
+                // The owner exists before the hook and tray are fully
+                // initialized. Ask the real owner for its explicit readiness
+                // state so callers never need a timing sleep before input.
                 if owner_is_ready(owner) {
                     return Ok(Self {
                         process,
@@ -414,13 +414,14 @@ fn owner_is_ready(owner: HWND) -> bool {
     unsafe {
         SendMessageTimeoutW(
             owner,
-            WM_NULL,
+            WM_APPLICATION_READY,
             0,
             0,
             SMTO_ABORTIFHUNG | SMTO_ERRORONEXIT,
             2_000,
             &mut result,
         ) != 0
+            && result == 1
     }
 }
 

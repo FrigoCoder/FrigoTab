@@ -11,6 +11,7 @@ use super::application_window::ApplicationWindow;
 use super::window_finder::WindowFinder;
 use super::window_handle::WindowHandle;
 use crate::geometry::Layout;
+use crate::rendering::WindowSnapshot;
 use crate::switcher::CloseButtonMode;
 
 /// The live previews for one switcher owner window.
@@ -38,15 +39,32 @@ impl ApplicationWindows {
         finder: &WindowFinder,
         close_button_mode: CloseButtonMode,
     ) -> Self {
-        Self::build(owner, finder, close_button_mode, true)
+        Self::build(owner, finder, close_button_mode, true, None, None)
     }
 
-    pub(crate) fn prepared_hidden(
+    pub(crate) fn with_close_button_mode_and_snapshot_source(
         owner: WindowHandle,
         finder: &WindowFinder,
         close_button_mode: CloseButtonMode,
+        snapshot_source: Option<HWND>,
     ) -> Self {
-        Self::build(owner, finder, close_button_mode, false)
+        Self::build(
+            owner,
+            finder,
+            close_button_mode,
+            true,
+            snapshot_source,
+            None,
+        )
+    }
+
+    pub(crate) fn prepared_hidden_with_snapshot(
+        owner: WindowHandle,
+        finder: &WindowFinder,
+        close_button_mode: CloseButtonMode,
+        snapshot: Option<(HWND, WindowSnapshot)>,
+    ) -> Self {
+        Self::build(owner, finder, close_button_mode, false, None, snapshot)
     }
 
     fn build(
@@ -54,8 +72,26 @@ impl ApplicationWindows {
         finder: &WindowFinder,
         close_button_mode: CloseButtonMode,
         thumbnails_visible: bool,
+        snapshot_source: Option<HWND>,
+        retained_snapshot: Option<(HWND, WindowSnapshot)>,
     ) -> Self {
         let layout = Layout::new(&finder.windows);
+        // Capture before constructing any preview HWND. A foreground
+        // fullscreen renderer can discard its surface as soon as a topmost
+        // switcher window exists, even though its application HWND stays valid.
+        let captured_snapshot = snapshot_source.and_then(|source| {
+            let bounds = layout.bounds.get(&WindowHandle::new(source))?;
+            WindowSnapshot::capture_foreground(
+                source,
+                RECT {
+                    left: bounds.x,
+                    top: bounds.y,
+                    right: bounds.right(),
+                    bottom: bounds.bottom(),
+                },
+            )
+            .map(|snapshot| (source, snapshot))
+        });
         let mut windows = Vec::new();
         for application in finder.windows.iter().copied() {
             let Some(bounds) = layout.bounds.get(&application).copied() else {
@@ -71,6 +107,11 @@ impl ApplicationWindows {
             // already accepted, not by the original EnumWindows index.  A
             // stale candidate therefore cannot leave a gap in the shortcuts.
             let index = windows.len();
+            let snapshot = retained_snapshot
+                .as_ref()
+                .or(captured_snapshot.as_ref())
+                .filter(|(source, _)| *source == application.raw())
+                .map(|(_, snapshot)| snapshot.clone());
             match ApplicationWindow::with_close_button_mode_and_thumbnail_visibility(
                 owner.raw(),
                 application.raw(),
@@ -78,6 +119,7 @@ impl ApplicationWindows {
                 native_bounds,
                 close_button_mode,
                 thumbnails_visible,
+                snapshot,
             ) {
                 Ok(window) => windows.push(window),
                 Err(error) => {
@@ -112,6 +154,13 @@ impl ApplicationWindows {
 
     pub fn windows(&self) -> &[ApplicationWindow] {
         &self.windows
+    }
+
+    pub(crate) fn snapshot_for(&self, application: HWND) -> Option<WindowSnapshot> {
+        self.windows
+            .iter()
+            .find(|window| window.application() == application)
+            .and_then(ApplicationWindow::snapshot)
     }
 
     /// Set the selected preview and propagate the visual state transition.
