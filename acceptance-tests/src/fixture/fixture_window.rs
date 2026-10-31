@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
 use std::ptr::{null, null_mut};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 
 use windows_sys::Win32::Foundation::{HWND, RECT};
-use windows_sys::Win32::Graphics::Gdi::UpdateWindow;
+use windows_sys::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DestroyWindow, IsWindow, SW_HIDE, SW_MINIMIZE, SW_RESTORE, SW_SHOWNA,
@@ -18,7 +18,7 @@ use crate::{
 };
 
 pub(crate) struct FixtureWindowState {
-    pub(crate) color: Color,
+    color: AtomicU32,
     keyboard_messages: Mutex<VecDeque<KeyboardMessage>>,
     keyboard_message_log_overflowed: AtomicBool,
     system_close_requests: AtomicUsize,
@@ -49,11 +49,19 @@ const MAX_KEYBOARD_MESSAGES: usize = 512;
 impl FixtureWindowState {
     fn new(color: Color) -> Self {
         Self {
-            color,
+            color: AtomicU32::new(color),
             keyboard_messages: Mutex::new(VecDeque::with_capacity(MAX_KEYBOARD_MESSAGES)),
             keyboard_message_log_overflowed: AtomicBool::new(false),
             system_close_requests: AtomicUsize::new(0),
         }
+    }
+
+    pub(crate) fn color(&self) -> Color {
+        self.color.load(Ordering::Acquire)
+    }
+
+    fn set_color(&self, color: Color) {
+        self.color.store(color, Ordering::Release);
     }
 
     fn clear_keyboard_messages(&self) {
@@ -212,6 +220,16 @@ impl FixtureWindow {
 
     pub fn title(&self) -> String {
         window_title(self.hwnd)
+    }
+
+    /// Repaint this real HWND with a new solid client color.
+    pub fn set_color(&self, color: Color) {
+        self.state.set_color(color);
+        unsafe {
+            InvalidateRect(self.hwnd, null(), 0);
+            UpdateWindow(self.hwnd);
+        }
+        pump_messages();
     }
 
     pub fn clear_keyboard_messages(&self) {

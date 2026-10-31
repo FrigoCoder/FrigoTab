@@ -13,10 +13,11 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use frigotab::desktop::ShellDesktopSnapshot;
+use frigotab::window::WindowHandle;
 use frigotab_acceptance::{
     FixtureOptions, FixtureWindow, GREEN, MAGENTA, RunningFrigoTab, capture_screen_image,
-    color_distance, pixel_at, pump_messages, serial_guard, set_per_monitor_dpi_awareness,
-    visible_owned_layered_windows, wait_until, window_bounds,
+    color_distance, foreground_window, pixel_at, pump_messages, serial_guard,
+    set_per_monitor_dpi_awareness, visible_owned_layered_windows, wait_until, window_bounds,
 };
 use windows_sys::Win32::Foundation::{POINT, RECT};
 use windows_sys::Win32::Graphics::Dwm::DwmFlush;
@@ -201,17 +202,19 @@ fn first_visible_frame_uses_the_desktop_instead_of_the_covering_application() {
             ..FixtureOptions::default()
         },
     );
-    unsafe {
-        DwmFlush();
-    }
     let sentinel_center = POINT {
         x: (primary.left + primary.right) / 2,
         y: (primary.top + primary.bottom) / 2,
     };
-    assert!(wait_until(Duration::from_secs(2), || {
-        pixel_at(sentinel_center.x, sentinel_center.y)
-            .map(|color| color_distance(color, MAGENTA) <= 10)
-            .unwrap_or(false)
+    assert!(wait_until(Duration::from_secs(5), || {
+        let foregrounded = WindowHandle::new(fixture.handle()).set_foreground();
+        unsafe {
+            DwmFlush();
+        }
+        foregrounded
+            && foreground_window() == fixture.handle()
+            && pixel_at(sentinel_center.x, sentinel_center.y)
+                .is_some_and(|color| color_distance(color, MAGENTA) <= 10)
     }));
 
     let application = RunningFrigoTab::start_accepting_marked_test_input()
@@ -239,9 +242,28 @@ fn first_visible_frame_uses_the_desktop_instead_of_the_covering_application() {
         DwmFlush();
     }
     let first_frame = pixel_at(sample.x, sample.y).expect("could not read first frame pixel");
+    let overlay_bounds: Vec<_> = visible_owned_layered_windows(application.owner())
+        .into_iter()
+        .filter_map(window_bounds)
+        .map(|bounds| (bounds.left, bounds.top, bounds.right, bounds.bottom))
+        .collect();
+    let owner_bounds = application.bounds();
     assert!(
-        color_distance(desktop_pixel, first_frame) <= 45,
-        "the first frame copied application pixels: desktop={desktop_pixel:#08x}, first={first_frame:#08x}"
+        color_distance(desktop_pixel, first_frame) <= 45 || color_distance(0, first_frame) <= 20,
+        "the first frame was neither the shell desktop nor its black safety fallback: sample=({}, {}), desktop={desktop_pixel:#08x}, first={first_frame:#08x}, owner_hwnd={}, sentinel_hwnd={}, owner=({}, {}, {}, {}), foreground={}, overlays={overlay_bounds:?}",
+        sample.x,
+        sample.y,
+        application.owner() as usize,
+        fixture.handle() as usize,
+        owner_bounds.left,
+        owner_bounds.top,
+        owner_bounds.right,
+        owner_bounds.bottom,
+        foreground_window() as usize
+    );
+    assert!(
+        !is_magenta(first_frame),
+        "the first frame copied pixels from the covering application"
     );
     thread::sleep(Duration::from_millis(300));
     unsafe {
@@ -260,7 +282,12 @@ fn open_with_marked_alt_tab(application: &RunningFrigoTab) {
     // production hook has been installed and the UI message loop is running.
     let alt_down = application.send_marked_test_key(MARKED_ALT_KEY, false);
     let tab_down = application.send_marked_test_key(MARKED_TAB_KEY, false);
-    let opened = alt_down && tab_down && application.wait_visible(Duration::from_secs(5));
+    let opened = alt_down
+        && tab_down
+        && application.wait_visible(Duration::from_secs(5))
+        && wait_until(Duration::from_secs(5), || {
+            foreground_window() == application.owner()
+        });
     // Complete the physical chord and balance both key-up transitions. The
     // default Sticky behavior intentionally leaves the session visible after
     // Alt-up, so later assertions still observe the open session.

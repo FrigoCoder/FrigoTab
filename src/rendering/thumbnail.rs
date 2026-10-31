@@ -8,10 +8,11 @@
 
 use std::num::NonZeroIsize;
 
-use windows_sys::Win32::Foundation::{E_FAIL, HWND, RECT};
+use windows_sys::Win32::Foundation::{E_FAIL, HWND, RECT, SIZE};
 use windows_sys::Win32::Graphics::Dwm::{
     DWM_THUMBNAIL_PROPERTIES, DWM_TNP_OPACITY, DWM_TNP_RECTDESTINATION, DWM_TNP_VISIBLE,
-    DwmRegisterThumbnail, DwmUnregisterThumbnail, DwmUpdateThumbnailProperties,
+    DwmQueryThumbnailSourceSize, DwmRegisterThumbnail, DwmUnregisterThumbnail,
+    DwmUpdateThumbnailProperties,
 };
 use windows_sys::Win32::System::Diagnostics::Debug::OutputDebugStringW;
 
@@ -91,6 +92,19 @@ impl DwmThumbnail {
             ..Default::default()
         };
         self.update(properties)
+    }
+
+    /// Query the physical source surface size reported by DWM.
+    pub(crate) fn source_size(&self) -> Result<SIZE, i32> {
+        let mut size = SIZE::default();
+        let hresult = unsafe { DwmQueryThumbnailSourceSize(self.handle.get(), &mut size) };
+        if hresult < 0 {
+            Err(hresult)
+        } else if size.cx <= 0 || size.cy <= 0 {
+            Err(E_FAIL)
+        } else {
+            Ok(size)
+        }
     }
 
     fn update(&self, properties: DWM_THUMBNAIL_PROPERTIES) -> Result<(), i32> {

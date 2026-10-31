@@ -15,7 +15,7 @@ use windows_sys::Win32::Graphics::Gdi::ScreenToClient;
 use super::frigo_window::FrigoWindow;
 use super::window_handle::WindowHandle;
 use super::window_icon::WindowIcon;
-use crate::rendering::{DwmThumbnail, Font, LayerUpdater};
+use crate::rendering::{DwmThumbnail, Font, FullscreenPreview, LayerUpdater};
 use crate::switcher::CloseButtonMode;
 use windows_sys::Win32::Graphics::GdiPlus::{FontStyleBold, FontStyleRegular, PointF, RectF};
 
@@ -32,9 +32,10 @@ pub(crate) const CLOSE_BUTTON_INSET: i32 = 8;
 /// A separate, owned top-level popup carrying one application's overlay.
 pub struct ApplicationWindow {
     // Declaration order is intentional: Rust drops fields in this order,
-    // matching ApplicationWindow.Dispose (icon, layer, thumbnail, popup).
+    // matching ApplicationWindow.Dispose (icon, layer, preview, thumbnail, popup).
     window_icon: WindowIcon,
     layer_updater: Rc<RefCell<LayerUpdater>>,
+    fullscreen_preview: Rc<RefCell<Option<FullscreenPreview>>>,
     thumbnail: Option<DwmThumbnail>,
     popup: FrigoWindow,
     application: HWND,
@@ -83,22 +84,47 @@ impl ApplicationWindow {
         close_button_mode: CloseButtonMode,
         thumbnail_visible: bool,
     ) -> Result<Self, String> {
-        let thumbnail = match DwmThumbnail::register(owner, application) {
-            Ok(thumbnail) => {
-                let destination = screen_to_client_rect(owner, bounds);
-                let configured = if thumbnail_visible {
-                    thumbnail.set_destination_rect(destination)
-                } else {
-                    thumbnail.set_hidden_destination_rect(destination)
-                };
-                if configured.is_ok() {
-                    Some(thumbnail)
-                } else {
-                    None
+        Self::with_close_button_mode_thumbnail_and_preview(
+            owner,
+            application,
+            index,
+            bounds,
+            close_button_mode,
+            thumbnail_visible,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn with_close_button_mode_thumbnail_and_preview(
+        owner: HWND,
+        application: HWND,
+        index: usize,
+        bounds: RECT,
+        close_button_mode: CloseButtonMode,
+        thumbnail_visible: bool,
+        fullscreen_preview: Option<FullscreenPreview>,
+    ) -> Result<Self, String> {
+        let thumbnail = fullscreen_preview
+            .as_ref()
+            .is_none()
+            .then(|| match DwmThumbnail::register(owner, application) {
+                Ok(thumbnail) => {
+                    let destination = screen_to_client_rect(owner, bounds);
+                    let configured = if thumbnail_visible {
+                        thumbnail.set_destination_rect(destination)
+                    } else {
+                        thumbnail.set_hidden_destination_rect(destination)
+                    };
+                    if configured.is_ok() {
+                        Some(thumbnail)
+                    } else {
+                        None
+                    }
                 }
-            }
-            Err(_) => None,
-        };
+                Err(_) => None,
+            })
+            .flatten();
         let popup = FrigoWindow::new(owner, bounds)?;
         let layer_updater = Rc::new(RefCell::new(LayerUpdater::new(popup.hwnd(), bounds)?));
         let window_icon = WindowIcon::new(application)?;
@@ -110,8 +136,11 @@ impl ApplicationWindow {
         let callback_hovered = Rc::clone(&hovered_state);
         let close_button_mode_state = Rc::new(Cell::new(close_button_mode));
         let callback_close_button_mode = Rc::clone(&close_button_mode_state);
+        let fullscreen_preview = Rc::new(RefCell::new(fullscreen_preview));
+        let callback_preview = Rc::clone(&fullscreen_preview);
         window_icon.on_changed(move || {
             let _ = icon_state.with_icon(|icon, icon_width, icon_height| {
+                let preview = callback_preview.borrow();
                 let _ = render_overlay_with_icon(
                     &mut callback_layer.borrow_mut(),
                     icon,
@@ -122,6 +151,7 @@ impl ApplicationWindow {
                     callback_selected.get(),
                     callback_hovered.get(),
                     callback_close_button_mode.get(),
+                    preview.as_ref(),
                 );
             });
         });
@@ -138,6 +168,7 @@ impl ApplicationWindow {
             close_button_mode_state,
             window_icon,
             layer_updater,
+            fullscreen_preview,
             thumbnail,
         };
         result.render_overlay()?;
@@ -180,6 +211,32 @@ impl ApplicationWindow {
             thumbnail.set_visible(visible)?;
         }
         Ok(())
+    }
+
+    /// Replace an initial fullscreen placeholder after the background worker
+    /// publishes its first frame. This only clones the cached `Arc`; capture
+    /// and pixel copies never run on the UI thread.
+    pub(crate) fn refresh_fullscreen_preview(
+        &mut self,
+        cache: &crate::rendering::FullscreenPreviewCache,
+    ) -> Result<(), String> {
+        if self.fullscreen_preview.borrow().is_none() {
+            return Ok(());
+        }
+        let Some(latest) = cache.get(self.application) else {
+            return Ok(());
+        };
+        {
+            let mut current = self.fullscreen_preview.borrow_mut();
+            let Some(previous) = current.as_ref() else {
+                return Ok(());
+            };
+            if previous.has_same_image(&latest) {
+                return Ok(());
+            }
+            *current = Some(latest);
+        }
+        self.render_overlay()
     }
 
     pub fn try_activate(&self) -> bool {
@@ -256,6 +313,7 @@ impl ApplicationWindow {
                 selected,
                 self.hovered_state.get(),
                 self.close_button_mode_state.get(),
+                self.fullscreen_preview.borrow().as_ref(),
             )
         });
         icon_result.unwrap_or_else(|| Err("Window icon is unavailable".to_string()))
@@ -273,10 +331,27 @@ fn render_overlay_with_icon(
     selected: bool,
     hovered: bool,
     close_button_mode: CloseButtonMode,
+    fullscreen_preview: Option<&FullscreenPreview>,
 ) -> Result<(), String> {
     let title = WindowHandle::new(application).get_window_text();
     layer.update(|graphics| {
         graphics.set_overlay_quality()?;
+        if let Some(preview) = fullscreen_preview {
+            preview.draw(graphics)?;
+            if !preview.has_image() {
+                let label = "Fullscreen application";
+                let label_font = Font::new("Segoe UI", 11.0, FontStyleRegular)
+                    .map_err(|error| crate::rendering::gdi_plus::Error(error.0))?;
+                let label_size = graphics.measure_string(label, &label_font)?;
+                graphics.draw_string_at(
+                    label,
+                    &label_font,
+                    (graphics.width - label_size.Width) / 2.0,
+                    graphics.height * 0.72,
+                    ARGB_WHITE,
+                )?;
+            }
+        }
         if selected {
             graphics.fill_rect(
                 RectF {

@@ -11,6 +11,7 @@ use super::application_window::ApplicationWindow;
 use super::window_finder::WindowFinder;
 use super::window_handle::WindowHandle;
 use crate::geometry::Layout;
+use crate::rendering::FullscreenPreviewCache;
 use crate::switcher::CloseButtonMode;
 
 /// The live previews for one switcher owner window.
@@ -38,15 +39,25 @@ impl ApplicationWindows {
         finder: &WindowFinder,
         close_button_mode: CloseButtonMode,
     ) -> Self {
-        Self::build(owner, finder, close_button_mode, true)
+        Self::build(owner, finder, close_button_mode, true, None)
     }
 
-    pub(crate) fn prepared_hidden(
+    pub(crate) fn with_close_button_mode_and_preview_cache(
         owner: WindowHandle,
         finder: &WindowFinder,
         close_button_mode: CloseButtonMode,
+        preview_cache: &FullscreenPreviewCache,
     ) -> Self {
-        Self::build(owner, finder, close_button_mode, false)
+        Self::build(owner, finder, close_button_mode, true, Some(preview_cache))
+    }
+
+    pub(crate) fn prepared_hidden_with_preview_cache(
+        owner: WindowHandle,
+        finder: &WindowFinder,
+        close_button_mode: CloseButtonMode,
+        preview_cache: &FullscreenPreviewCache,
+    ) -> Self {
+        Self::build(owner, finder, close_button_mode, false, Some(preview_cache))
     }
 
     fn build(
@@ -54,6 +65,7 @@ impl ApplicationWindows {
         finder: &WindowFinder,
         close_button_mode: CloseButtonMode,
         thumbnails_visible: bool,
+        preview_cache: Option<&FullscreenPreviewCache>,
     ) -> Self {
         let layout = Layout::new(&finder.windows);
         let mut windows = Vec::new();
@@ -71,13 +83,15 @@ impl ApplicationWindows {
             // already accepted, not by the original EnumWindows index.  A
             // stale candidate therefore cannot leave a gap in the shortcuts.
             let index = windows.len();
-            match ApplicationWindow::with_close_button_mode_and_thumbnail_visibility(
+            let fullscreen_preview = preview_cache.and_then(|cache| cache.get(application.raw()));
+            match ApplicationWindow::with_close_button_mode_thumbnail_and_preview(
                 owner.raw(),
                 application.raw(),
                 index,
                 native_bounds,
                 close_button_mode,
                 thumbnails_visible,
+                fullscreen_preview,
             ) {
                 Ok(window) => windows.push(window),
                 Err(error) => {
@@ -165,6 +179,19 @@ impl ApplicationWindows {
             Err(error)
         } else {
             Ok(())
+        }
+    }
+
+    /// Pick up frames completed after this session's tiles were constructed.
+    /// Ordinary DWM thumbnails are untouched.
+    pub(crate) fn refresh_fullscreen_previews(&mut self, cache: &FullscreenPreviewCache) {
+        if self.disposed {
+            return;
+        }
+        for window in &mut self.windows {
+            if let Err(error) = window.refresh_fullscreen_preview(cache) {
+                debug_log(&format!("Could not refresh fullscreen preview: {error}"));
+            }
         }
     }
 

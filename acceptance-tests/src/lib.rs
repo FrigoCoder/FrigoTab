@@ -154,7 +154,7 @@ unsafe extern "system" fn fixture_window_proc(
             let color = if state.is_null() {
                 0
             } else {
-                unsafe { (*state).color }
+                unsafe { (*state).color() }
             };
             let brush = unsafe { CreateSolidBrush(color) };
             if !brush.is_null() {

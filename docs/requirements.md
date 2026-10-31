@@ -4,7 +4,7 @@ This is the observable behavior inventory of the current native Rust application
 
 ## Test policy
 
-The automated gate contains 64 green plain Rust integration acceptance tests. They use real application objects and real Windows resources:
+The automated gate contains 65 green plain Rust integration acceptance tests. They use real application objects and real Windows resources:
 
 - 15 tests launch the executable and observe real switcher/session HWNDs, candidate windows, navigation, activation, cleanup, and keyboard balance through the production hook.
 - 7 tests exercise real window classification, stale HWND/layout handling, shell desktop capture, DWM visibility, and native resource lifetime.
@@ -22,8 +22,9 @@ The automated gate contains 64 green plain Rust integration acceptance tests. Th
 - 2 tests exercise real owner-linked top-level windows and preserve the application root when a detached tool window becomes active without changing ordinary owned-dialog behavior.
 - 1 test closes a source independently of the launched executable and verifies that the live sticky session removes its tile, reflows, and retains surviving previews.
 - 2 automated tests exercise fullscreen-application boundaries through the launched executable: debounced in-place display relayout and a usable icon/title tile plus native close handling for a no-redirection-style source. One additional ignored, attended-only test covers clearing a real system cursor clip because that resource is shared with the user's desktop.
+- 1 test exercises three sequential fullscreen HWNDs through the launched executable, verifies retained cached frames or explicit labeled placeholders after later handoffs, keeps an ordinary DWM preview live, bounds input/UI latency, and activates the oldest source by number.
 
-The sixteen timestamped integration-test files are:
+The seventeen timestamped integration-test files are:
 
 - `acceptance-tests/tests/t20260914t211700z_001_real_switcher_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260914t212400z_002_real_window_and_backdrop_acceptance_tests.rs`
@@ -41,6 +42,7 @@ The sixteen timestamped integration-test files are:
 - `acceptance-tests/tests/t20260930t232302z_014_window_group_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260930t232503z_015_external_window_lifecycle_acceptance_tests.rs`
 - `acceptance-tests/tests/t20261001t075200z_016_fullscreen_application_acceptance_tests.rs`
+- `acceptance-tests/tests/t20261031t112900z_017_fullscreen_preview_acceptance_tests.rs`
 
 The timestamp and family suffix are stable identifiers; test functions use descriptive plain Rust names.
 
@@ -73,9 +75,9 @@ Marked `SendInput` is a realistic hook-level test boundary but not physical keyb
 | Layout | Use restored placement to choose a minimized window's monitor; preserve negative origins, working-area margins, stable numbering, and source aspect ratios. | Real layout acceptance tests; manual mixed-DPI/portrait check. |
 | Full desktop backdrop | In the default Full desktop mode, render Explorer's desktop host (`Progman`, or the matching `WorkerW`) into an off-screen bitmap containing wallpaper and icons. Do not capture the screen or compose the background from application windows. Retain stable normal-desktop snapshot geometry rather than replacing it with transient fullscreen-mode dimensions. | Real shell-backdrop acceptance tests; manual Explorer/restart/RDP check. |
 | Alternative backdrops | Background image only paints the desktop wallpaper/pattern without icons; Black rectangle paints a black owner background. Both are selectable from the tray and do not require shell capture. | Real tray/background acceptance tests; manual visual check. |
-| First frame | Prepare the selected backdrop and DWM preview surfaces while the owner is hidden, then paint the owner synchronously as it is shown. The first composed preview frame must contain the live source rather than a delayed placeholder, and the backdrop must not show application pixels. Full desktop reuses the shell snapshot; image-only and black modes do not require shell capture. | Real process first-frame, thumbnail-reveal, and background-mode acceptance tests; manual visual check. |
+| First frame | Prepare the selected backdrop and DWM preview surfaces while the owner is hidden; prepaint the hidden owner, show it without activation, validate the backdrop again, reveal overlays, and activate last. The first composed preview frame must contain the live source rather than a delayed placeholder, and the backdrop must not show application pixels. Full desktop reuses the shell snapshot; image-only and black modes do not require shell capture. | Real process first-frame, thumbnail-reveal, and background-mode acceptance tests; manual visual check. |
 | Shell fallback | If the shell host or render is unavailable in Full desktop mode, use the last matching frame when possible or black, release partial resources, and keep opening usable. Image-only and black modes remain independent of the retained shell snapshot. | Real shell-backdrop and background-mode acceptance tests; manual protected/RDP check. |
-| DWM previews | Configure destination geometry and make each thumbnail ready while its owner remains hidden, surface native failures, and unregister deterministically. This must not defer per-thumbnail source preparation until after the owner is visible. If a source has no DWM redirection surface, retain the icon/title fallback so it remains usable and closable. | Real DWM and fullscreen-boundary/thumbnail-reveal acceptance tests; manual DWM-disabled/protected-surface check. |
+| DWM and fullscreen previews | Keep ordinary windows on live DWM thumbnails. Independently cache a small recent frame while a foreground HWND covers a monitor, retain it by HWND/PID through later handoffs, and do no capture or waiting while Alt-Tab opens. If capture is unavailable or black, render an opaque labeled fullscreen placeholder while retaining title, icon, number, close, and activation behavior. Configure DWM destination geometry while the owner remains hidden and unregister deterministically. | Real DWM, fullscreen-cache, and thumbnail-reveal acceptance tests; manual protected/exclusive-surface check. |
 | Resource lifetime | Windows, thumbnails, icons, fonts, bitmaps, hook handles, tray resources, and mutexes are released on normal close, failed construction, and process exit. | Real cleanup/resource acceptance tests; manual repeated-session handle check. |
 | Activation handoff | Restore minimized targets and attempt foreground activation without `AttachThreadInput`. The intentional deactivation during handoff is not treated as an external interruption. The historical zero-key foreground nudge is tagged and consumed by FrigoTab's own hook before it can become an application keyboard message. | Real activation and marked-hook acceptance tests; manual focus/taskbar check. |
 | Display transition | Coalesce bursts of display/DPI/composition notifications, keep a visible Sticky session and its retained snapshot geometry, then rebuild the preview graph in place after the display settles. Retry a temporarily empty enumeration; deactivate only when the owner has genuinely lost foreground or relayout fails. While visible, periodically release a fullscreen source's system cursor clip. | Real non-disruptive fullscreen-boundary acceptance tests; cursor confinement and true exclusive display-mode/game transitions remain attended manual checks. |
@@ -88,6 +90,7 @@ Marked `SendInput` is a realistic hook-level test boundary but not physical keyb
 - Background selection is tray-only and runtime-only: Full desktop is the default, while Background image only and Black rectangle are opt-in alternatives. No UI text is localized because the application has no other user-facing text surface.
 - Close buttons are configured only from the tray's `Close buttons` submenu and are not persisted. Always visible is the default 32x32 black square with a white `×`. On hover follows the Alt-Tab/Win-Tab style: a white `×` without a background appears only on the pointer-hovered thumbnail and does not follow keyboard selection. Hidden removes the close affordance. A close request targets only the source HWND, does not activate it, waits for actual disappearance, then refreshes the candidate list and reflows/renumbers the live session while leaving the session and foreground overlay in place.
 - Protected, secure, unavailable, or capture-disabled surfaces may render black.
+- A cached fullscreen frame is a recent static screenshot taken while that HWND was visible; FrigoTab does not claim a live preview after an exclusive renderer discards or protects its surface.
 - Display/DPI/composition notifications are debounced and normally relaid out in place while the owner remains visible. If the owner loses foreground or native relayout fails, the session may still close safely. True exclusive display-mode/game transitions remain a manual release check.
 - While a session is visible, periodic cursor-clip release counters games that reapply confinement after losing activation; this does not claim to emulate every raw-input or anti-cheat implementation.
 - `SetForegroundWindow` can be denied by Windows focus/UIPI policy. The overlay remains admitted and usable when that happens.

@@ -12,14 +12,16 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
 use windows_sys::Win32::Foundation::{HWND, POINT, RECT};
-use windows_sys::Win32::Graphics::Dwm::DwmFlush;
+use windows_sys::Win32::Graphics::Dwm::{
+    DWMWA_EXTENDED_FRAME_BOUNDS, DwmFlush, DwmGetWindowAttribute,
+};
 use windows_sys::Win32::Graphics::Gdi::{
-    GetMonitorInfoW, HDC, InvalidateRect, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow,
-    UpdateWindow,
+    GdiFlush, GetMonitorInfoW, HDC, InvalidateRect, MONITOR_DEFAULTTONEAREST, MONITORINFO,
+    MonitorFromWindow, UpdateWindow,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     ClipCursor, GetClientRect, GetCursorPos, GetForegroundWindow, GetWindowRect, HWND_TOPMOST,
-    IsWindowVisible, KillTimer, PostMessageW, SC_CLOSE, SW_HIDE, SW_SHOW, SWP_NOACTIVATE,
+    IsWindowVisible, KillTimer, PostMessageW, SC_CLOSE, SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE,
     SWP_NOOWNERZORDER, SetTimer, SetWindowPos, ShowWindow, WM_APP, WM_SYSCOMMAND,
 };
 
@@ -27,6 +29,7 @@ use crate::desktop::shell_desktop_snapshot::ShellDesktopSnapshot;
 use crate::geometry::display_mode::current_display_geometry_is_persisted;
 use crate::geometry::rect::virtual_screen_bounds;
 use crate::geometry::screen_point::ScreenPoint;
+use crate::rendering::FullscreenPreviewCache;
 use crate::window::{ApplicationWindows, WindowFinder, WindowHandle};
 
 pub use super::background_mode::BackgroundMode;
@@ -52,6 +55,7 @@ pub struct SessionWindow {
     painter: SessionPainter,
     owner_bounds: RECT,
     applications: Option<ApplicationWindows>,
+    fullscreen_previews: FullscreenPreviewCache,
     snapshot_completion: Arc<Mutex<Option<SnapshotCompletion>>>,
     snapshot_refresh_running: Arc<AtomicBool>,
     disposal_requested: Arc<AtomicBool>,
@@ -93,6 +97,7 @@ impl SessionWindow {
             painter,
             owner_bounds: RECT::default(),
             applications: None,
+            fullscreen_previews: FullscreenPreviewCache::new(hwnd),
             snapshot_completion: Arc::new(Mutex::new(None)),
             snapshot_refresh_running: Arc::new(AtomicBool::new(false)),
             disposal_requested: Arc::new(AtomicBool::new(false)),
@@ -260,6 +265,7 @@ impl SessionWindow {
             .lock()
             .unwrap_or_else(|error| error.into_inner())
             .take();
+        self.fullscreen_previews.stop();
         // A hung Explorer PrintWindow must not hang UI teardown. The worker's
         // Arc-owned state remains valid until the detached thread returns.
         drop(self.snapshot_worker.take());
@@ -272,7 +278,10 @@ impl SessionWindow {
         }
 
         let previous_foreground = unsafe { GetForegroundWindow() };
-        let fullscreen_source = window_covers_monitor(previous_foreground);
+        let cached_fullscreen = self
+            .fullscreen_previews
+            .mark_fullscreen(previous_foreground);
+        let fullscreen_source = window_covers_monitor(previous_foreground) || cached_fullscreen;
         self.close_session_resources();
         let finder = WindowFinder::new();
         if finder.windows.is_empty() {
@@ -306,8 +315,12 @@ impl SessionWindow {
         }
 
         let owner = WindowHandle::new(self.hwnd);
-        let applications =
-            ApplicationWindows::with_close_button_mode(owner, &finder, self.close_button_mode);
+        let applications = ApplicationWindows::with_close_button_mode_and_preview_cache(
+            owner,
+            &finder,
+            self.close_button_mode,
+            &self.fullscreen_previews,
+        );
         if applications.is_empty() {
             return Ok(0);
         }
@@ -319,8 +332,13 @@ impl SessionWindow {
             self.close_session_resources();
             return Err(());
         }
+        // Establish an opaque backing surface while the owner is still
+        // hidden. SW_SHOW may activate a top-level window immediately, so use
+        // the non-activating form and preserve the explicit activation below
+        // as the session's final publication barrier.
+        self.paint_owner_synchronously();
         unsafe {
-            ShowWindow(self.hwnd, SW_SHOW);
+            ShowWindow(self.hwnd, SW_SHOWNOACTIVATE);
         }
         self.paint_owner_synchronously();
         if let Some(applications) = self.applications.as_mut() {
@@ -509,7 +527,9 @@ impl SessionWindow {
             // composed. A reentrant WM_PAINT uses the separately shared
             // SessionPainter, never the App or this mutably borrowed
             // SessionWindow.
+            InvalidateRect(self.hwnd, std::ptr::null(), 0);
             UpdateWindow(self.hwnd);
+            GdiFlush();
         }
     }
 
@@ -600,8 +620,12 @@ impl SessionWindow {
         self.paint_owner_synchronously();
 
         let owner = WindowHandle::new(self.hwnd);
-        let mut replacement =
-            ApplicationWindows::prepared_hidden(owner, &finder, self.close_button_mode);
+        let mut replacement = ApplicationWindows::prepared_hidden_with_preview_cache(
+            owner,
+            &finder,
+            self.close_button_mode,
+            &self.fullscreen_previews,
+        );
         if replacement.is_empty() {
             let _ = self.set_owner_bounds(previous_bounds);
             self.paint_owner_synchronously();
@@ -648,6 +672,9 @@ impl SessionWindow {
         // after losing foreground. Keep clearing that process-global clip for
         // as long as FrigoTab owns the visible interaction surface.
         release_cursor_clip();
+        if let Some(applications) = self.applications.as_mut() {
+            applications.refresh_fullscreen_previews(&self.fullscreen_previews);
+        }
 
         let source_is_alive = |source: HWND| WindowHandle::new(source).is_valid();
         let requested_close_completed = self
@@ -695,8 +722,12 @@ impl SessionWindow {
         self.refresh_evidence_ticks = 0;
 
         let owner = WindowHandle::new(self.hwnd);
-        let mut replacement =
-            ApplicationWindows::prepared_hidden(owner, &finder, self.close_button_mode);
+        let mut replacement = ApplicationWindows::prepared_hidden_with_preview_cache(
+            owner,
+            &finder,
+            self.close_button_mode,
+            &self.fullscreen_previews,
+        );
         if replacement.is_empty() {
             return Err(());
         }
@@ -901,10 +932,9 @@ fn window_covers_monitor(hwnd: HWND) -> bool {
     if hwnd.is_null() {
         return false;
     }
-    let mut window = RECT::default();
-    if unsafe { GetWindowRect(hwnd, &mut window) } == 0 {
+    let Some(window) = physical_window_bounds(hwnd) else {
         return false;
-    }
+    };
     let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
     if monitor.is_null() {
         return false;
@@ -918,4 +948,27 @@ fn window_covers_monitor(hwnd: HWND) -> bool {
         && window.top <= info.rcMonitor.top
         && window.right >= info.rcMonitor.right
         && window.bottom >= info.rcMonitor.bottom
+}
+
+fn physical_window_bounds(hwnd: HWND) -> Option<RECT> {
+    let mut bounds = RECT::default();
+    let hresult = unsafe {
+        DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_EXTENDED_FRAME_BOUNDS as u32,
+            (&mut bounds as *mut RECT).cast(),
+            std::mem::size_of::<RECT>() as u32,
+        )
+    };
+    if hresult >= 0 && bounds.right > bounds.left && bounds.bottom > bounds.top {
+        return Some(bounds);
+    }
+    if unsafe { GetWindowRect(hwnd, &mut bounds) } != 0
+        && bounds.right > bounds.left
+        && bounds.bottom > bounds.top
+    {
+        Some(bounds)
+    } else {
+        None
+    }
 }

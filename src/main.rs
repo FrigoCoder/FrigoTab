@@ -16,7 +16,9 @@ use frigotab::system::{APPLICATION_MUTEX_NAME, SingleInstanceGuard};
 use frigotab::tray::{SysTrayIcon, TRAY_CALLBACK_MESSAGE, TrayAction};
 use frigotab::window::WindowHandle;
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
-use windows_sys::Win32::Graphics::Gdi::{BeginPaint, ClientToScreen, EndPaint, PAINTSTRUCT};
+use windows_sys::Win32::Graphics::Gdi::{
+    BLACKNESS, BeginPaint, ClientToScreen, EndPaint, HDC, PAINTSTRUCT, PatBlt,
+};
 use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     TME_LEAVE, TRACKMOUSEEVENT, TrackMouseEvent,
@@ -322,7 +324,31 @@ unsafe extern "system" fn owner_window_proc(
             }
             0
         }
-        WM_ERASEBKGND => 1,
+        WM_ERASEBKGND => {
+            let mut client = RECT::default();
+            if unsafe { GetClientRect(hwnd, &mut client) } != 0 {
+                let dc = wparam as HDC;
+                if let Some(painter) = context.painter.as_ref() {
+                    // ShowWindow can expose the owner before the queued
+                    // WM_PAINT. Paint the selected backdrop during erase as
+                    // well, so the compositor never reuses pixels from the
+                    // application underneath as an initial frame.
+                    painter.paint(dc, client);
+                } else {
+                    unsafe {
+                        PatBlt(
+                            dc,
+                            client.left,
+                            client.top,
+                            client.right - client.left,
+                            client.bottom - client.top,
+                            BLACKNESS,
+                        );
+                    }
+                }
+            }
+            1
+        }
         WM_MOUSEACTIVATE => MA_ACTIVATE as isize,
         WM_MOUSEMOVE => {
             track_mouse_leave(hwnd);

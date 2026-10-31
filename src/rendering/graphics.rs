@@ -4,9 +4,10 @@ use std::ptr::{NonNull, null, null_mut};
 
 use windows_sys::Win32::Graphics::Gdi::{HDC, IntersectClipRect, RestoreDC, SaveDC};
 use windows_sys::Win32::Graphics::GdiPlus::{
-    FillModeAlternate, GdipCreateFromHDC, GdipDeleteGraphics, GdipDrawString, GdipFillPolygon,
-    GdipGraphicsClear, GdipMeasureString, GdipSetPixelOffsetMode, GdipSetSmoothingMode,
-    GdipSetTextRenderingHint, GpGraphics, PixelOffsetModeHighQuality, PointF, RectF,
+    FillModeAlternate, GdipCreateBitmapFromScan0, GdipCreateFromHDC, GdipDeleteGraphics,
+    GdipDisposeImage, GdipDrawImageRect, GdipDrawString, GdipFillPolygon, GdipGraphicsClear,
+    GdipMeasureString, GdipSetPixelOffsetMode, GdipSetSmoothingMode, GdipSetTextRenderingHint,
+    GpBitmap, GpGraphics, GpImage, PixelOffsetModeHighQuality, PointF, RectF,
     SmoothingModeAntiAlias, TextRenderingHintAntiAliasGridFit,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{DI_NORMAL, DrawIconEx, HICON};
@@ -176,6 +177,58 @@ impl Graphics {
             },
             argb,
         )
+    }
+
+    /// Draw an opaque ARGB buffer across this graphics surface.
+    ///
+    /// The temporary bitmap borrows `pixels` and is destroyed before this
+    /// method returns, so callers may keep the backing frame in shared memory.
+    pub(crate) fn draw_argb32_image(
+        &mut self,
+        pixels: &[u32],
+        width: i32,
+        height: i32,
+    ) -> Result<()> {
+        let expected = (width as usize).checked_mul(height as usize);
+        if width <= 0 || height <= 0 || expected != Some(pixels.len()) {
+            return Err(Error(2));
+        }
+
+        // PixelFormat32bppARGB. A 32-bit Windows DIB stores BGRA bytes, which
+        // is this format's native little-endian memory representation.
+        const PIXEL_FORMAT_32BPP_ARGB: i32 = 10 | (32 << 8) | 0x40000 | 0x20000 | 0x200000;
+        let mut raw_bitmap: *mut GpBitmap = null_mut();
+        let status = unsafe {
+            GdipCreateBitmapFromScan0(
+                width,
+                height,
+                width.checked_mul(4).ok_or(Error(2))?,
+                PIXEL_FORMAT_32BPP_ARGB,
+                pixels.as_ptr().cast(),
+                &mut raw_bitmap,
+            )
+        };
+        let bitmap = NonNull::new(raw_bitmap).ok_or(Error(if status == 0 { 1 } else { status }))?;
+        if status != 0 {
+            unsafe {
+                let _ = GdipDisposeImage(bitmap.as_ptr().cast::<GpImage>());
+            }
+            return Err(Error(status));
+        }
+        let draw_status = unsafe {
+            GdipDrawImageRect(
+                self.raw.as_ptr(),
+                bitmap.as_ptr().cast::<GpImage>(),
+                0.0,
+                0.0,
+                self.width,
+                self.height,
+            )
+        };
+        unsafe {
+            let _ = GdipDisposeImage(bitmap.as_ptr().cast::<GpImage>());
+        }
+        check_drawing(draw_status)
     }
 
     /// Draw an icon at integer coordinates through the graphics HDC and

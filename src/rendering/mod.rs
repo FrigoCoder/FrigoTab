@@ -7,6 +7,8 @@
 
 pub mod error;
 pub mod font;
+pub mod fullscreen_preview;
+pub mod fullscreen_preview_cache;
 pub mod gdi_plus;
 pub mod graphics;
 pub mod layer_updater;
@@ -14,11 +16,14 @@ pub mod thumbnail;
 
 pub use error::{Error, Result};
 pub use font::Font;
+pub use fullscreen_preview::FullscreenPreview;
+pub use fullscreen_preview_cache::FullscreenPreviewCache;
 pub use graphics::Graphics;
 pub use layer_updater::LayerUpdater;
 pub use startup::ensure_started;
 pub use thumbnail::DwmThumbnail;
 
+mod capture_surface;
 mod font_family;
 mod graphics_dc;
 mod layer_errors;

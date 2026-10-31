@@ -14,7 +14,7 @@ The behavior inventory, test boundary, and native validation checklist are docum
 - [Acceptance test matrix](docs/test-matrix.md)
 - [Architecture and test boundaries](docs/architecture.md)
 
-There are 64 automated acceptance tests in sixteen timestamped test families, plus one explicitly ignored attended check that exercises Windows' shared cursor confinement:
+There are 65 automated acceptance tests in seventeen timestamped test families, plus one explicitly ignored attended check that exercises Windows' shared cursor confinement:
 
 - 15 tests launch the executable, drive real HWNDs through its real hook, and observe session windows, navigation, activation, cleanup, and key-up behavior.
 - 7 tests exercise real Win32, DWM, GDI, shell, layout, and native-resource objects without a controller-fed test double.
@@ -32,8 +32,9 @@ There are 64 automated acceptance tests in sixteen timestamped test families, pl
 - 2 real-window tests verify that an active owned tool window cannot hide its application root, while an ordinary owned dialog remains the group representative.
 - 1 launched-executable test verifies that an application which closes independently is removed from the live sticky session without disturbing surviving previews.
 - 2 automated launched-executable tests cover fullscreen-application boundaries: debounced in-place display relayout and a usable icon/title tile plus native close handling for a no-redirection-style source. A third, attended-only test verifies clearing an active system cursor clip; the default suite never confines the user's real pointer.
+- 1 launched-executable test passes through three real fullscreen HWNDs, verifies that every cached frame remains identifiable after later foreground handoffs, keeps ordinary DWM previews live, enforces bounded hook/UI latency, and activates the oldest source by number.
 
-These are plain Rust acceptance tests. They do not use Cucumber/Gherkin, `LiveSession`, a controller-fed acceptance harness, or `WM_BEGIN_SESSION`; session behavior is observed only through the launched executable. The families are the sixteen timestamped Rust integration-test files:
+These are plain Rust acceptance tests. They do not use Cucumber/Gherkin, `LiveSession`, a controller-fed acceptance harness, or `WM_BEGIN_SESSION`; session behavior is observed only through the launched executable. The families are the seventeen timestamped Rust integration-test files:
 
 - `acceptance-tests/tests/t20260914t211700z_001_real_switcher_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260914t212400z_002_real_window_and_backdrop_acceptance_tests.rs`
@@ -51,6 +52,7 @@ These are plain Rust acceptance tests. They do not use Cucumber/Gherkin, `LiveSe
 - `acceptance-tests/tests/t20260930t232302z_014_window_group_acceptance_tests.rs`
 - `acceptance-tests/tests/t20260930t232503z_015_external_window_lifecycle_acceptance_tests.rs`
 - `acceptance-tests/tests/t20261001t075200z_016_fullscreen_application_acceptance_tests.rs`
+- `acceptance-tests/tests/t20261031t112900z_017_fullscreen_preview_acceptance_tests.rs`
 
 The timestamp and family suffix are stable identifiers. Keep them when refactoring a family; test functions use descriptive plain Rust names.
 
@@ -65,7 +67,7 @@ The timestamp and family suffix are stable identifiers. Keep them when refactori
 .\build.ps1 -Task Clean
 ```
 
-`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 64 non-disruptive acceptance tests serially. `Test` builds and runs the same tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. The attended cursor-confinement test is compiled but ignored by these commands. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
+`Verify` checks formatting, runs Clippy with warnings denied, builds the selected Cargo profile, and runs all 65 non-disruptive acceptance tests serially. `Test` builds and runs the same tests. `Publish` runs the Release verification gate, then places the executable at `artifacts/publish/win-x64/FrigoTab.exe`. The attended cursor-confinement test is compiled but ignored by these commands. `Clean` removes generated Cargo and artifact output. `build.cmd` forwards the same arguments for callers that prefer a CMD entry point.
 
 The direct Cargo equivalents are:
 
@@ -84,6 +86,8 @@ The default Full desktop backdrop is a retained snapshot of the Windows shell de
 
 While the session is visible, FrigoTab periodically releases any system cursor clip left behind by a fullscreen source, allowing the pointer to leave the former game bounds. Because cursor confinement is shared by the interactive Windows desktop, the default automated suite never creates a real clip; that destructive boundary is an explicitly ignored attended check. If a source has no DWM redirection surface, its preview remains usable through the icon/title fallback and can still be closed with the native system close command. True exclusive display-mode/game transitions remain part of the manual Windows release matrix; the automated fullscreen family exercises the surrounding real Win32 boundaries without changing the machine's display mode.
 
+Ordinary application previews remain live DWM thumbnails. Separately, one low-rate worker in the resident FrigoTab process remembers a small frame whenever the foreground HWND's physical frame covers a monitor, including a DPI-virtualized near-fullscreen frame whose DWM source exactly matches that monitor. The worker captures only while that source is actually visible, keys the frame by HWND and process ID, and retains it through later foreground changes. Opening Alt-Tab only clones an in-memory frame reference; it performs no capture, scaling, process launch, or wait in the hook/session-opening path. A fullscreen source whose frame is unavailable or black receives an opaque black tile labeled `Fullscreen application`, while keeping its normal title, icon, number, close control, and activation behavior. The cached frame is a recent static screenshot, not a claim of live capture after a fullscreen renderer has discarded its surface.
+
 ## Runtime and distribution
 
 The Release build is a native x64 Windows executable. Rust's MSVC static CRT setting embeds the C runtime in the executable, and the application uses Windows APIs directly through `windows-sys`. A target machine does not need .NET, the .NET Desktop Runtime, or any other managed runtime.
@@ -101,4 +105,4 @@ Normal production launches intentionally ignore injected and lower-integrity inj
 
 Marked `SendInput` differs from hardware in timing and typematic/autorepeat, scheduler batching, virtual-key/scan-code/extended-flag details, keyboard layout and AltGr behavior, and interaction with modifiers already held on the physical keyboard. The hook's bounded, panic-safe modifier and consumed-key ledgers, the executable readiness barrier, explicit fixture foregrounding, and per-scenario log clearing reduce those effects but do not remove them. UIPI/elevation boundaries, lower-integrity injection, secure desktop/lock screens, RDP, true exclusive fullscreen/display-mode transitions, raw-HID consumers, Explorer/DWM state, hook timeout/removal, and heavy system load remain manual or special-environment checks.
 
-`PostMessage`/`SendMessage` and UI Automation are useful for deterministic window or menu setup, but bypass global input routing and `WH_KEYBOARD_LL`, so they are less realistic keyboard alternatives. A virtual HID/VHF device or signed kernel driver is closer to hardware but requires administrator access, driver signing and installation, WDK/kernel code, and Windows-version policy maintenance. A physical USB HID device or keyboard robot is the highest-fidelity option, at the cost of hardware, lab setup, and manual/non-hermetic execution. Keep the physical/special-environment matrix as a release requirement alongside the 64 non-disruptive local acceptance tests.
+`PostMessage`/`SendMessage` and UI Automation are useful for deterministic window or menu setup, but bypass global input routing and `WH_KEYBOARD_LL`, so they are less realistic keyboard alternatives. A virtual HID/VHF device or signed kernel driver is closer to hardware but requires administrator access, driver signing and installation, WDK/kernel code, and Windows-version policy maintenance. A physical USB HID device or keyboard robot is the highest-fidelity option, at the cost of hardware, lab setup, and manual/non-hermetic execution. Keep the physical/special-environment matrix as a release requirement alongside the 65 non-disruptive local acceptance tests.
